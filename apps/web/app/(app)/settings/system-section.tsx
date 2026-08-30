@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardTitle, DataRow, RowCell, RowGrid, RowHeader } from "@sage/ui";
+import { Callout, Card, CardTitle, DataRow, RowCell, RowGrid, RowHeader } from "@sage/ui";
 import { getSystemStatus } from "@/lib/api";
 import { formatSecondsAgo, formatUptime, providerLabel } from "@/lib/format";
 import { qk } from "@/lib/query/keys";
@@ -112,6 +112,23 @@ export function SystemSection() {
         </CardTitle>
 
         {isLoading && <p className="text-xs text-muted-foreground">Reading system status…</p>}
+
+        {/* Registration stays open after the owner signs up, because closing it
+            takes an env change and a restart that nothing prompts for. As a
+            plain row next to "Node version" it read as trivia; anyone who can
+            reach the port can still create an account. */}
+        {data?.environment.signups === "open" && (
+          <Callout>
+            <p className="font-medium">This instance is accepting new accounts.</p>
+            <p className="mt-1 text-muted-foreground">
+              Anyone who can reach it can register. Once you have your own account, set{" "}
+              <code className="rounded-badge bg-surface-active px-1 py-0.5 text-xs">
+                ALLOW_SIGNUP=false
+              </code>{" "}
+              and restart. You can still sign in; only new registrations stop.
+            </p>
+          </Callout>
+        )}
 
         {data && (
           <>

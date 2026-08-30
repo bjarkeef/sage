@@ -318,12 +318,15 @@ export async function commitSnowballImport(
   return (await res.json()) as ImportResultDTO;
 }
 
+export type ImportTypeDTO = "buy" | "sell" | "dividend" | "split";
+
 export type ColumnMappingDTO = {
   symbol: string;
   type: string;
   quantity: string;
   price: string;
-  currency: string;
+  /** Null when the file has no currency column; defaultCurrency covers it. */
+  currency: string | null;
   tradeDate: string;
   fee?: string | null;
   feeCurrency?: string | null;
@@ -331,7 +334,16 @@ export type ColumnMappingDTO = {
   name?: string | null;
   defaultCurrency?: string | null;
   defaultExchange?: string | null;
+  /** Broker wording → Sage type, keyed by the normalized value. */
+  typeAliases?: Record<string, ImportTypeDTO> | null;
   dateFormat?: "iso" | "dmy" | "mdy" | "auto";
+};
+
+export type ColumnValueSummaryDTO = {
+  value: string;
+  normalized: string;
+  count: number;
+  resolved: ImportTypeDTO | null;
 };
 
 export type CsvInspectDTO = {
@@ -339,6 +351,7 @@ export type CsvInspectDTO = {
   sampleRows: Record<string, string>[];
   rowCount: number;
   suggestedMapping: Partial<ColumnMappingDTO>;
+  valuesByColumn: Record<string, ColumnValueSummaryDTO[]>;
 };
 
 export async function inspectCsvImport(file: File): Promise<CsvInspectDTO> {

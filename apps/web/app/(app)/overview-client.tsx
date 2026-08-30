@@ -103,8 +103,18 @@ export function OverviewClient() {
 
       {dashboard.positions.length === 0 ? (
         <EmptyState
-          message="No holdings yet. Add a transaction to get started."
-          action={<TransactionDialog mode="add" />}
+          // Anyone arriving with a book already has it in a broker CSV, and
+          // this is the first screen after sign-up. Offering only the one-at-a-
+          // time dialog left them to find Import in the nav on their own.
+          message="No holdings yet. Add a transaction, or bring in your whole book from a broker CSV."
+          action={
+            <div className="flex flex-col items-center gap-3">
+              <TransactionDialog mode="add" />
+              <Link href="/import" className="text-sm text-primary hover:underline">
+                Import transactions →
+              </Link>
+            </div>
+          }
         />
       ) : (
         <div className="grid gap-5 md:grid-cols-2">

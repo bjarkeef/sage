@@ -87,9 +87,27 @@ Export a CSV from your broker and drop it on the import page. Sage reads the
 header row and guesses which column is the symbol, the quantity, the price, the
 date, the currency and the fee; you correct anything it got wrong, see the
 parsed rows before committing, and rows it cannot read are listed with a reason
-rather than skipped silently. Re-importing an overlapping file is safe, because
-every row carries a hash and the ones already recorded are recognised as
-duplicates. Snowball Analytics exports have their own reader.
+rather than skipped silently.
+
+Broker exports are not written for machines, so the reader is forgiving about
+how numbers are written. `$1,241.30`, `1.241,30`, `1 241,30` and `1'241.30` all
+read as the same number, and a quantity written as `-45` on a sell keeps its
+meaning from the type column. Dates that could be read two ways are flagged
+rather than guessed at.
+
+Your broker's word for what happened gets matched too — "Cash Dividend" is a
+dividend, "SELL - MARKET" is a sell. Anything left over is listed on the mapping
+step with a dropdown, so a value like "Reinvest Shares" is yours to place rather
+than something to go and edit the file over. If your file has no currency
+column, set one default for the whole thing.
+
+Two conventions worth knowing: a dividend row's price is the amount **per
+share**, and a split row's quantity is the **ratio** — 2 for a two-for-one, 0.5
+for a one-for-two reverse split.
+
+Re-importing an overlapping file is safe, because every row carries a hash and
+the ones already recorded are recognised as duplicates. Snowball Analytics
+exports have their own reader.
 
 You can also add holdings one at a time, which is the faster path for a handful
 of positions.
