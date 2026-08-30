@@ -25,4 +25,17 @@ describe("countryToRegion", () => {
   it("is case-insensitive", () => {
     expect(countryToRegion("us")).toBe("North America");
   });
+
+  /** Added alongside the region fix. Until countries actually resolved, an
+   *  unmapped code cost nothing because every holding was already `Unknown`.
+   *  Now that they resolve, a European ETF domiciled in Luxembourg would have
+   *  read "Other" — which looks like a classification, not a gap. */
+  it.each([
+    ["LU", "Europe"],
+    ["GR", "Europe"],
+    ["CZ", "Europe"],
+    ["HU", "Europe"],
+  ])("maps %s to %s", (iso, region) => {
+    expect(countryToRegion(iso)).toBe(region);
+  });
 });

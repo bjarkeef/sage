@@ -21,6 +21,7 @@ import type {
   YfRatingsResult,
 } from "./client";
 import { exchangeToCurrency } from "./currency";
+import { countryNameToIso } from "./country-iso";
 
 // Yahoo reports LSE (and a few other) values in minor units like `GBp` (pence);
 // normalize every amount to the major-unit ISO currency.
@@ -156,6 +157,11 @@ export function applyAssetProfileModule(
     sector: profile.sector ?? ap.sector ?? null,
     industry: profile.industry ?? ap.industry ?? null,
     country: profile.country ?? ap.country ?? null,
+    // Yahoo reports a country NAME and no code, but the contract asks for an
+    // ISO code and `countryToRegion` keys on it — so leaving this null put
+    // every holding in `Unknown` on the region card. Derived from whichever
+    // name we end up with, so it stays consistent with the country card.
+    countryIso: profile.countryIso ?? countryNameToIso(profile.country ?? ap.country),
     fullTimeEmployees:
       profile.fullTimeEmployees ??
       (ap.fullTimeEmployees != null ? String(ap.fullTimeEmployees) : null),
