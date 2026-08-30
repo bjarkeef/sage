@@ -17,6 +17,13 @@ const REGION_MAP: Record<string, string> = {
   IE: "Europe",
   PT: "Europe",
   PL: "Europe",
+  // Added with the region fix: LU in particular is a fund domicile, so a
+  // European ETF was landing in "Other" rather than "Europe" the moment the
+  // country actually resolved.
+  LU: "Europe",
+  GR: "Europe",
+  CZ: "Europe",
+  HU: "Europe",
   JP: "Asia-Pacific",
   AU: "Asia-Pacific",
   HK: "Asia-Pacific",
