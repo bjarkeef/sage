@@ -22,7 +22,7 @@ allowBuilds:
 catalog:
   "@changesets/cli": ^2
   "@eslint/js": ^9
-  "@next/eslint-plugin-next": ^15
+  "@next/eslint-plugin-next": ^16
   # Floor, not just a lockfile pin: <1.19.15 is path traversal in `serveStatic`
   # on Windows via an encoded backslash (GHSA-frvp-7c67-39w9). Sage's API mounts
   # no static middleware at all, so exposure is nil — but a public repo should
@@ -72,9 +72,20 @@ catalog:
   # Floor, not just a lockfile pin: <15.5.21 carries SSRF via attacker-
   # controlled rewrite destinations, SSRF in Server Actions on custom servers,
   # DoS in Server Actions, and unauthenticated disclosure of internal Server
-  # Function endpoints. Bumping this also clears the sharp (libvips CVEs) and
-  # postcss advisories, which reach the tree only through Next.
-  next: ^15.5.21
+  # Function endpoints.
+  #
+  # On 16, not 15, for the transitive advisories. This note used to claim that
+  # bumping within 15 also cleared the sharp (libvips) and postcss findings; it
+  # does not, and could not: 15.x pins `postcss` at exactly 8.4.31 and `sharp`
+  # at ^0.34.3, both of which sit under every relevant advisory, so no in-range
+  # bump reaches a fixed version. 16.x pins postcss 8.5.23 and sharp ^0.35.3,
+  # which clears both — upstream, rather than by overriding a pin Next chose.
+  #
+  # `sharp` is worth naming precisely: it arrives through `next`, which is a
+  # production dependency, not through build tooling. Nothing in this app
+  # invokes it (the single next/image is `unoptimized`), but /_next/image
+  # exists on the server regardless.
+  next: ^16.3.3
   next-themes: ^0.4
   postgres: ^3
   prettier: ^3
