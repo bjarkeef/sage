@@ -9,6 +9,17 @@ packages:
 # zod@4 (present transitively), which breaks better-auth's type exports.
 overrides:
   "better-call>zod": ^3
+  # nwsapi is jsdom's CSS selector engine, so it decides what every
+  # testing-library query matches. 2.2.26 makes interaction tests hang rather
+  # than fail: five suites went from milliseconds to timing out at 5s each
+  # (currency picker, remove-holding, dividend calendar, dividends page), and
+  # the reported error is a bare "Test timed out" that names nothing. 2.2.25 is
+  # fine; the break is exactly .26.
+  #
+  # To retire this: drop the line, `pnpm install`, and run
+  # `apps/web` vitest. If the interaction suites still pass in milliseconds,
+  # upstream fixed it and the pin can go.
+  nwsapi: "<2.2.26"
 
 allowBuilds:
   cpu-features: false
