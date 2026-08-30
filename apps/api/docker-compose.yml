@@ -1,0 +1,16 @@
+# Local-dev Postgres for apps/api. The full 3-service stack is a later
+# Phase 0 item; this is just the database.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sage
+      POSTGRES_PASSWORD: sage
+      POSTGRES_DB: sage
+    ports:
+      - "5432:5432"
+    volumes:
+      - sage_db_data:/var/lib/postgresql/data
+
+volumes:
+  sage_db_data:

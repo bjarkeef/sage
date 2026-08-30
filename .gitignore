@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+.turbo/
+out/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Test / coverage
+coverage/
+
+# End-to-end run output — traces, screenshots and HTML reports, regenerated on
+# every run and often tens of MB. Kept here rather than in e2e/.gitignore so
+# every ignore rule for this repo is readable in one place.
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+.playwright-mcp/
+
+# Claude Code planning artifacts (kept local, not shipped in the repo).
+#
+# They were tracked for part of 2026 and are not in this history at all: the
+# repository was squashed to a single commit before going public, so nothing
+# below has a past version to recover. Working notes belong on the machine that
+# made them, not in a public repository.
+docs/superpowers/
+.superpowers/
+
+# Editor / IDE (this repo goes public — keep local editor state out)
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Local agent settings (Claude Code) — share settings.json, never the local override
+.claude/settings.local.json
+.claude/launch.json
+
+# Local-only overrides
+*.local
+
+# Planning and product-strategy docs. Kept locally, like docs/superpowers/
+# above: they are working notes and commercial plans, not documentation for
+# someone running or contributing to Sage. Untracked 2026-08-29; the versions
+# tracked before that are still in history.
+SAGE_vision.md
+docs/roadmap.md
+docs/yield-calc-checkup.md
+docs/first-run-findings-*.md

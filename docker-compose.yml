@@ -1,0 +1,82 @@
+# Self-host stack: db + api + web. See docs/DEPLOYMENT.md and .env.example.
+services:
+  db:
+    image: postgres:16-alpine
+    # Sage is meant to be left running: a self-hoster wants it there after a
+    # reboot or a crash without going to the box to start it. `unless-stopped`
+    # rather than `always` so an explicit `docker compose stop` stays stopped.
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sage}
+      POSTGRES_DB: ${POSTGRES_DB:-sage}
+    # Bind to loopback only — do not expose Postgres on the public interface.
+    # The host port is configurable because 5432 is very often already taken by
+    # a Postgres the operator is already running; without this the first command
+    # in the README fails with "port is already allocated", and a Compose
+    # override does not help (Compose appends port lists rather than replacing
+    # them, so both ports get bound unless you know to write `ports: !override`).
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - sage_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sage}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://sage:sage@db:5432/sage}
+      AUTH_BASE_URL: ${AUTH_BASE_URL:-http://localhost:3001}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
+      PORT: "3001"
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # 127.0.0.1, not localhost: busybox wget resolves localhost to [::1] first,
+      # and a server bound to 0.0.0.0 is not listening on IPv6.
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:3001/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Opt-in only; see .env.example for what turning it on discloses.
+        NEXT_PUBLIC_LOGO_DEV_TOKEN: ${NEXT_PUBLIC_LOGO_DEV_TOKEN:-}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      SAGE_API_URL: ${SAGE_API_URL:-http://api:3001}
+      NEXT_PUBLIC_SAGE_API_URL: ${NEXT_PUBLIC_SAGE_API_URL:-http://localhost:3001}
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # See the api healthcheck: Next binds 0.0.0.0 (IPv4 only), so localhost
+      # resolving to [::1] made this container permanently unhealthy.
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:3000 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  sage_db_data:

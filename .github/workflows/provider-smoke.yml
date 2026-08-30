@@ -1,0 +1,36 @@
+name: Provider smoke
+
+# Advisory, not a gate: it tells us an upstream broke. It never runs on a PR
+# and never blocks a merge. Yahoo only, and keyless — it is the unofficial
+# scraper and therefore the leg that actually breaks, and needing no secrets
+# means this runs on any fork and cannot fail on someone's spent API quota.
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily, after the US close
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  yahoo:
+    runs-on: ubuntu-latest
+    # The 30s per-test vitest timeout does not bound `pnpm install`; without
+    # this GitHub's default job timeout is six hours.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Live Yahoo check
+        run: pnpm --filter @sage/provider-yahoo-finance test:live

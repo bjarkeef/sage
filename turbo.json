@@ -1,0 +1,29 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "globalDependencies": ["tooling/tsconfig/base.json"],
+  "tasks": {
+    "dev": {
+      "persistent": true,
+      "cache": false,
+      // Turbo runs strict env mode, so anything not named here is stripped
+      // before the task sees it. These four decide where the app is reachable,
+      // and without the passthrough `WEB_ORIGIN=... pnpm dev` silently has no
+      // effect: the API keeps its localhost default, rejects the LAN origin,
+      // and every client fetch from a phone fails CORS with no visible error.
+      "passThroughEnv": ["AUTH_BASE_URL", "WEB_ORIGIN", "NEXT_PUBLIC_SAGE_API_URL", "SAGE_API_URL"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "passThroughEnv": ["SAGE_STANDALONE"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", "**/*.{ts,tsx}"]
+    },
+    "test": {
+      "inputs": ["$TURBO_DEFAULT$", "**/*.{ts,tsx}"],
+      "env": ["SKIP_DB_TESTS"]
+    }
+  }
+}

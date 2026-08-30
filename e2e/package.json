@@ -1,0 +1,19 @@
+{
+  "name": "@sage/e2e",
+  "version": "0.0.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@sage/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "postgres": "catalog:",
+    "typescript": "catalog:"
+  }
+}

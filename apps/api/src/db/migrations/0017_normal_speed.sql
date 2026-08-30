@@ -1,0 +1,1 @@
+ALTER TABLE "asset_profile" ADD COLUMN "payout_ratio" numeric;

@@ -1,0 +1,8 @@
+{
+  "extends": "@sage/tsconfig/base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src", "vitest.config.ts", "vitest.setup.ts"]
+}

@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 560" width="1120" height="560" role="img" aria-label="Sage architecture: browser, web app, API and Postgres run together inside your machine; symbols go out from the API to Yahoo Finance, EODHD and the ECB, company logos are off unless the operator opts in, and fetched prices are stored locally">
+  <defs>
+    <marker id="arrowFgLight" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#0d0d0c"/>
+    </marker>
+    <marker id="arrowEmLight" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#3d6a4d"/>
+    </marker>
+  </defs>
+
+  <rect width="1120" height="560" fill="#ececea"/>
+
+  <!-- Boundary: your machine -->
+  <text x="60" y="88" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="18" font-weight="600" fill="#3d6a4d">Your machine</text>
+  <rect x="40" y="100" width="580" height="330" rx="12" fill="none" stroke="#3d6a4d" stroke-width="2" stroke-dasharray="6 5"/>
+
+  <!-- Internal chain: Browser -> Web -> API -> Postgres -->
+  <rect x="190" y="130" width="280" height="44" rx="8" fill="none" stroke="#0d0d0c" stroke-width="1.5"/>
+  <text x="330" y="157" text-anchor="middle" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="16" fill="#0d0d0c">Browser</text>
+  <line x1="330" y1="174" x2="330" y2="196" stroke="#0d0d0c" stroke-width="2" marker-end="url(#arrowFgLight)"/>
+  <rect x="190" y="198" width="280" height="44" rx="8" fill="none" stroke="#0d0d0c" stroke-width="1.5"/>
+  <text x="330" y="225" text-anchor="middle" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="16" fill="#0d0d0c">Web · Next.js :3000</text>
+  <line x1="330" y1="242" x2="330" y2="264" stroke="#0d0d0c" stroke-width="2" marker-end="url(#arrowFgLight)"/>
+  <rect x="190" y="266" width="280" height="44" rx="8" fill="none" stroke="#0d0d0c" stroke-width="1.5"/>
+  <text x="330" y="293" text-anchor="middle" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="16" fill="#0d0d0c">API · Hono :3001</text>
+  <line x1="330" y1="310" x2="330" y2="348" stroke="#3d6a4d" stroke-width="2" marker-end="url(#arrowEmLight)"/>
+  <text x="350" y="334" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="14" fill="#3d6a4d">prices stored locally</text>
+  <rect x="190" y="350" width="280" height="44" rx="8" fill="none" stroke="#0d0d0c" stroke-width="1.5"/>
+  <text x="330" y="377" text-anchor="middle" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="16" fill="#0d0d0c">Postgres</text>
+
+  <!-- Logo hosts: the browser requests these directly, so the domain of every
+       company you hold leaves the machine. -->
+  <rect x="790" y="130" width="280" height="44" rx="8" fill="none" stroke="#7a7a76" stroke-width="1.5"/>
+  <text x="930" y="157" text-anchor="middle" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="15" fill="#7a7a76">logo.dev (opt-in, off by default)</text>
+  <line x1="470" y1="152" x2="786" y2="152" stroke="#3d6a4d" stroke-width="2" marker-end="url(#arrowEmLight)"/>
+  <text x="690" y="142" text-anchor="middle" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="14" fill="#3d6a4d">company domains</text>
+
+  <!-- Provider group. The fetch arrow starts at the group's edge, so it reads
+       as coming from whichever provider is configured, not from EODHD. -->
+  <text x="770" y="200" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="16" font-weight="600" fill="#7a7a76">Market-data providers</text>
+  <rect x="770" y="210" width="320" height="200" rx="12" fill="none" stroke="#7a7a76" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <rect x="790" y="228" width="280" height="44" rx="8" fill="none" stroke="#7a7a76" stroke-width="1.5"/>
+  <text x="930" y="255" text-anchor="middle" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="15" fill="#7a7a76">Yahoo Finance (unofficial)</text>
+  <rect x="790" y="296" width="280" height="44" rx="8" fill="none" stroke="#7a7a76" stroke-width="1.5"/>
+  <text x="930" y="323" text-anchor="middle" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="15" fill="#7a7a76">EODHD (optional key)</text>
+  <rect x="790" y="364" width="280" height="44" rx="8" fill="none" stroke="#7a7a76" stroke-width="1.5"/>
+  <text x="930" y="391" text-anchor="middle" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="15" fill="#7a7a76">ECB (FX, no key)</text>
+  <line x1="770" y1="310" x2="472" y2="292" stroke="#3d6a4d" stroke-width="2" marker-end="url(#arrowEmLight)"/>
+  <text x="690" y="292" text-anchor="middle" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="14" fill="#3d6a4d">fetch on miss</text>
+
+  <!-- Caption -->
+  <text x="560" y="478" text-anchor="middle" font-style="italic" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="15" fill="#0d0d0c">Quantities, cost basis and account stay inside the box.</text>
+  <text x="560" y="502" text-anchor="middle" font-style="italic" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="15" fill="#0d0d0c">Symbols go out to the providers. Company logos would name what you hold, so they are off until you turn them on.</text>
+</svg>

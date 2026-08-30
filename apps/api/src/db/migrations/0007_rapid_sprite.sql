@@ -1,0 +1,1 @@
+ALTER TABLE "instrument" DROP CONSTRAINT "instrument_isin_unique";

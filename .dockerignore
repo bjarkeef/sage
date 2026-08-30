@@ -1,0 +1,17 @@
+node_modules
+.next
+dist
+.git
+.gitignore
+*.env
+.env*
+!.env.example
+docs/superpowers
+.superpowers
+.turbo
+coverage
+.vscode
+.idea
+*.log
+*.md
+!pnpm-workspace.yaml

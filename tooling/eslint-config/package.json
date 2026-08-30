@@ -1,0 +1,27 @@
+{
+  "name": "@sage/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./react": "./react.js",
+    "./design": "./design.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@eslint/js": "catalog:",
+    "@next/eslint-plugin-next": "catalog:",
+    "eslint-plugin-react": "catalog:",
+    "eslint-plugin-react-hooks": "catalog:",
+    "globals": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}

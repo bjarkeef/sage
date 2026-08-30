@@ -1,0 +1,1 @@
+DROP TABLE "fx_rate_cache" CASCADE;

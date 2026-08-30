@@ -1,0 +1,44 @@
+{
+  "name": "@sage/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "build": "node scripts/build.mjs && node scripts/copy-migrations.mjs",
+    "start": "node dist/index.js",
+    "cli": "tsx --env-file-if-exists=.env src/cli.ts",
+    "dev-session": "tsx --env-file-if-exists=.env scripts/dev-session.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "dev:e2e": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@sage/core": "workspace:*",
+    "@sage/provider-ecb": "workspace:*",
+    "@sage/provider-eodhd": "workspace:*",
+    "@sage/provider-interface": "workspace:*",
+    "@sage/provider-yahoo-finance": "workspace:*",
+    "better-auth": "catalog:",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "papaparse": "^5.6.0",
+    "postgres": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@sage/tsconfig": "workspace:*",
+    "@testcontainers/postgresql": "catalog:",
+    "@types/node": "catalog:",
+    "@types/papaparse": "^5.5.2",
+    "drizzle-kit": "catalog:",
+    "esbuild": "catalog:",
+    "tsx": "catalog:",
+    "vitest": "catalog:"
+  }
+}
