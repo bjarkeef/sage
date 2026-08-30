@@ -156,3 +156,104 @@ describe("ImportPage default format", () => {
     expect(dropzone).not.toHaveTextContent(/Snowball Analytics export/);
   });
 });
+
+/** The mapping step maps columns. It could not map the *values* inside the type
+ *  column, so an export saying "Reinvest Shares" had no in-app fix at all — the
+ *  rows were skipped and the user had to edit the CSV by hand. */
+describe("ImportPage type-value mapping", () => {
+  const inspectPayload = {
+    headers: ["Date", "Symbol", "Action", "Quantity", "Price", "Currency"],
+    sampleRows: [],
+    rowCount: 3,
+    suggestedMapping: {
+      tradeDate: "Date",
+      symbol: "Symbol",
+      type: "Action",
+      quantity: "Quantity",
+      price: "Price",
+      currency: "Currency",
+    },
+    valuesByColumn: {
+      Action: [
+        { value: "Buy", normalized: "buy", count: 2, resolved: "buy" as const },
+        { value: "Reinvest Shares", normalized: "reinvest shares", count: 1, resolved: null },
+      ],
+    },
+  };
+
+  async function openMappingStep(payload: unknown = inspectPayload) {
+    inspectMock.mockReset().mockResolvedValue(payload);
+    previewCsvMock.mockReset().mockResolvedValue(makePreview());
+    const user = userEvent.setup();
+    renderWithClient(<ImportPage />, makeTestQueryClient());
+    const input = document.getElementById("csv-upload") as HTMLInputElement;
+    await user.upload(input, new File(["csv"], "broker.csv", { type: "text/csv" }));
+    await waitFor(() => expect(inspectMock).toHaveBeenCalled());
+    return user;
+  }
+
+  it("flags the values it could not place, and counts the rows at stake", async () => {
+    await openMappingStep();
+    expect(await screen.findByText(/1 row uses a word Sage does not recognise/)).toBeDefined();
+    expect(screen.getByLabelText("Type for Reinvest Shares")).toHaveValue("");
+  });
+
+  it("shows what it read a recognised value as, without calling it an override", async () => {
+    await openMappingStep();
+    const select = screen.getByLabelText<HTMLSelectElement>("Type for Buy");
+    expect(select.value).toBe("");
+    expect(select.options[0]!.textContent).toBe("Auto — buy");
+  });
+
+  it("sends a chosen value mapping through to the preview", async () => {
+    const user = await openMappingStep();
+    await user.selectOptions(screen.getByLabelText("Type for Reinvest Shares"), "buy");
+    await user.click(screen.getByRole("button", { name: "Preview import" }));
+    await waitFor(() => expect(previewCsvMock).toHaveBeenCalled());
+    expect(previewCsvMock.mock.calls[0]![1]).toMatchObject({
+      typeAliases: { "reinvest shares": "buy" },
+    });
+  });
+});
+
+/** defaultCurrency existed for the single-currency broker that omits the
+ *  column, but both the button's enable rule and the server validator still
+ *  demanded a real currency column — so the field could never be reached. */
+describe("ImportPage currency fallback", () => {
+  const noCurrency = {
+    headers: ["Date", "Symbol", "Type", "Quantity", "Price"],
+    sampleRows: [],
+    rowCount: 1,
+    suggestedMapping: {
+      tradeDate: "Date",
+      symbol: "Symbol",
+      type: "Type",
+      quantity: "Quantity",
+      price: "Price",
+      currency: null,
+    },
+    valuesByColumn: {},
+  };
+
+  it("lets a default currency stand in for a missing column", async () => {
+    inspectMock.mockReset().mockResolvedValue(noCurrency);
+    previewCsvMock.mockReset().mockResolvedValue(makePreview());
+    const user = userEvent.setup();
+    renderWithClient(<ImportPage />, makeTestQueryClient());
+    const input = document.getElementById("csv-upload") as HTMLInputElement;
+    await user.upload(input, new File(["csv"], "broker.csv", { type: "text/csv" }));
+    await waitFor(() => expect(inspectMock).toHaveBeenCalled());
+
+    expect(screen.getByRole("button", { name: "Preview import" })).toBeDisabled();
+
+    await user.type(screen.getByLabelText(/Default currency/), "gbp");
+    expect(screen.getByRole("button", { name: "Preview import" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Preview import" }));
+    await waitFor(() => expect(previewCsvMock).toHaveBeenCalled());
+    expect(previewCsvMock.mock.calls[0]![1]).toMatchObject({
+      currency: null,
+      defaultCurrency: "GBP",
+    });
+  });
+});
