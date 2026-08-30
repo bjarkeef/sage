@@ -294,6 +294,29 @@ describe("applyAssetProfileModule", () => {
     const result = applyAssetProfileModule(withSector, { sector: "Electronics" });
     expect(result.sector).toBe("Technology");
   });
+
+  /** Yahoo reports a country name and never a code, and this mapper left
+   *  `countryIso` null — which was the entire region gap, since
+   *  `countryToRegion` keys on the code. Every holding on the default provider
+   *  path read `Unknown` on the Diversification region card while the country
+   *  card, which uses the name, worked fine. */
+  it("derives countryIso from the country name Yahoo actually sends", () => {
+    const result = applyAssetProfileModule(base(), { country: "Germany" });
+    expect(result.country).toBe("Germany");
+    expect(result.countryIso).toBe("DE");
+  });
+
+  it("leaves countryIso null for a country name it does not recognise", () => {
+    const result = applyAssetProfileModule(base(), { country: "Ruritania" });
+    expect(result.country).toBe("Ruritania");
+    expect(result.countryIso).toBeNull();
+  });
+
+  it("derives countryIso from a country the quote already provided", () => {
+    const withCountry = { ...base(), country: "Japan" };
+    const result = applyAssetProfileModule(withCountry, {});
+    expect(result.countryIso).toBe("JP");
+  });
 });
 
 describe("mapFundProfile", () => {
