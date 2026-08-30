@@ -1,0 +1,171 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@source "../";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-gain: var(--gain);
+  --color-gain-foreground: var(--gain-foreground);
+  --color-income: var(--income);
+  --color-income-muted: var(--income-muted);
+  --color-loss: var(--loss);
+  --color-loss-foreground: var(--loss-foreground);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-certainty-paid: var(--certainty-paid-bg);
+  --color-certainty-paid-border: var(--certainty-paid-border);
+  --color-certainty-confirmed-border: var(--certainty-confirmed-border);
+  --color-certainty-estimated-border: var(--certainty-estimated-border);
+
+  --color-chart-line: var(--chart-line);
+  --color-chart-comparison-1: var(--chart-comparison-1);
+  --color-chart-comparison-2: var(--chart-comparison-2);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-hairline: var(--hairline);
+  --color-surface-card: var(--surface-card);
+  --color-surface-focus: var(--surface-focus);
+  --color-hairline-faint: var(--hairline-faint);
+  --color-bloom: var(--bloom);
+
+  --font-display: var(--ff-display);
+  --font-body: var(--ff-body);
+  --font-mono: var(--ff-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+
+  --radius-card: var(--radius); /* 16px — cards, rows, tiles */
+  --radius-control: 8px; /* buttons, inputs, nav items */
+  --radius-badge: 6px; /* kbd hints, chips, tiny badges */
+
+  --text-data: 13px;
+  --text-data--line-height: 1.5;
+  --text-title: 28px;
+  --text-title--line-height: 1.2;
+  --text-hero: 44px;
+  --text-hero--line-height: 1.1;
+  --container-page: 1120px;
+  --container-narrow: 720px;
+}
+
+@utility label-caps {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@utility hero-num {
+  font-family: var(--ff-display);
+  font-size: 44px;
+  line-height: 1.05;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility stat-num {
+  font-family: var(--ff-display);
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@utility skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--muted);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--foreground) 5%, transparent),
+      transparent
+    );
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      animation: none;
+    }
+  }
+}
+
+@utility fade-up {
+  animation: fade-up 0.5s ease-out both;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/** The counterpart to `fade-up`, for something leaving under its own steam
+ *  (a toast expiring). Quicker than the entrance — an exit that lingers reads
+ *  as lag, not as polish. */
+@utility fade-out-down {
+  animation: fade-out-down 0.2s ease-in both;
+}
+
+@keyframes fade-out-down {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up,
+  .fade-out-down {
+    animation: none;
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "extends": "@sage/tsconfig/base.json",
+  "include": ["src", "vitest.config.ts", "vitest.live.config.ts"]
+}

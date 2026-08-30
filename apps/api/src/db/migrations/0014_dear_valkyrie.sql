@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "dividend_tax_rate" numeric(5, 2);

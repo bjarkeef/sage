@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "allow_negative_dividend_growth" boolean DEFAULT true NOT NULL;

@@ -1,0 +1,7 @@
+{
+  "extends": "@sage/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "ESNext.Intl"]
+  },
+  "include": ["src", "vitest.config.ts"]
+}

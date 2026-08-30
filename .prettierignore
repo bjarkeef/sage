@@ -1,0 +1,12 @@
+pnpm-lock.yaml
+**/dist/**
+**/.next/**
+**/.turbo/**
+node_modules/**
+# Git worktrees live here — full copies of the repo, not files to format.
+.claude/**
+
+# Playwright output
+e2e/test-results
+e2e/playwright-report
+e2e/blob-report

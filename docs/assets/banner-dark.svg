@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320" role="img" aria-label="Sage — your portfolio, your server, your data">
+  <rect width="1280" height="320" fill="#0d0d0c"/>
+  <g transform="translate(367 96) scale(5.2)">
+    <path d="M3.9 13.9a8.1 8.1 0 0 0 16.2 0Z" fill="#ececea"/>
+    <circle cx="12" cy="6.8" r="2.7" fill="#86ab7c"/>
+  </g>
+  <text x="517" y="168" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="76" font-weight="600" fill="#ececea">Sage</text>
+  <text x="517" y="212" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif" font-size="23" fill="#86ab7c">Your portfolio, your server, your data.</text>
+</svg>

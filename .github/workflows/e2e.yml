@@ -1,0 +1,69 @@
+name: E2E
+
+# The journey unit tests cannot cover: a real browser, a real API, a real
+# database. Kept out of ci.yml so a browser download and a Postgres service do
+# not sit in front of every lint-only change, and so a flake here is legible as
+# an E2E flake rather than a failed unit run.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        # Matches docker-compose.yml; the suite creates its own `sage_e2e`
+        # database inside this instance.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sage
+          POSTGRES_PASSWORD: sage
+          POSTGRES_DB: sage
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sage"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        # Chromium only: this suite asserts behaviour, not rendering, so three
+        # engines would triple the runtime to re-prove the same API contract.
+        run: pnpm --filter @sage/e2e exec playwright install --with-deps chromium
+
+      - name: Run end-to-end tests
+        run: pnpm test:e2e
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7

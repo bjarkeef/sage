@@ -1,0 +1,205 @@
+/* ─────────────────────────────────────────────────────────────
+   Layer 1 — primitives. Raw palette. Never referenced by components.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --gray-50: #f9f9f8;
+  --gray-100: #f2f2f0;
+  --gray-200: #e8e8e5;
+  --gray-300: #d8d8d4;
+  --gray-400: #adadaa;
+  --gray-500: #878783;
+  --gray-600: #616160;
+  --gray-700: #434342;
+  --gray-800: #292928;
+  --gray-850: #1c1c1b;
+  --gray-900: #161615;
+  --gray-925: #101010;
+  --gray-950: #0d0d0c;
+
+  --sage-50: #eaf2e3;
+  --sage-100: #dde9d8;
+  --sage-200: #bacdc2;
+  --sage-300: #93b0a0;
+  --sage-400: #86ab7c;
+  --sage-500: #3d6a4d;
+  --sage-600: #1f4a35;
+  --sage-700: #3a4f44;
+  --sage-800: #2f4036;
+  --sage-900: #26332c;
+
+  /* brand indirection — repoint these 8 aliases to rebrand the whole app off sage */
+  --brand-100: var(--sage-100);
+  --brand-200: var(--sage-200);
+  --brand-300: var(--sage-300);
+  --brand-400: var(--sage-400);
+  --brand-500: var(--sage-500);
+  --brand-600: var(--sage-600);
+  --brand-700: var(--sage-700);
+  --brand-800: var(--sage-800);
+
+  --green-300: #3dbe86;
+  --green-400: #1f9d67;
+  --green-500: #147d52;
+
+  --red-300: #e87468;
+  --red-400: #d85a4c;
+  --red-500: #c0392b;
+
+  --gold-300: #d6b483;
+  --gold-400: #9a7430;
+  --gold-500: #7a5c1f;
+
+  --white: #ffffff;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Layer 2 — semantic roles. The ONLY thing components consume.
+   Light theme.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --background: var(--gray-50);
+  --foreground: #141413;
+  --card: var(--white);
+  --card-foreground: #141413;
+  --popover: var(--white);
+  --popover-foreground: #141413;
+  --muted: var(--gray-100);
+  --muted-foreground: rgba(20, 20, 19, 0.65);
+
+  --primary: var(--brand-600);
+  --primary-foreground: var(--white);
+  --secondary: var(--gray-100);
+  --secondary-foreground: #141413;
+  --accent: var(--brand-100);
+  --accent-foreground: var(--brand-700);
+  --destructive: var(--red-500);
+  --destructive-foreground: var(--white);
+
+  --border: rgba(20, 20, 19, 0.12);
+  --input: rgba(20, 20, 19, 0.12);
+  --ring: var(--brand-400);
+  --radius: 16px;
+
+  /* layering — depth from washes and hairlines, not borders (round 3) */
+  --surface-hover: rgba(20, 20, 19, 0.04);
+  --surface-active: rgba(20, 20, 19, 0.07);
+  --hairline: rgba(20, 20, 19, 0.07);
+  --surface-card: rgba(20, 20, 19, 0.015);
+  --surface-focus: rgba(20, 20, 19, 0.09);
+  --hairline-faint: rgba(20, 20, 19, 0.05);
+  --bloom: color-mix(in srgb, var(--primary) 8%, transparent);
+
+  /* finance semantics — first-class, themeable */
+  --gain: var(--green-500);
+  --gain-foreground: var(--white);
+  --loss: var(--red-500);
+  --loss-foreground: var(--white);
+  --neutral: var(--gray-700);
+  --neutral-foreground: var(--white);
+
+  /* certainty vocabulary — dividend status encoding (paid/confirmed/estimated) */
+  --certainty-paid-bg: color-mix(in srgb, var(--brand-500) 14%, transparent);
+  --certainty-paid-border: color-mix(in srgb, var(--brand-500) 35%, transparent);
+  --certainty-confirmed-border: color-mix(in srgb, var(--brand-500) 55%, transparent);
+  --certainty-estimated-border: color-mix(in srgb, var(--brand-500) 30%, transparent);
+
+  /* income vocabulary — gold's reserved job: dividend/income surfaces only */
+  --income: var(--gold-500);
+  --income-muted: color-mix(in srgb, var(--gold-500) 55%, transparent);
+
+  /* chart language — line is always the accent; comparisons are muted, dashed */
+  --chart-line: var(--primary);
+  --chart-comparison-1: var(--gray-500);
+  --chart-comparison-2: var(--seg-4);
+
+  /* categorical income ramp — curated, income-toned (gold-led), NOT a rainbow.
+     Shared by the dividend composition donut and the holdings "share of income"
+     bars so a holding keeps one color across both. --seg-rest = the "N others"
+     roll-up slice. Light theme. */
+  --seg-1: #c99f4f;
+  --seg-2: #5c8a58;
+  --seg-3: #2f9585;
+  --seg-4: #3d8fce;
+  --seg-5: #8a5fc0;
+  --seg-6: #cf6b4b;
+  --seg-7: #c25574;
+  --seg-rest: #9a9a97;
+
+  --ff-display: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --ff-body: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --ff-mono: "Geist Mono", ui-monospace, monospace;
+}
+
+/* Dark theme — same roles, remapped. */
+.dark {
+  --background: var(--gray-950);
+  --foreground: #ececea;
+  --card: #161615;
+  --card-foreground: #ececea;
+  --popover: #161615;
+  --popover-foreground: #ececea;
+  --muted: var(--gray-800);
+  --muted-foreground: rgba(236, 236, 234, 0.64);
+
+  --primary: var(--brand-400);
+  --primary-foreground: var(--gray-950);
+  --secondary: var(--gray-800);
+  --secondary-foreground: #ececea;
+  --accent: var(--brand-800);
+  --accent-foreground: var(--brand-100);
+  --destructive: var(--red-400);
+  --destructive-foreground: var(--gray-950);
+
+  --border: rgba(255, 255, 255, 0.09);
+  --input: rgba(255, 255, 255, 0.09);
+  --ring: var(--brand-500);
+
+  --surface-hover: rgba(255, 255, 255, 0.04);
+  --surface-active: rgba(255, 255, 255, 0.07);
+  --hairline: rgba(255, 255, 255, 0.07);
+  --surface-card: rgba(255, 255, 255, 0.015);
+  --surface-focus: rgba(255, 255, 255, 0.09);
+  --hairline-faint: rgba(255, 255, 255, 0.05);
+  --bloom: color-mix(in srgb, var(--primary) 10%, transparent);
+
+  --gain: var(--green-300);
+  --gain-foreground: var(--gray-950);
+  --loss: var(--red-300);
+  --loss-foreground: var(--gray-950);
+  --neutral: var(--gray-400);
+  --neutral-foreground: var(--gray-950);
+
+  --certainty-paid-bg: color-mix(in srgb, var(--brand-400) 20%, transparent);
+  --certainty-paid-border: color-mix(in srgb, var(--brand-400) 40%, transparent);
+  --certainty-confirmed-border: color-mix(in srgb, var(--brand-400) 55%, transparent);
+  --certainty-estimated-border: color-mix(in srgb, var(--brand-400) 32%, transparent);
+
+  --income: var(--gold-300);
+  --income-muted: color-mix(in srgb, var(--gold-300) 55%, transparent);
+
+  --chart-line: var(--primary);
+  --chart-comparison-1: var(--gray-400);
+  --chart-comparison-2: var(--seg-4);
+
+  /* categorical income ramp — dark theme (brighter to hold up on gray-950). */
+  --seg-1: #e0c184;
+  --seg-2: #8fbf82;
+  --seg-3: #4fc2ad;
+  --seg-4: #6fb6f0;
+  --seg-5: #b691e0;
+  --seg-6: #ef9576;
+  --seg-7: #e485a0;
+  --seg-rest: #5a5a57;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Adding a theme = copy this block, rename the selector, retarget
+   the roles. No component changes required.
+   ───────────────────────────────────────────────────────────── */
+/*
+[data-theme="warm"] {
+  --background: #f7f4ec;
+  --foreground: #2f4538;
+  ...
+}
+*/

@@ -1,0 +1,94 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "packages/providers/*"
+  - "tooling/*"
+  - "e2e"
+
+# better-call's zod peer is optional; without a pin pnpm may re-resolve it to
+# zod@4 (present transitively), which breaks better-auth's type exports.
+overrides:
+  "better-call>zod": ^3
+
+allowBuilds:
+  cpu-features: false
+  esbuild: true
+  msw: false
+  protobufjs: false
+  sharp: true
+  ssh2: false
+
+# Single source of truth for shared dependency versions (pnpm catalogs).
+catalog:
+  "@changesets/cli": ^2
+  "@eslint/js": ^9
+  "@next/eslint-plugin-next": ^15
+  # Floor, not just a lockfile pin: <1.19.15 is path traversal in `serveStatic`
+  # on Windows via an encoded backslash (GHSA-frvp-7c67-39w9). Sage's API mounts
+  # no static middleware at all, so exposure is nil — but a public repo should
+  # not resolve to a known-vulnerable range. Staying on 1.x deliberately: 2.x is
+  # a major and carries its own open advisories at the time of writing.
+  "@hono/node-server": ^1.19.15
+  "@tailwindcss/postcss": ^4
+  "@tanstack/react-query": ^5
+  "@tanstack/react-query-devtools": ^5
+  "@testcontainers/postgresql": ^12
+  "@testing-library/jest-dom": ^6
+  "@testing-library/react": ^16
+  "@types/node": ^22
+  "@types/react": ^19
+  "@types/react-dom": ^19
+  # Floor, not just a lockfile pin: <1.6.22 allows account takeover by
+  # pre-account hijacking on magic-link and email-OTP sign-in. Sage enables
+  # neither — auth.ts configures emailAndPassword with no plugins, and there is
+  # no email capability anywhere in the tree — so it is not reachable here. The
+  # floor stands anyway: a public repo should not ship an auth library on a
+  # known-vulnerable range, and the day someone adds a plugin is not the day to
+  # remember this.
+  #
+  # 1.7 needs `account.issuer` — migration 0028. Below that migration the
+  # library refuses every write to the table, so the two move together: do not
+  # raise this into 1.7 territory on a checkout that lacks 0028, and do not
+  # lower it below 1.7 now that 0028 has run.
+  better-auth: ^1.7.1
+  class-variance-authority: ^0.7
+  clsx: ^2
+  decimal.js: ^10
+  drizzle-kit: ^0.31
+  drizzle-orm: ^0.45
+  esbuild: ^0.28
+  eslint: ^9
+  eslint-plugin-react: ^7
+  eslint-plugin-react-hooks: ^5
+  globals: ^16
+  # Floor, not just a lockfile pin: <4.12.34 carries cross-request data
+  # disclosure in hono/jsx, an XSS bypass in cx(), and a header de-duplication
+  # bug. Sage serves JSON and uses neither hono/jsx nor cx(), so exposure is
+  # limited — but a public repo should not resolve to a known-vulnerable range.
+  hono: ^4.12.34
+  jsdom: ^26
+  lucide-react: ^0.460
+  msw: ^2
+  # Floor, not just a lockfile pin: <15.5.21 carries SSRF via attacker-
+  # controlled rewrite destinations, SSRF in Server Actions on custom servers,
+  # DoS in Server Actions, and unauthenticated disclosure of internal Server
+  # Function endpoints. Bumping this also clears the sharp (libvips CVEs) and
+  # postcss advisories, which reach the tree only through Next.
+  next: ^15.5.21
+  next-themes: ^0.4
+  postgres: ^3
+  prettier: ^3
+  react: ^19
+  react-dom: ^19
+  tailwind-merge: ^3
+  tailwindcss: ^4
+  tsx: ^4
+  turbo: ^2
+  typescript: ^5
+  typescript-eslint: ^8
+  vitest: ^3
+  yahoo-finance2: ^4.0.2
+  zod: ^3
+
+minimumReleaseAgeExclude:
+  - yahoo-finance2@4.0.2

@@ -1,0 +1,217 @@
+import { describe, it, expect, vi, beforeAll } from "vitest";
+import { screen, waitFor, cleanup } from "@testing-library/react";
+import { renderWithClient, makeTestQueryClient } from "../../../../lib/test/render-with-client";
+import { qk } from "../../../../lib/query/keys";
+import type { DividendIncomeDTO, PortfolioDTO } from "../../../../lib/types";
+
+vi.mock("../../../../lib/api", () => ({
+  getDividendIncome: vi.fn(),
+  getPortfolio: vi.fn(),
+}));
+
+// Import after the mock above so the page's transitive deps (incl. the
+// dividend-tax hooks) pick it up.
+import DividendAnalyticsPage from "./page";
+
+// GROSS payload, as the wire format always is — the hook nets it internally.
+// A future payment date, computed relatively so this fixture never rots into
+// a past date (see the self-expiring-tests hazard).
+const UPCOMING_PAYMENT_DATE = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d.toISOString().slice(0, 10);
+})();
+
+const GROSS_INCOME: DividendIncomeDTO = {
+  retroactive: [],
+  projected: [],
+  announced: [
+    {
+      symbol: "O",
+      name: "Realty Income",
+      declarationDate: null,
+      exDate: UPCOMING_PAYMENT_DATE,
+      recordDate: null,
+      paymentDate: UPCOMING_PAYMENT_DATE,
+      paymentDateEstimated: false,
+      amountPerShare: "0.26",
+      shares: "10",
+      income: "2.60",
+      currency: "USD",
+    },
+  ],
+  perHolding: [
+    {
+      symbol: "O",
+      forwardAnnualIncome: { amount: "100.00", currency: "USD" },
+      incomeShare: 1,
+      cagr5y: null,
+      trend: "unknown",
+    },
+  ],
+  summary: {
+    trailingTwelveMonthIncome: [{ amount: "1000.00", currency: "USD" }],
+    projectedTwelveMonthIncome: [{ amount: "1000.00", currency: "USD" }],
+    monthlyBreakdown: [],
+    receivedByYear: [],
+  },
+  incomeByGroup: { holdings: [], sector: [], currency: [] },
+  dividendTaxRate: 35,
+  fxIncomplete: false,
+  incomeRecordingOff: false,
+};
+
+const PORTFOLIO: PortfolioDTO = {
+  positions: [
+    {
+      symbol: "O",
+      name: "Realty Income",
+      exchange: "NYSE",
+      currency: "USD",
+      nativeCurrency: "USD",
+      quantity: "10",
+      averageCost: { amount: "55", currency: "USD" },
+      costBasis: { amount: "550", currency: "USD" },
+      currentPrice: { amount: "100", currency: "USD" },
+      marketValue: { amount: "1000", currency: "USD" },
+      unrealizedGainLoss: { amount: "450", currency: "USD" },
+      gainLossPercent: 81.8,
+      dailyChange: null,
+      dailyChangePercent: null,
+      dividendIncome: null,
+      totalReturn: null,
+      totalReturnPercent: null,
+      website: null,
+      // Non-null on purpose: yieldOnCost: null was masking the fact that
+      // "Yield on cost" (both the Yield card's "On cost" slot and the
+      // Holdings table column) was never netted, even on this after-tax page.
+      yieldOnCost: 0.08,
+      basisMismatch: null,
+    },
+  ],
+  subtotalsByCurrency: [
+    {
+      currency: "USD",
+      costBasis: { amount: "550", currency: "USD" },
+      marketValue: { amount: "1000", currency: "USD" },
+      gainLoss: { amount: "450", currency: "USD" },
+    },
+  ],
+};
+
+beforeAll(() => {
+  if (typeof globalThis.ResizeObserver === "undefined") {
+    class RO {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    globalThis.ResizeObserver = RO;
+  }
+});
+
+describe("DividendAnalyticsPage — Yield card gross/net", () => {
+  it("recovers a true gross figure from the netted payload, alongside the net headline", async () => {
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.dividendIncome(), GROSS_INCOME);
+    qc.setQueryData(qk.portfolio(), PORTFOLIO);
+
+    renderWithClient(<DividendAnalyticsPage />, qc);
+
+    await waitFor(() => expect(screen.getByText("Dividend analytics")).toBeInTheDocument());
+
+    // Gross forward yield = 100 / 1000 * 100 = 10%, computed from the raw
+    // (un-netted) payload the hook exposes as `gross`.
+    expect(screen.getByText("10.00%")).toBeInTheDocument(); // "Before tax" slot
+    // Net headline = 10% * (1 - 0.35) = 6.5%.
+    expect(screen.getByTestId("yield-net")).toHaveTextContent("6.50%");
+  });
+
+  it("nets yield on cost too — both the Yield card's 'On cost' slot and the Holdings table column", async () => {
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.dividendIncome(), GROSS_INCOME);
+    qc.setQueryData(qk.portfolio(), PORTFOLIO);
+
+    renderWithClient(<DividendAnalyticsPage />, qc);
+
+    await waitFor(() => expect(screen.getByText("Dividend analytics")).toBeInTheDocument());
+
+    // Position yieldOnCost = 0.08 (8%, gross) × factor 0.65 = 5.2%.
+    // Yield card ("On cost" slot, 2 decimals):
+    expect(screen.getByText("5.20%")).toBeInTheDocument();
+    // Holdings table ("Yield on cost" column, 1 decimal):
+    expect(screen.getByTestId("yield-on-cost")).toHaveTextContent("5.2%");
+  });
+
+  it("renders netted annual-income and cash-flow figures", async () => {
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.dividendIncome(), GROSS_INCOME);
+    qc.setQueryData(qk.portfolio(), PORTFOLIO);
+
+    renderWithClient(<DividendAnalyticsPage />, qc);
+
+    await waitFor(() => expect(screen.getByText("Dividend analytics")).toBeInTheDocument());
+
+    // Forward 12m income = 1000 gross × 0.65 = 650.
+    expect(screen.getByTestId("annual-income")).toHaveTextContent("$650");
+    // Cash flow monthly avg = 650 / 12 = 54.17 → rounds to $54 (whole-figure display).
+    expect(screen.getByText("$54")).toBeInTheDocument();
+  });
+
+  it("renders a real gross figure and a 0% net figure at a 100% tax rate — never NaN", async () => {
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.dividendIncome(), { ...GROSS_INCOME, dividendTaxRate: 100 });
+    qc.setQueryData(qk.portfolio(), PORTFOLIO);
+
+    renderWithClient(<DividendAnalyticsPage />, qc);
+
+    await waitFor(() => expect(screen.getByText("Dividend analytics")).toBeInTheDocument());
+
+    // Gross forward yield is unaffected by the tax rate — still 10%. Computing
+    // it from the raw `gross` payload (rather than dividing the netted figure
+    // by `factor`, which is 0 at a 100% rate) is what keeps this a real number.
+    expect(screen.getByText("10.00%")).toBeInTheDocument(); // "Before tax" slot
+    // Net headline = 10% × (1 - 1) = 0%.
+    expect(screen.getByTestId("yield-net")).toHaveTextContent("0.00%");
+    expect(document.body.textContent).not.toContain("NaN");
+  });
+
+  it("does not set a single-letter ticker in mono", async () => {
+    // "O" (Realty Income) in Geist Mono is indistinguishable from a zero, so the
+    // cash-flow rows read "0 · Sep 15". Ticker identity is not a data figure.
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.dividendIncome(), GROSS_INCOME);
+    qc.setQueryData(qk.portfolio(), PORTFOLIO);
+
+    renderWithClient(<DividendAnalyticsPage />, qc);
+
+    await waitFor(() => expect(screen.getByText("Dividend analytics")).toBeInTheDocument());
+
+    const ticker = screen.getByTestId("cashflow-symbol-O");
+    expect(ticker.className).not.toMatch(/font-mono/);
+  });
+
+  it("shows the FX-unavailable banner only when fxIncomplete is set", async () => {
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.dividendIncome(), GROSS_INCOME);
+    qc.setQueryData(qk.portfolio(), PORTFOLIO);
+
+    renderWithClient(<DividendAnalyticsPage />, qc);
+
+    await waitFor(() => expect(screen.getByText("Dividend analytics")).toBeInTheDocument());
+    expect(
+      screen.queryByText(/Exchange rates are temporarily unavailable/),
+    ).not.toBeInTheDocument();
+
+    cleanup();
+
+    const qc2 = makeTestQueryClient();
+    qc2.setQueryData(qk.dividendIncome(), { ...GROSS_INCOME, fxIncomplete: true });
+    qc2.setQueryData(qk.portfolio(), PORTFOLIO);
+
+    renderWithClient(<DividendAnalyticsPage />, qc2);
+
+    await waitFor(() => expect(screen.getByText("Dividend analytics")).toBeInTheDocument());
+    expect(screen.getByText(/Exchange rates are temporarily unavailable/)).toBeInTheDocument();
+  });
+});

@@ -1,0 +1,85 @@
+name: Self-host smoke
+
+# Guards the promise the README makes to every self-hoster: that
+# `cp .env.example .env && docker compose up -d --build` produces a working
+# instance. That claim was false for three weeks — the API image crash-looped on
+# an ESM resolution error and the web container was permanently unhealthy — and
+# nothing caught it, because CI never built the images and the roadmap recorded
+# the change as done from intent rather than evidence.
+#
+# `--wait` is the assertion. It blocks until every service reports healthy and
+# exits non-zero if any does not, so this job fails on exactly the two failures
+# that shipped. The curls afterwards check the app answers, not just that the
+# process is up.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure environment
+        run: |
+          cp .env.example .env
+          # A real random secret: better-auth rejects the placeholder, and a
+          # hardcoded one here would be a bad example to copy.
+          sed -i "s|^BETTER_AUTH_SECRET=.*|BETTER_AUTH_SECRET=$(openssl rand -hex 32)|" .env
+
+      - name: Build and start the stack
+        run: docker compose up -d --build --wait
+
+      - name: API answers
+        run: |
+          curl --fail --silent --show-error http://localhost:3001/health
+          curl --fail --silent --show-error http://localhost:3001/public-config
+
+      - name: Web answers
+        # `/` redirects to /sign-in for a signed-out visitor, so follow it.
+        run: curl --fail --silent --show-error --location -o /dev/null http://localhost:3000
+
+      - name: Signup works end to end
+        # Exercises the paths a fresh install depends on and nothing else does:
+        # migrations having actually run, and the auth hook seeding a portfolio.
+        run: |
+          curl --fail --silent --show-error \
+            -X POST http://localhost:3001/api/auth/sign-up/email \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"smoke@example.com","password":"correct-horse-battery-staple","name":"Smoke"}' \
+            -o /dev/null
+
+      - name: Account recovery works in the shipped image
+        # Guards the Dockerfile's `RUN printf ... /usr/local/bin/sage` block --
+        # nothing else in the repo notices if that install step is deleted or
+        # broken -- and the one path no unit test can reach: a real reset
+        # against a real database, through the wrapper, with no TTY.
+        #
+        # `-T` requests no TTY on purpose. That is what a locked-out
+        # self-hoster's script gets, and it selects the branch that generates
+        # a password instead of prompting for one. Its stdout is discarded
+        # because that generated password would otherwise be published in the
+        # workflow log; the exit code is the assertion.
+        run: |
+          docker compose exec -T api sage list
+          docker compose exec -T api sage reset-password smoke@example.com > /dev/null
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: docker compose ps; docker compose logs --no-color --tail=100
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
