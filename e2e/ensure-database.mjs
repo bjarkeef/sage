@@ -8,7 +8,11 @@
 import postgres from "postgres";
 
 const DATABASE = "sage_e2e";
-const ADMIN_URL = process.env.E2E_ADMIN_URL ?? "postgres://sage:sage@localhost:5432/postgres";
+// Keep both overrides in step with e2e/config.ts. If this honoured only
+// E2E_ADMIN_URL, moving the suite off port 5432 would create the database on
+// one server while the API connected to another.
+const SERVER_URL = process.env.E2E_PG_URL ?? "postgres://sage:sage@localhost:5432";
+const ADMIN_URL = process.env.E2E_ADMIN_URL ?? `${SERVER_URL}/postgres`;
 
 if (DATABASE === "sage") {
   throw new Error("Refusing to run: the e2e database must not be the dev database.");

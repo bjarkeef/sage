@@ -126,7 +126,10 @@ const columnMappingSchema = z.object({
   type: z.string().min(1),
   quantity: z.string().min(1),
   price: z.string().min(1),
-  currency: z.string().min(1),
+  // Optional: a single-currency broker omits the column, and defaultCurrency
+  // stands in for the whole file. parseGenericCsv rejects the case where
+  // neither is given.
+  currency: z.string().nullish(),
   tradeDate: z.string().min(1),
   fee: z.string().nullish(),
   feeCurrency: z.string().nullish(),
@@ -134,6 +137,7 @@ const columnMappingSchema = z.object({
   name: z.string().nullish(),
   defaultCurrency: z.string().length(3).nullish(),
   defaultExchange: z.string().nullish(),
+  typeAliases: z.record(z.string(), z.enum(["buy", "sell", "dividend", "split"])).nullish(),
   dateFormat: z.enum(["iso", "dmy", "mdy", "auto"]).optional(),
 });
 
