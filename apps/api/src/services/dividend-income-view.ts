@@ -684,13 +684,25 @@ export async function buildDividendIncomeView(
   // currency if the book is homogeneous. Portfolio-level sums only include
   // rows that actually land in that currency (converted or native) — never
   // add EUR face value into a USD total.
-  const displayCcy =
+  //
+  // The last resort used to be the literal "USD". On a fresh install with no
+  // dividend history yet every source above is empty, so the summary was built
+  // as `{ amount: "0", currency: "USD" }` and the analytics headline read
+  // `ANNUAL INCOME $0` — a currency the user never chose, on a number that did
+  // not exist. Falling back to the book's own currency covers the ordinary
+  // single-currency install; a mixed book with no display currency yields null,
+  // and the summary below is then omitted rather than invented.
+  const bookCurrencies = new Set(positions.map((p) => p.currency));
+  const displayCcy: string | null =
     targetCurrency ??
     retroactiveDTO[0]?.currency ??
     projectedDTO[0]?.currency ??
     announcedDTO[0]?.currency ??
-    "USD";
+    (bookCurrencies.size === 1 ? [...bookCurrencies][0]! : null);
   const inDisplay = (ccy: string) => ccy === displayCcy;
+  /** A portfolio-level total, or nothing when we cannot name its currency. */
+  const money = (total: Decimal) =>
+    displayCcy === null ? [] : [{ amount: total.toFixed(), currency: displayCcy }];
 
   // A received row we could not convert is excluded from every total by
   // `inDisplay`. That exclusion is correct — mixing currencies in one sum is
@@ -783,15 +795,22 @@ export async function buildDividendIncomeView(
     entry.announced = entry.announced.plus(new Decimal(a.income));
     monthMap.set(month, entry);
   }
-  const monthlyBreakdown = [...monthMap.entries()]
-    .map(([month, val]) => ({
-      month,
-      retroactive: val.retroactive.toFixed(),
-      announced: val.announced.toFixed(),
-      projected: val.projected.toFixed(),
-      currency: displayCcy,
-    }))
-    .sort((a, b) => a.month.localeCompare(b.month));
+  // `monthMap` is filled only from rows passing `inDisplay`, which matches
+  // nothing when there is no display currency — so this is already empty in
+  // that case. Saying so explicitly keeps the row's `currency` a string
+  // instead of widening the DTO to carry a null nobody downstream expects.
+  const monthlyBreakdown =
+    displayCcy === null
+      ? []
+      : [...monthMap.entries()]
+          .map(([month, val]) => ({
+            month,
+            retroactive: val.retroactive.toFixed(),
+            announced: val.announced.toFixed(),
+            projected: val.projected.toFixed(),
+            currency: displayCcy,
+          }))
+          .sort((a, b) => a.month.localeCompare(b.month));
 
   // Only display-currency rows enter the forward map. convertAmount leaves
   // unconvertible rows in their native currency; summing those into a map that
@@ -802,16 +821,25 @@ export async function buildDividendIncomeView(
     inFlightDTO.filter((r) => inDisplay(r.currency)),
   );
 
-  const perHolding = buildPerHolding(symbols, forwardBySymbol, divHistory, now, displayCcy);
+  // Same reasoning as monthlyBreakdown below: `forwardBySymbol` is built from
+  // `inDisplay` rows only, so both of these are empty when the currency is
+  // unknown. Every figure they carry is money, and money needs a unit.
+  const perHolding =
+    displayCcy === null
+      ? []
+      : buildPerHolding(symbols, forwardBySymbol, divHistory, now, displayCcy);
 
-  const incomeByGroup = buildIncomeByGroup(
-    symbols,
-    forwardBySymbol,
-    nameBySymbol,
-    currencyBySymbol,
-    sectorBySymbol,
-    displayCcy,
-  );
+  const incomeByGroup =
+    displayCcy === null
+      ? { holdings: [], sector: [], currency: [] }
+      : buildIncomeByGroup(
+          symbols,
+          forwardBySymbol,
+          nameBySymbol,
+          currencyBySymbol,
+          sectorBySymbol,
+          displayCcy,
+        );
 
   const yearMap = new Map<string, Decimal>();
   for (const r of retroactiveDTO) {
@@ -821,9 +849,12 @@ export async function buildDividendIncomeView(
     const year = cashDate.slice(0, 4);
     yearMap.set(year, (yearMap.get(year) ?? new Decimal(0)).plus(new Decimal(r.income)));
   }
-  const receivedByYear = [...yearMap.entries()]
-    .map(([year, amt]) => ({ year, amount: amt.toFixed(2), currency: displayCcy }))
-    .sort((a, b) => a.year.localeCompare(b.year));
+  const receivedByYear =
+    displayCcy === null
+      ? []
+      : [...yearMap.entries()]
+          .map(([year, amt]) => ({ year, amount: amt.toFixed(2), currency: displayCcy }))
+          .sort((a, b) => a.year.localeCompare(b.year));
 
   return {
     retroactive: retroactiveDTO,
@@ -838,8 +869,11 @@ export async function buildDividendIncomeView(
     incomeRecordingOff,
     allowNegativeDividendGrowth,
     summary: {
-      trailingTwelveMonthIncome: [{ amount: totalRetro.toFixed(), currency: displayCcy }],
-      projectedTwelveMonthIncome: [{ amount: totalProj.toFixed(), currency: displayCcy }],
+      // Empty when there is no currency to state the total in, which the
+      // clients already render as "—". A figure needs a unit; `0` on its own is
+      // not a smaller truth than "we don't know", it is a different claim.
+      trailingTwelveMonthIncome: money(totalRetro),
+      projectedTwelveMonthIncome: money(totalProj),
       monthlyBreakdown,
       receivedByYear,
     },
