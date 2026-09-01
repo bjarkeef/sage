@@ -48,9 +48,9 @@ These are deliberate, documented, and not vulnerabilities:
   visitor create an account; `ALLOW_SIGNUP=false` shuts it after yours. An
   instance exposed to the internet before that is a real problem, and the
   deployment docs say so.
-- **Company logos are off by default**, because fetching one tells a third
-  party which company it is for. `NEXT_PUBLIC_LOGO_DEV_TOKEN` turns them on;
-  `.env.example` states what that discloses. News thumbnails are still loaded
-  from publisher image hosts by the browser, which is documented in the
-  README's "How it works" and not yet fixed. Reports of _other_ undocumented
-  outbound requests are very welcome.
+- **Company logos and news thumbnails are off by default**, because loading
+  either tells a third party which company it is for.
+  `NEXT_PUBLIC_LOGO_DEV_TOKEN` and `NEXT_PUBLIC_NEWS_THUMBNAILS` turn them on;
+  `.env.example` states what each discloses. With both unset, nothing in Sage
+  sends a third party anything about your positions. Reports of _other_
+  undocumented outbound requests are very welcome.

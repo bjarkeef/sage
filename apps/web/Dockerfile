@@ -17,11 +17,14 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build
 COPY . .
 ENV SAGE_STANDALONE=true
-# Next inlines NEXT_PUBLIC_* at build time, so this has to arrive as a build
-# arg rather than a runtime env var. Empty by default, which is what keeps a
-# stock image from requesting logos for the companies its owner holds.
+# Next inlines NEXT_PUBLIC_* at build time, so these have to arrive as build
+# args rather than runtime env vars. Both empty by default, which is what keeps
+# a stock image from telling anyone what its owner holds — logo.dev for the
+# companies themselves, publisher image hosts for the stories about them.
 ARG NEXT_PUBLIC_LOGO_DEV_TOKEN=""
 ENV NEXT_PUBLIC_LOGO_DEV_TOKEN=$NEXT_PUBLIC_LOGO_DEV_TOKEN
+ARG NEXT_PUBLIC_NEWS_THUMBNAILS=""
+ENV NEXT_PUBLIC_NEWS_THUMBNAILS=$NEXT_PUBLIC_NEWS_THUMBNAILS
 RUN pnpm turbo run build --filter=@sage/web
 
 # ---- runtime ----

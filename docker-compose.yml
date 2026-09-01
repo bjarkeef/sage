@@ -57,8 +57,9 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        # Opt-in only; see .env.example for what turning it on discloses.
+        # Opt-in only; see .env.example for what turning these on disclose.
         NEXT_PUBLIC_LOGO_DEV_TOKEN: ${NEXT_PUBLIC_LOGO_DEV_TOKEN:-}
+        NEXT_PUBLIC_NEWS_THUMBNAILS: ${NEXT_PUBLIC_NEWS_THUMBNAILS:-}
     restart: unless-stopped
     ports:
       - "3000:3000"

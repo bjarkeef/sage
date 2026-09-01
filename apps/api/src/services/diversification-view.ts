@@ -71,9 +71,16 @@ export async function buildDiversificationView(
   const { db, provider, fxRateService } = deps;
   const book =
     opts.book ?? (await loadPortfolioBook(db, userId, { currency: opts.currency ?? null }));
-  // Diversification always labels in a concrete currency (default USD).
-  const currencyCode: string = book.targetCurrency ?? "USD";
   const { portfolioId, positions } = book;
+  // Diversification has to label in one concrete currency, because its buckets
+  // are sums. Prefer the user's display currency; failing that the book's own,
+  // when it has just one — a EUR-only book used to be converted into dollars
+  // and labelled `$`, a currency its owner never picked, on the strength of a
+  // hardcoded default here. A genuinely mixed book with no display currency
+  // still has to land somewhere, and USD remains that somewhere.
+  const bookCurrencies = new Set(positions.map((p) => p.currency));
+  const currencyCode: string =
+    book.targetCurrency ?? (bookCurrencies.size === 1 ? [...bookCurrencies][0]! : "USD");
   const money = (v: Decimal): MoneyDTO => ({ amount: v.toFixed(2), currency: currencyCode });
 
   if (positions.length === 0) {
