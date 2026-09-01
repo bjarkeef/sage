@@ -65,6 +65,34 @@ describe("SystemSection", () => {
     expect(screen.getByText("23")).toBeInTheDocument();
   });
 
+  /** Registration stays open after the owner signs up — closing it takes an env
+   *  change and a restart, and nothing prompted for either. Sitting in a row
+   *  next to the Node version, it read as trivia rather than as an instance
+   *  anyone who can reach the port can register on. */
+  it("warns while the instance still accepts new accounts", async () => {
+    getSystemStatusMock.mockResolvedValue(
+      systemDTO({
+        environment: {
+          nodeEnv: "production",
+          nodeVersion: "v22.14.0",
+          uptimeSeconds: 10,
+          signups: "open",
+          schemaMigrations: 23,
+        },
+      }),
+    );
+    render(<SystemSection />);
+    expect(await screen.findByText(/accepting new accounts/i)).toBeInTheDocument();
+    expect(screen.getByText("ALLOW_SIGNUP=false")).toBeInTheDocument();
+  });
+
+  it("stays quiet once registration is closed", async () => {
+    getSystemStatusMock.mockResolvedValue(systemDTO());
+    render(<SystemSection />);
+    expect(await screen.findByText("closed")).toBeInTheDocument();
+    expect(screen.queryByText(/accepting new accounts/i)).not.toBeInTheDocument();
+  });
+
   it("shows uptime, so a just-restarted API is visible", async () => {
     getSystemStatusMock.mockResolvedValue(systemDTO());
     render(<SystemSection />);

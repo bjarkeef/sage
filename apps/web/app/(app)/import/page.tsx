@@ -23,6 +23,7 @@ import {
   commitCsvImport,
   type ColumnMappingDTO,
   type CsvInspectDTO,
+  type ImportTypeDTO,
 } from "@/lib/api";
 import { invalidateFor } from "@/lib/query/invalidation";
 import { formatDate } from "@/lib/format";
@@ -31,23 +32,42 @@ import type { ImportPreviewDTO, ImportResultDTO, ImportTransactionDTO } from "@/
 type Format = "snowball" | "generic";
 type Step = "upload" | "map" | "review" | "done";
 
+/** The mapping fields that name a CSV column, as opposed to the defaults and
+ *  the value aliases, which have their own controls. */
+type MappableColumn =
+  | "tradeDate"
+  | "symbol"
+  | "type"
+  | "quantity"
+  | "price"
+  | "currency"
+  | "fee"
+  | "feeCurrency"
+  | "exchange"
+  | "name";
+
 const MAP_FIELDS: {
-  key: keyof ColumnMappingDTO;
+  key: MappableColumn;
   label: string;
   required?: boolean;
   optionalCol?: boolean;
+  note?: string;
 }[] = [
   { key: "tradeDate", label: "Trade date", required: true },
   { key: "symbol", label: "Symbol / ticker", required: true },
   { key: "type", label: "Type (buy/sell/…)", required: true },
   { key: "quantity", label: "Quantity", required: true },
   { key: "price", label: "Price", required: true },
-  { key: "currency", label: "Currency", required: true },
+  // Not every export has one — a single-currency broker leaves it out, and the
+  // default below covers the whole file.
+  { key: "currency", label: "Currency", optionalCol: true, note: "or set a default below" },
   { key: "fee", label: "Fee", optionalCol: true },
   { key: "feeCurrency", label: "Fee currency", optionalCol: true },
   { key: "exchange", label: "Exchange", optionalCol: true },
   { key: "name", label: "Name", optionalCol: true },
 ];
+
+const TYPE_CHOICES: ImportTypeDTO[] = ["buy", "sell", "dividend", "split"];
 
 function emptyMapping(): ColumnMappingDTO {
   return {
@@ -56,13 +76,14 @@ function emptyMapping(): ColumnMappingDTO {
     type: "",
     quantity: "",
     price: "",
-    currency: "",
+    currency: null,
     fee: null,
     feeCurrency: null,
     exchange: null,
     name: null,
     defaultCurrency: null,
     defaultExchange: null,
+    typeAliases: {},
     dateFormat: "auto",
   };
 }
@@ -71,10 +92,12 @@ function mergeSuggested(s: Partial<ColumnMappingDTO>): ColumnMappingDTO {
   return {
     ...emptyMapping(),
     ...s,
+    currency: s.currency ?? null,
     fee: s.fee ?? null,
     feeCurrency: s.feeCurrency ?? null,
     exchange: s.exchange ?? null,
     name: s.name ?? null,
+    typeAliases: {},
     dateFormat: s.dateFormat ?? "auto",
   };
 }
@@ -166,13 +189,32 @@ export default function ImportPage() {
     if (inputRef.current) inputRef.current.value = "";
   }
 
+  // A currency column OR a default for the whole file — requiring the column
+  // made defaultCurrency unreachable and turned a single-currency export into a
+  // dead end.
+  const currencyReady = Boolean(mapping.currency) || (mapping.defaultCurrency ?? "").length === 3;
   const mappingReady =
     mapping.tradeDate &&
     mapping.symbol &&
     mapping.type &&
     mapping.quantity &&
     mapping.price &&
-    mapping.currency;
+    currencyReady;
+
+  const typeValues = inspect && mapping.type ? (inspect.valuesByColumn[mapping.type] ?? []) : [];
+  const aliases = mapping.typeAliases ?? {};
+  const unplacedRows = typeValues
+    .filter((v) => v.resolved === null && !aliases[v.normalized])
+    .reduce((n, v) => n + v.count, 0);
+
+  function setTypeAlias(normalized: string, type: ImportTypeDTO | null) {
+    setMapping((m) => {
+      const next = { ...(m.typeAliases ?? {}) };
+      if (type) next[normalized] = type;
+      else delete next[normalized];
+      return { ...m, typeAliases: next };
+    });
+  }
 
   return (
     <PageShell className="py-10">
@@ -229,8 +271,13 @@ export default function ImportPage() {
         <div className="mt-6 space-y-4">
           <Callout>
             <p className="text-sm">
-              {inspect.rowCount} data rows. Map each Sage field to a column. Type values accept
-              buy/sell/dividend/split (case-insensitive).
+              {inspect.rowCount} data rows. Map each Sage field to a column below. Prices and
+              quantities may carry currency symbols and thousand separators — <code>$1,241.30</code>{" "}
+              and <code>1.241,30</code> both read fine.
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              A dividend row&apos;s price is the amount <em>per share</em>, and a split row&apos;s
+              quantity is the ratio — 2 for a two-for-one, 0.5 for a one-for-two reverse split.
             </p>
           </Callout>
 
@@ -240,6 +287,7 @@ export default function ImportPage() {
                 <span className="text-muted-foreground">
                   {f.label}
                   {f.required ? " *" : ""}
+                  {f.note && <span className="block text-xs opacity-70">{f.note}</span>}
                 </span>
                 <select
                   className="rounded-control border border-hairline bg-surface-active px-3 py-2 text-sm"
@@ -281,9 +329,14 @@ export default function ImportPage() {
             </label>
 
             <label className="grid grid-cols-[160px_1fr] items-center gap-3 text-sm">
-              <span className="text-muted-foreground">Default currency</span>
+              <span className="text-muted-foreground">
+                Default currency
+                {!mapping.currency && <span className="block text-xs opacity-70">required *</span>}
+              </span>
               <Input
-                placeholder="e.g. EUR when column empty"
+                placeholder={
+                  mapping.currency ? "e.g. EUR when column empty" : "e.g. EUR for every row"
+                }
                 maxLength={3}
                 value={mapping.defaultCurrency ?? ""}
                 onChange={(e) =>
@@ -294,7 +347,70 @@ export default function ImportPage() {
                 }
               />
             </label>
+
+            <label className="grid grid-cols-[160px_1fr] items-center gap-3 text-sm">
+              <span className="text-muted-foreground">Default exchange</span>
+              <Input
+                placeholder="e.g. XETRA when column empty"
+                value={mapping.defaultExchange ?? ""}
+                onChange={(e) =>
+                  setMapping((m) => ({ ...m, defaultExchange: e.target.value.trim() || null }))
+                }
+              />
+            </label>
           </Card>
+
+          {typeValues.length > 0 && (
+            <Card className="space-y-3 p-5">
+              <div>
+                <p className="text-sm font-medium">
+                  What each value in &ldquo;{mapping.type}&rdquo; means
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {unplacedRows > 0
+                    ? `${unplacedRows} ${unplacedRows === 1 ? "row uses a word" : "rows use words"} Sage does not recognise. Place them here or they will be skipped.`
+                    : "Sage placed every value. Change any it read wrongly."}
+                </p>
+              </div>
+              <div className="space-y-2">
+                {typeValues.map((v) => {
+                  const override = aliases[v.normalized] ?? null;
+                  const unplaced = !v.resolved && !override;
+                  return (
+                    <label
+                      key={v.normalized}
+                      className="grid grid-cols-[1fr_auto_140px] items-center gap-3 text-sm"
+                    >
+                      <span className={unplaced ? "text-loss" : ""}>{v.value}</span>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {v.count} {v.count === 1 ? "row" : "rows"}
+                      </span>
+                      <select
+                        aria-label={`Type for ${v.value}`}
+                        className="rounded-control border border-hairline bg-surface-active px-3 py-1.5 text-sm"
+                        value={override ?? ""}
+                        onChange={(e) =>
+                          setTypeAlias(
+                            v.normalized,
+                            (e.target.value || null) as ImportTypeDTO | null,
+                          )
+                        }
+                      >
+                        <option value="">
+                          {v.resolved ? `Auto — ${v.resolved}` : "Skip these rows"}
+                        </option>
+                        {TYPE_CHOICES.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
 
           {inspect.sampleRows.length > 0 && (
             <ExpandableSection title="Sample rows" defaultOpen>

@@ -10,6 +10,11 @@ const nextConfig = {
   // the navigation. Nothing is lost: it reports compile status that the
   // terminal already prints.
   devIndicators: false,
+  // Next 16 writes its own apps/web/AGENTS.md and apps/web/CLAUDE.md on dev
+  // start. This repo authors both at the root, and a generated pair one level
+  // down contradicts them — and lands as untracked files in every
+  // contributor's first `git status`.
+  agentRules: false,
   images: {
     // logo.dev only, and only reachable at all when the operator sets
     // NEXT_PUBLIC_LOGO_DEV_TOKEN. The Google favicon host was removed with the
