@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Callout, Card, CardTitle, DataRow, RowCell, RowGrid, RowHeader } from "@sage/ui";
 import { getSystemStatus } from "@/lib/api";
+import { CurrencyPicker } from "@/components/currency-picker";
 import { formatSecondsAgo, formatUptime, providerLabel } from "@/lib/format";
 import { qk } from "@/lib/query/keys";
 import type { FxPairStatusDTO, ProviderHealthDTO, SystemDTO } from "@/lib/types";
@@ -168,7 +169,16 @@ export function SystemSection() {
             </p>
 
             <div>
-              <h4 className="label-caps text-muted-foreground">Exchange rates</h4>
+              {/* The picker also lives in every money page's header, which is
+                  where you change it in passing. It belongs here too because
+                  this is the one place that *names* the setting — stating "No
+                  display currency set" beside no way to set one sent people
+                  looking through Settings for a control that was in the page
+                  header all along. */}
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="label-caps text-muted-foreground">Exchange rates</h4>
+                <CurrencyPicker initialCurrency={data.fx.displayCurrency} />
+              </div>
               <p className="mt-1 text-xs text-muted-foreground">{fxSummary(data.fx)}</p>
               {data.fx.coverageFrom && (
                 <p className="mt-1 text-xs text-muted-foreground">
