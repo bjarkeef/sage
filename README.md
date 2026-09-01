@@ -199,9 +199,15 @@ is a deliberate trade rather than a default:
 [`.env.example`](./.env.example) says what it discloses. The screenshots above
 were taken with it on.
 
-**News thumbnails go to whoever published them.** The news and asset pages
-render provider-supplied image URLs directly, so those publishers' image hosts
-see that someone is reading a story about that company.
+**News thumbnails are off for the same reason.** A story's image lives on the
+publisher's server, so loading one is a request from your browser, at your
+address, made without you clicking anything — down a feed scoped to what you
+own. Sage renders the headlines and skips the pictures.
+`NEXT_PUBLIC_NEWS_THUMBNAILS=true` turns them on. Following a headline still
+goes to the publisher, but that is a choice you make.
+
+Those two settings are the only things in Sage that can tell a third party what
+you hold. With both unset, nothing does.
 
 Prices and ECB reference rates are stored in your database as they arrive,
 which is why the app still has something to show when a provider is

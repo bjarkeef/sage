@@ -93,6 +93,35 @@ describe("SystemSection", () => {
     expect(screen.queryByText(/accepting new accounts/i)).not.toBeInTheDocument();
   });
 
+  /** Settings named the condition — "No display currency set" — beside no way
+   *  to set one, sending people hunting through Settings for a control that
+   *  was in the page header all along. */
+  it("offers the currency control beside the sentence that names it", async () => {
+    getSystemStatusMock.mockResolvedValue(
+      systemDTO({
+        fx: { displayCurrency: null, ratesAsOf: null, coverageFrom: "1999-01-04", pairs: [] },
+      }),
+    );
+    render(<SystemSection />);
+    expect(await screen.findByText(/No display currency set/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Native" })).toBeInTheDocument();
+  });
+
+  it("shows the chosen currency on that control once one is set", async () => {
+    getSystemStatusMock.mockResolvedValue(
+      systemDTO({
+        fx: {
+          displayCurrency: "DKK",
+          ratesAsOf: "2026-07-24",
+          coverageFrom: "1999-01-04",
+          pairs: [],
+        },
+      }),
+    );
+    render(<SystemSection />);
+    expect(await screen.findByRole("button", { name: "DKK" })).toBeInTheDocument();
+  });
+
   it("shows uptime, so a just-restarted API is visible", async () => {
     getSystemStatusMock.mockResolvedValue(systemDTO());
     render(<SystemSection />);
