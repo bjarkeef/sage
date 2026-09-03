@@ -14,7 +14,7 @@ import { instrument, customHolding, manualPrice, assetProfile, transaction } fro
 import { getUserPortfolio } from "../auth";
 import { syncAllPositionDividends } from "../market-data/dividend-sync";
 import { syncCustomIncome } from "../services/custom-income-sync";
-import { parseSnowballCSV } from "../import/snowball-parser";
+import { parseSnowballCSV, isSnowballCsv } from "../import/snowball-parser";
 import { inspectCsv, parseGenericCsv, type ColumnMapping } from "../import/generic-csv";
 import { planImport, executeImport, type PlannedRow } from "../import/dedupe";
 import type { ImportInstrument, ParseResult } from "../import/types";
@@ -164,6 +164,31 @@ async function previewFromParsed(db: Database, portfolioId: string, parsed: Pars
       customHoldings: parsed.customSettings.length,
       priceMarks: parsed.priceMarks.length,
     },
+  };
+}
+
+/**
+ * A file this route must not parse, because a dedicated parser reads meaning
+ * the column mapping cannot.
+ *
+ * The mapping UI can find plausible columns in a Snowball export — `Symbol`,
+ * `Price`, `Quantity` all look ordinary — and produce silent corruption: the
+ * exchange lives in its own column, so `KOBANK`/`CO` imports as a bare
+ * `KOBANK` that duplicates the existing `KOBANK.CO`, and a dividend's
+ * `Price` is per share against a `Quantity` holding the total amount, so rows
+ * land at the wrong size or, where Snowball writes `Price=0`, at no value at
+ * all. None of that fails loudly, so the guard is here and not just in the UI.
+ */
+function detectWrongImporter(
+  text: string,
+): { error: "wrong_importer"; detectedFormat: "snowball"; message: string } | null {
+  if (!isSnowballCsv(text)) return null;
+  return {
+    error: "wrong_importer",
+    detectedFormat: "snowball",
+    message:
+      "This is a Snowball Analytics export. Import it with the Snowball option, " +
+      "which reads its exchange column and dividend amounts correctly.",
   };
 }
 
@@ -443,7 +468,10 @@ export function importRoutes(
       return c.json({ error: "invalid_mapping", issues: mappingParsed.error.issues }, 400);
     }
     const mapping: ColumnMapping = mappingParsed.data;
-    const parsed = parseGenericCsv(await file.text(), mapping);
+    const text = await file.text();
+    const wrongImporter = detectWrongImporter(text);
+    if (wrongImporter) return c.json(wrongImporter, 409);
+    const parsed = parseGenericCsv(text, mapping);
     const { id: portfolioId } = await getUserPortfolio(db, c.get("user").id);
     return c.json(await previewFromParsed(db, portfolioId, parsed));
   });
@@ -471,7 +499,10 @@ export function importRoutes(
       return c.json({ error: "invalid_mapping", issues: mappingParsed.error.issues }, 400);
     }
     const mapping: ColumnMapping = mappingParsed.data;
-    const parsed = parseGenericCsv(await file.text(), mapping);
+    const text = await file.text();
+    const wrongImporter = detectWrongImporter(text);
+    if (wrongImporter) return c.json(wrongImporter, 409);
+    const parsed = parseGenericCsv(text, mapping);
     if (parsed.transactions.length === 0 && parsed.warnings.length > 0) {
       return c.json({ error: "empty_import", warnings: parsed.warnings }, 400);
     }
