@@ -352,6 +352,8 @@ export type CsvInspectDTO = {
   rowCount: number;
   suggestedMapping: Partial<ColumnMappingDTO>;
   valuesByColumn: Record<string, ColumnValueSummaryDTO[]>;
+  /** Set when the file belongs to a broker format with its own parser. */
+  detectedFormat: "snowball" | null;
 };
 
 export async function inspectCsvImport(file: File): Promise<CsvInspectDTO> {

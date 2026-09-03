@@ -119,6 +119,7 @@ export default function ImportPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [restoreDeleted, setRestoreDeleted] = useState(false);
+  const [autoRouted, setAutoRouted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleFileSelect(f: File) {
@@ -132,6 +133,19 @@ export default function ImportPage() {
         setStep("review");
       } else {
         const data = await inspectCsvImport(f);
+        // A Snowball export has columns the mapping step can match but not
+        // read: the exchange lives in its own column, and a dividend's price
+        // is per share against a quantity holding the total. Mapping it by
+        // hand duplicates every non-US holding and imports dividends at the
+        // wrong size or at zero — so the file picks the importer, not the tab.
+        if (data.detectedFormat === "snowball") {
+          setFormat("snowball");
+          setAutoRouted(true);
+          const preview = await previewSnowballImport(f);
+          setPreview(preview);
+          setStep("review");
+          return;
+        }
         setInspect(data);
         setMapping(mergeSuggested(data.suggestedMapping));
         setStep("map");
@@ -186,6 +200,7 @@ export default function ImportPage() {
     setResult(null);
     setError(null);
     setRestoreDeleted(false);
+    setAutoRouted(false);
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -457,6 +472,16 @@ export default function ImportPage() {
 
       {step === "review" && preview && (
         <div className="mt-6 space-y-4">
+          {autoRouted && (
+            <Callout>
+              This is a Snowball Analytics export, so Sage read it with the Snowball importer
+              instead of asking you to map columns. That keeps the exchange on each ticker —{" "}
+              <span className="font-mono">KOBANK.CO</span> rather than a second, empty{" "}
+              <span className="font-mono">KOBANK</span> — and reads dividend amounts the way
+              Snowball writes them.
+            </Callout>
+          )}
+
           <StatStrip>
             <Stat size="sm" label="Buys" value={preview.summary.buys} />
             <Stat size="sm" label="Sells" value={preview.summary.sells} />

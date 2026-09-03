@@ -144,6 +144,97 @@ describeDb("import routes", () => {
     expect(nvda!.feeCurrency).toBe("USD");
   });
 
+  // The generic path silently mangles a Snowball export: it drops the exchange
+  // suffix (`KOBANK.CO` becomes a bare `KOBANK` that duplicates the holding)
+  // and reads a dividend's per-share price against its total amount, landing
+  // rows at the wrong quantity or at zero. This happened to a real book.
+  describe("Snowball files are kept out of the generic importer", () => {
+    const mapping = JSON.stringify({
+      tradeDate: "Date",
+      symbol: "Symbol",
+      type: "Event",
+      quantity: "Quantity",
+      price: "Price",
+      currency: "Currency",
+      dateFormat: "auto",
+    });
+
+    function genericBody(file: File): FormData {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("mapping", mapping);
+      return fd;
+    }
+
+    const snowball = () =>
+      csvFile('BUY,2024-03-08 00:00:00,KOBANK,"205.5","10",DKK,"29",CO,"DKK","False",""');
+
+    it("inspect names the format instead of only suggesting columns", async () => {
+      const res = await app.request("/import/csv/inspect", {
+        method: "POST",
+        headers: { cookie },
+        body: formBody(snowball()),
+      });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { detectedFormat: string | null }).detectedFormat).toBe(
+        "snowball",
+      );
+    });
+
+    it("preview refuses it", async () => {
+      const res = await app.request("/import/csv/preview", {
+        method: "POST",
+        headers: { cookie },
+        body: genericBody(snowball()),
+      });
+      expect(res.status).toBe(409);
+      expect((await res.json()) as { error: string }).toMatchObject({
+        error: "wrong_importer",
+        detectedFormat: "snowball",
+      });
+    });
+
+    it("commit refuses it, so no rows land", async () => {
+      const before = await tdb.db.select().from(transaction);
+      const res = await app.request("/import/csv/commit", {
+        method: "POST",
+        headers: { cookie },
+        body: genericBody(snowball()),
+      });
+      expect(res.status).toBe(409);
+      const after = await tdb.db.select().from(transaction);
+      expect(after).toHaveLength(before.length);
+    });
+
+    it("still accepts an ordinary broker export", async () => {
+      const file = new File(
+        [`Date,Ticker,Side,Qty,Price,CCY\n2024-01-15,ZZTEST,BUY,10,150.00,USD\n`],
+        "broker.csv",
+        { type: "text/csv" },
+      );
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append(
+        "mapping",
+        JSON.stringify({
+          tradeDate: "Date",
+          symbol: "Ticker",
+          type: "Side",
+          quantity: "Qty",
+          price: "Price",
+          currency: "CCY",
+          dateFormat: "auto",
+        }),
+      );
+      const res = await app.request("/import/csv/preview", {
+        method: "POST",
+        headers: { cookie },
+        body: fd,
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+
   describe("idempotent re-import", () => {
     async function commit(file: File, restoreDeleted = false) {
       const res = await app.request("/import/snowball/commit", {

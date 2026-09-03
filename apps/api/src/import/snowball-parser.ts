@@ -102,6 +102,38 @@ function parseCustomSettings(row: SnowballRawRow): ImportCustomSettings | null {
   }
 }
 
+/**
+ * Snowball's export header, reduced to the columns that identify it.
+ *
+ * `DoNotAdjustCash` is the fingerprint — no ordinary broker export has it —
+ * while `Event` and `Symbol` keep a file that merely happens to carry a cash
+ * flag from being claimed. Matching a subset rather than the exact header
+ * means a future Snowball release can add or drop a trailing column without
+ * silently routing the file back into the generic importer.
+ */
+const SNOWBALL_SIGNATURE = ["event", "symbol", "donotadjustcash"];
+
+function normalizeHeader(h: string): string {
+  return h.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * True when this text is a Snowball export.
+ *
+ * The generic importer can read these columns but not their meaning: it drops
+ * the exchange suffix that separates `KOBANK.CO` from a bare `KOBANK`, and it
+ * reads a dividend's `Price`/`Quantity` pair literally when Snowball writes
+ * per-share price against total amount — so rows import at the wrong quantity,
+ * or at zero, under symbols that duplicate the book instead of matching it.
+ * Callers use this to route the file here instead.
+ */
+export function isSnowballCsv(csvText: string): boolean {
+  const firstLine = csvText.split(/\r?\n/, 1)[0];
+  if (!firstLine) return false;
+  const headers = new Set(Papa.parse<string[]>(firstLine).data[0]?.map(normalizeHeader) ?? []);
+  return SNOWBALL_SIGNATURE.every((h) => headers.has(h));
+}
+
 export function parseSnowballCSV(csvText: string): ParseResult {
   const { data } = Papa.parse<SnowballRawRow>(csvText, {
     header: true,
