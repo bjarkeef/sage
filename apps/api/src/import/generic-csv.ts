@@ -2,6 +2,7 @@ import Papa from "papaparse";
 import { Decimal } from "@sage/core";
 import { parseNumber } from "./parse-number";
 import { resolveType, normalizeTypeValue, describeTypeFailure } from "./parse-type";
+import { isSnowballCsv } from "./snowball-parser";
 import type {
   ImportInstrument,
   ImportTransaction,
@@ -68,6 +69,14 @@ export interface CsvInspectResult {
    * without a second round trip when they change which column holds the type.
    */
   valuesByColumn: Record<string, ColumnValueSummary[]>;
+  /**
+   * Set when the file is a known broker format with a dedicated parser, which
+   * reads meaning this one cannot: Snowball encodes the exchange in its own
+   * column and a dividend's amount in `Quantity`. Mapping such a file column
+   * by column loses both. The caller routes on this rather than trusting
+   * whichever format tab happened to be selected.
+   */
+  detectedFormat: "snowball" | null;
 }
 
 /** Above this a column is free text (prices, dates), not a category. */
@@ -194,6 +203,7 @@ export function inspectCsv(text: string): CsvInspectResult {
     rowCount: data.length,
     suggestedMapping: suggestMapping(headers),
     valuesByColumn: summarizeValues(headers, data),
+    detectedFormat: isSnowballCsv(text) ? "snowball" : null,
   };
 }
 

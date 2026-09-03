@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseSnowballCSV } from "./snowball-parser";
+import { parseSnowballCSV, isSnowballCsv } from "./snowball-parser";
 
 const header =
   "Event,Date,Symbol,Price,Quantity,Currency,FeeTax,Exchange,FeeCurrency,DoNotAdjustCash,Note";
@@ -282,5 +282,37 @@ describe("parseSnowballCSV", () => {
     expect(result.transactions).toHaveLength(0);
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0]!.reason).toContain("Unknown event");
+  });
+});
+
+describe("isSnowballCsv", () => {
+  it("recognizes a Snowball export by its header", () => {
+    expect(isSnowballCsv(csv())).toBe(true);
+  });
+
+  it("recognizes it regardless of case and separator style", () => {
+    expect(
+      isSnowballCsv(
+        "event,date,symbol,price,quantity,currency,fee_tax,exchange,do-not-adjust-cash",
+      ),
+    ).toBe(true);
+  });
+
+  // The whole point: an ordinary broker export must still reach the generic
+  // importer, or auto-routing would break every other file.
+  it("does not claim an ordinary broker export", () => {
+    expect(
+      isSnowballCsv("Date,Ticker,Side,Qty,Price,CCY,Fee\n2024-01-15,AAPL,BUY,10,150,USD,1"),
+    ).toBe(false);
+  });
+
+  // Event + Symbol alone are common enough elsewhere; the cash flag is the
+  // fingerprint, so a file with only the generic-looking half is not Snowball.
+  it("does not claim a file that merely has an Event column", () => {
+    expect(isSnowballCsv("Event,Date,Symbol,Price,Quantity,Currency")).toBe(false);
+  });
+
+  it("handles an empty file", () => {
+    expect(isSnowballCsv("")).toBe(false);
   });
 });
