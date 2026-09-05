@@ -107,7 +107,15 @@
   --income: var(--gold-500);
   --income-muted: color-mix(in srgb, var(--gold-500) 55%, transparent);
 
-  /* chart language — line is always the accent; comparisons are muted, dashed */
+  /* chart language — line is always the accent; comparisons are muted, dashed.
+     Trade markers are deliberately NOT the accent: --chart-line IS --primary,
+     so a marker in the accent is invisible on the line it sits on. They are
+     drawn in ink over a card-coloured halo that punches them out of the line,
+     and direction is carried by arrow shape rather than colour — a trade is an
+     event, not a verdict, and this file's colours already mean something
+     specific (gold = income, --loss = a loss). */
+  --chart-marker: var(--foreground);
+  --chart-marker-halo: var(--card);
   --chart-line: var(--primary);
   --chart-comparison-1: var(--gray-500);
   --chart-comparison-2: var(--seg-4);
@@ -177,6 +185,8 @@
   --income: var(--gold-300);
   --income-muted: color-mix(in srgb, var(--gold-300) 55%, transparent);
 
+  --chart-marker: var(--foreground);
+  --chart-marker-halo: var(--card);
   --chart-line: var(--primary);
   --chart-comparison-1: var(--gray-400);
   --chart-comparison-2: var(--seg-4);

@@ -6,16 +6,19 @@ import { Delta, SectionHeader, Stat } from "@sage/ui";
 import { getPortfolio } from "../../../../lib/api";
 import { qk } from "../../../../lib/query/keys";
 import { formatMoney, moneyToNumber } from "../../../../lib/format";
+import { netFactor } from "../../../../lib/dividend-tax";
 import type { AssetPositionDTO } from "../../../../lib/types";
 
 export function PositionSection({
   position,
   currency,
   symbol,
+  taxRate,
 }: {
   position: AssetPositionDTO;
   currency: string;
   symbol: string;
+  taxRate: number | null;
 }) {
   const { data: portfolio } = useQuery({
     queryKey: qk.portfolio(),
@@ -25,6 +28,23 @@ export function PositionSection({
   });
 
   if (!position.held) return null;
+
+  // Income figures net, the same way the Income section below nets its yields —
+  // this section previously took no tax rate at all, so the page showed the
+  // same "Yield on cost" twice, gross here and net there, ~200px apart. The
+  // basis now rides on each figure rather than on a caption in another card.
+  const f = netFactor(taxRate);
+  const basis = taxRate != null ? "after tax" : "before tax";
+  const yieldOnCost = position.yieldOnCost == null ? null : position.yieldOnCost * f;
+  const forwardIncome = position.forwardAnnualIncome
+    ? {
+        amount: (Number(position.forwardAnnualIncome.amount) * f).toFixed(2),
+        currency: position.forwardAnnualIncome.currency,
+      }
+    : null;
+  const dividendIncome = position.totalDividendIncome
+    ? (Number(position.totalDividendIncome) * f).toFixed(2)
+    : null;
 
   let weight: number | null = null;
   if (portfolio) {
@@ -63,24 +83,24 @@ export function PositionSection({
     {
       label: "Yield on cost",
       value:
-        position.yieldOnCost != null ? (
-          <span className="text-income">{`${(position.yieldOnCost * 100).toFixed(2)}%`}</span>
+        yieldOnCost != null ? (
+          <span className="text-income">{`${(yieldOnCost * 100).toFixed(2)}%`}</span>
         ) : (
           "—"
         ),
+      context: yieldOnCost != null ? basis : undefined,
     },
     {
       label: "Forward income",
-      value: position.forwardAnnualIncome ? formatMoney(position.forwardAnnualIncome) : "—",
-      context: position.forwardAnnualIncome ? "next 12 mo" : undefined,
+      value: forwardIncome ? formatMoney(forwardIncome) : "—",
+      context: forwardIncome ? `next 12 mo, ${basis}` : undefined,
     },
     { label: "Weight", value: weight != null ? `${(weight * 100).toFixed(1)}%` : "—" },
     { label: "Fees paid", value: position.feesPaid ? formatMoney(position.feesPaid) : "—" },
     {
       label: "Dividend income",
-      value: position.totalDividendIncome
-        ? formatMoney({ amount: position.totalDividendIncome, currency })
-        : "—",
+      value: dividendIncome ? formatMoney({ amount: dividendIncome, currency }) : "—",
+      context: dividendIncome ? basis : undefined,
     },
   ];
 
