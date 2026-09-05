@@ -20,6 +20,10 @@ const theme = {
   primary: "#3d6a4d",
   loss: "#b23b3b",
   costLine: "#888888",
+  // Deliberately not `primary`/`line`: trade markers must never resolve to the
+  // color of the line they sit on. See tradeMarkers in asset-price-chart.tsx.
+  marker: "#0a0a0a",
+  markerHalo: "#ffffff",
 };
 
 describe("chart-config", () => {

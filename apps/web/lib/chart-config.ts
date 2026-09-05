@@ -30,6 +30,8 @@ export interface ChartTheme {
   primary: string;
   loss: string;
   costLine: string;
+  marker: string;
+  markerHalo: string;
 }
 
 /** Read chart colors from the active theme's CSS custom properties. Client-only. */
@@ -46,6 +48,8 @@ export function readChartTheme(): ChartTheme {
     primary: resolve("--primary"),
     loss: resolve("--loss"),
     costLine: resolve("--muted-foreground"),
+    marker: resolve("--chart-marker"),
+    markerHalo: resolve("--chart-marker-halo"),
   };
 }
 

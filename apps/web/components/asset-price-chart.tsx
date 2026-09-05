@@ -27,16 +27,39 @@ import {
 
 type Trade = NonNullable<AssetPositionDTO["trades"]>[number];
 
-/** Buy/sell dots sit on the price line (`inBar`); color carries direction, and
- *  the id lets the hover tooltip resolve which trade it is. */
-function tradeMarkers(trades: Trade[], theme: { primary: string; loss: string }) {
-  return trades.map((t, i) => ({
-    time: t.tradeDate,
-    position: "inBar" as const,
-    color: t.type === "buy" ? theme.primary : theme.loss,
-    shape: "circle" as const,
-    id: `trade-${i}`,
-  }));
+/** Trades sit on the price line (`inBar`), two markers deep.
+ *
+ *  Direction is carried by the arrow's silhouette, not by color. Buys were
+ *  previously drawn in `--primary` — which IS `--chart-line`, so every buy was
+ *  painted in the exact color of the line it sits on and disappeared into it,
+ *  while sells in `--loss` read fine. Shape survives that, and survives color
+ *  blindness, which is why brokers mark fills with arrows rather than dots.
+ *
+ *  The halo is the second layer: the markers plugin has no border property, so
+ *  a larger card-colored circle is drawn first and punches a hole in the line
+ *  for the arrow to sit in. The crosshair dot already separates itself from the
+ *  same line this way via `crosshairMarkerBorderColor`.
+ *
+ *  Only the arrow carries `id` — the halo must not resolve as a hoverable
+ *  trade, or the tooltip fires twice for one fill. */
+function tradeMarkers(trades: Trade[], theme: { marker: string; markerHalo: string }) {
+  return trades.flatMap((t, i) => [
+    {
+      time: t.tradeDate,
+      position: "inBar" as const,
+      color: theme.markerHalo,
+      shape: "circle" as const,
+      size: 1.6,
+    },
+    {
+      time: t.tradeDate,
+      position: "inBar" as const,
+      color: theme.marker,
+      shape: t.type === "buy" ? ("arrowUp" as const) : ("arrowDown" as const),
+      size: 1.15,
+      id: `trade-${i}`,
+    },
+  ]);
 }
 
 const RANGES = [
@@ -128,9 +151,12 @@ export function AssetPriceChart({ slug, initialChart, position }: AssetPriceChar
       const t = typeof id === "string" ? trades[Number(id.slice("trade-".length))] : undefined;
       if (!t) return null;
       return {
-        primary: t.type === "buy" ? "Buy" : "Sell",
+        // Same encoding as the marker and the legend: the arrow says which way,
+        // in ink. Colouring "Buy" green here would reintroduce the verdict the
+        // marker deliberately drops — and green is the line's own colour.
+        primary: t.type === "buy" ? "▲ Buy" : "▼ Sell",
         secondary: `${Number(t.quantity)} sh · ${formatValue(Number(t.price))} · ${formatDate(t.tradeDate)}`,
-        colorClass: t.type === "buy" ? "text-primary" : "text-loss",
+        colorClass: "text-foreground",
       };
     };
 
@@ -183,11 +209,21 @@ export function AssetPriceChart({ slug, initialChart, position }: AssetPriceChar
           <div className="flex items-center gap-3">
             {showTrades && (
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {/* Mirrors the chart: the arrow is the encoding, so the legend
+                    shows arrows. The old swatch was `bg-primary` — the line's
+                    own color — which explained nothing about a marker the
+                    reader could not find. */}
                 <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-primary" /> Buy
+                  <span aria-hidden className="text-foreground">
+                    ▲
+                  </span>{" "}
+                  Buy
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-loss" /> Sell
+                  <span aria-hidden className="text-foreground">
+                    ▼
+                  </span>{" "}
+                  Sell
                 </span>
               </div>
             )}

@@ -105,7 +105,12 @@ export default function AssetDetailPage() {
       <section className="mb-10">
         <AssetPriceChart slug={slug} initialChart={chart} position={position} />
       </section>
-      <PositionSection position={position} currency={profile.currency} symbol={profile.symbol} />
+      <PositionSection
+        position={position}
+        currency={profile.currency}
+        symbol={profile.symbol}
+        taxRate={dividendTaxRate}
+      />
       <IncomeSection income={income} custom={custom} taxRate={dividendTaxRate} />
       <AboutSection profile={profile} />
 
