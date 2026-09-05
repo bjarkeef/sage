@@ -149,7 +149,69 @@ or equivalent. Install it on the host and the phone, use the host's overlay
 address in the three variables above, and Sage is reachable on mobile data with
 no port forwarding, no dynamic DNS, and no certificate to renew.
 
-**Exposing it publicly is a different job.** You need a reverse proxy
+### On a rented server, the URLs are not what protects you
+
+Everything above assumes a machine on a network you trust — a NAS, a homelab
+box, a laptop. **On a VPS with a public IP, following it unchanged puts your
+complete financial position on the public internet.**
+
+The trap is that the four variables look like they control access, and they do
+not. They tell the _browser_ where to send requests. What decides who can reach
+Sage is the `ports:` mapping, and the shipped Compose file publishes on
+`0.0.0.0`:
+
+```yaml
+ports:
+  - "3000:3000" # every interface, including the public one
+```
+
+That is deliberate — it is what makes the LAN address work from a phone — and
+it is exactly wrong on a rented server. Setting the three URLs to a Tailscale
+address does **not** undo it: the overlay address is what your phone talks to,
+while `http://<public-ip>:3000` keeps answering anyone who asks.
+
+Bind the published ports to the overlay interface instead. Put this in
+`docker-compose.override.yml` next to the main file, substituting the host's
+Tailscale address (`tailscale ip -4`):
+
+```yaml
+services:
+  web:
+    ports: !override
+      - "100.101.102.103:3000:3000"
+  api:
+    ports: !override
+      - "100.101.102.103:3001:3001"
+```
+
+`!override` is required and easy to miss. Compose _appends_ port lists when
+merging an override file, so a plain `ports:` leaves the original `0.0.0.0`
+binding in place alongside the new one and changes nothing about your exposure.
+The same footgun is documented against `POSTGRES_PORT` in the Compose file
+itself.
+
+Verify from somewhere other than the box — a refused connection is the goal:
+
+```bash
+curl --connect-timeout 5 http://<public-ip>:3000   # must fail
+curl --connect-timeout 5 http://<public-ip>:3001   # must fail
+curl http://<tailscale-ip>:3000                    # must answer
+```
+
+Add a firewall as the second layer, because a Compose file is one careless edit
+away from republishing. On Hetzner, prefer a Cloud Firewall in their console —
+it sits in front of the machine, so a misconfigured container cannot escape it.
+On the box itself, `ufw` is often _inactive_ by default; check rather than
+assume, and note that Docker publishes ports by writing its own iptables rules,
+which bypass `ufw` unless you have specifically configured otherwise.
+
+**The signup window matters more here.** The instruction to set
+`ALLOW_SIGNUP=false` in the same sitting as your first account is a minute of
+exposure on a home LAN. On a public IP it is a minute in which anyone scanning
+the address space can claim your instance. On a rented server, bind the ports
+privately _before_ the first `docker compose up`, not after.
+
+**Exposing it publicly on purpose is a different job.** You need a reverse proxy
 terminating TLS and the same three URLs on `https://`. Do not skip the TLS part:
 these are session cookies for an application holding your complete financial
 position, and on plain HTTP over a network you do not control they are readable
@@ -334,10 +396,18 @@ the intended guard — delete those in the app first.
       so the dev quick start stays a single command.
 - [ ] Postgres password not `sage` on any internet-facing host
 - [ ] Postgres port not published to the world (Compose binds `127.0.0.1` by default)
+- [ ] **On a rented server: web and API bound to a private interface before the
+      first `docker compose up`**, not after. The shipped Compose publishes them
+      on `0.0.0.0`, and the URL variables do not change that — see
+      [On a rented server](#on-a-rented-server-the-urls-are-not-what-protects-you).
+      Verify with `curl http://<public-ip>:3000` from elsewhere; it must fail.
+- [ ] Firewall in front of the machine on any public host — on Hetzner, a Cloud
+      Firewall rather than `ufw`, since Docker's own iptables rules bypass `ufw`
 - [ ] Self-host: `ALLOW_SIGNUP=false` after first user. **Do it in the same
       sitting as the first sign-up.** Unlike Postgres, the web and API
       containers publish on `0.0.0.0`, which is what makes the LAN address
       above work from a phone — so between `docker compose up` finishing and
       this flag being set, anyone on the same network can reach the signup page
       and claim the instance. The window is usually a minute; it is not zero.
+      On a public IP, "the same network" means everyone.
 - [ ] HTTPS reverse proxy in front of web + API; `AUTH_BASE_URL` uses `https://`
