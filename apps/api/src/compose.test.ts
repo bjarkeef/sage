@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 /** Reads the real docker-compose.yml, the same way env.test.ts reads the
@@ -49,6 +49,55 @@ describe("docker-compose", () => {
   // `always` would restart a container the operator deliberately stopped.
   it("does not use a policy that overrides a deliberate stop", () => {
     expect(compose).not.toMatch(/^\s*restart:\s*always$/m);
+  });
+
+  // Next freezes NEXT_PUBLIC_* into the browser bundle at build time, so a
+  // value supplied only as a runtime `environment:` entry never reaches the
+  // client — it silently keeps whatever was inlined during the build. That is
+  // how `NEXT_PUBLIC_SAGE_API_URL` shipped: compose set it at runtime, the
+  // Dockerfile never declared it, and every install not on localhost loaded
+  // the page and then failed every request against the baked-in localhost
+  // fallback, sign-up included. Nothing failed loudly.
+  //
+  // Asserted against the variables the web app actually reads rather than a
+  // hardcoded list, so the next one added is covered without editing this test.
+  it("passes every NEXT_PUBLIC_* the web app reads as a build arg", () => {
+    const used = new Set<string>();
+    const walk = (dir: URL) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (/^(node_modules|\.next|dist|coverage)$/.test(entry.name)) continue;
+        const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, dir);
+        if (entry.isDirectory()) walk(child);
+        else if (/\.(ts|tsx)$/.test(entry.name)) {
+          for (const m of readFileSync(child, "utf8").matchAll(
+            /process\.env\.(NEXT_PUBLIC_\w+)/g,
+          )) {
+            used.add(m[1]!);
+          }
+        }
+      }
+    };
+    walk(new URL("../../../apps/web/", import.meta.url));
+
+    // A guard that asserts nothing is worse than no guard: if the scan finds
+    // nothing, the walk broke rather than the app being clean.
+    expect(used.size).toBeGreaterThan(0);
+
+    const dockerfile = readFileSync(
+      new URL("../../../apps/web/Dockerfile", import.meta.url),
+      "utf8",
+    );
+    const webArgs = serviceBlock(compose, "web");
+
+    for (const name of [...used].sort()) {
+      expect(
+        dockerfile,
+        `${name} is read by the browser but has no ARG in apps/web/Dockerfile`,
+      ).toMatch(new RegExp(`^ARG ${name}\\b`, "m"));
+      expect(webArgs, `${name} is not passed under the web service's build.args`).toMatch(
+        new RegExp(`^\\s*${name}:`, "m"),
+      );
+    }
   });
 
   // Postgres holds the whole book; exposing it on the public interface is the

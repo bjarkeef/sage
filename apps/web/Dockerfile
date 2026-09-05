@@ -25,6 +25,15 @@ ARG NEXT_PUBLIC_LOGO_DEV_TOKEN=""
 ENV NEXT_PUBLIC_LOGO_DEV_TOKEN=$NEXT_PUBLIC_LOGO_DEV_TOKEN
 ARG NEXT_PUBLIC_NEWS_THUMBNAILS=""
 ENV NEXT_PUBLIC_NEWS_THUMBNAILS=$NEXT_PUBLIC_NEWS_THUMBNAILS
+
+# The same rule, and the one it is most costly to forget: the browser bundle's
+# API URL is frozen here. Supplied only as a runtime variable it never reaches
+# the client, which silently falls back to the localhost default in
+# `lib/api.ts` and `lib/auth-client.ts` — so every install that is not on
+# localhost loads the page and then fails every request, sign-up included.
+# Empty by default so the localhost fallback still serves the dev quick start.
+ARG NEXT_PUBLIC_SAGE_API_URL=""
+ENV NEXT_PUBLIC_SAGE_API_URL=$NEXT_PUBLIC_SAGE_API_URL
 RUN pnpm turbo run build --filter=@sage/web
 
 # ---- runtime ----

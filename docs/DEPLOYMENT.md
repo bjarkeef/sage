@@ -104,8 +104,20 @@ Also set real values when not on localhost:
 
 - `AUTH_BASE_URL` — public URL of the API (cookies / better-auth)
 - `WEB_ORIGIN` — public URL of the web app (CORS + trusted origins)
-- `NEXT_PUBLIC_SAGE_API_URL` — browser-reachable API URL
+- `NEXT_PUBLIC_SAGE_API_URL` — browser-reachable API URL. **Build time**, not
+  run time: rebuild the web container after changing it (see below)
 - `SAGE_API_URL` — server-side API URL (Docker network name is fine)
+
+**Three of those take effect on restart; `NEXT_PUBLIC_SAGE_API_URL` takes effect
+on rebuild.** Next freezes `NEXT_PUBLIC_*` into the browser bundle, so editing
+it and running `docker compose up -d` leaves the client calling the previously
+inlined address. The failure is quiet and confusing: the page loads normally,
+then every request fails against `localhost:3001` — sign-up first, before you
+have an account to tell you anything is wrong. After changing it:
+
+```bash
+docker compose up -d --build web
+```
 
 ## Always-on, and reaching it from your phone
 
