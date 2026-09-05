@@ -60,6 +60,10 @@ services:
         # Opt-in only; see .env.example for what turning these on disclose.
         NEXT_PUBLIC_LOGO_DEV_TOKEN: ${NEXT_PUBLIC_LOGO_DEV_TOKEN:-}
         NEXT_PUBLIC_NEWS_THUMBNAILS: ${NEXT_PUBLIC_NEWS_THUMBNAILS:-}
+        # Build-time, not runtime: Next freezes NEXT_PUBLIC_* into the browser
+        # bundle. Passed below as `environment` too, which is what server-side
+        # rendering reads — but only this line reaches the client.
+        NEXT_PUBLIC_SAGE_API_URL: ${NEXT_PUBLIC_SAGE_API_URL:-}
     restart: unless-stopped
     ports:
       - "3000:3000"
