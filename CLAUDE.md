@@ -66,3 +66,13 @@ restores the original directory in one step.
 If a manually-created worktree does need removing, it is usually `locked` while a
 session is attached: `git worktree unlock <path>` first, then
 `git worktree remove <path>`.
+
+**Git-ignored files do not exist inside a worktree.** A worktree is populated
+from the index, so `docs/roadmap.md`, `docs/superpowers/` and anything else in
+`.gitignore` are simply absent there. Since the roadmap has to be updated as the
+final step of every task, that update belongs in the main checkout — editing it
+from a worktree fails with "no such file", and creating it there would produce a
+second, divergent copy. The same applies to `.env`.
+
+A worktree also starts with no `node_modules`; run `pnpm install` before any
+`vitest` or `pnpm check` in one.
