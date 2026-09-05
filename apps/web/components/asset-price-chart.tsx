@@ -5,12 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import {
   createChart,
   AreaSeries,
-  createSeriesMarkers,
   LineStyle,
   type IChartApi,
   type ISeriesApi,
-  type ISeriesMarkersPluginApi,
-  type Time,
 } from "lightweight-charts";
 import { useTheme } from "next-themes";
 import { SegmentedControl, ChartSkeleton, Button } from "@sage/ui";
@@ -18,6 +15,7 @@ import { getAssetChart } from "../lib/api";
 import { qk } from "../lib/query/keys";
 import { formatDate } from "../lib/format";
 import type { AssetPositionDTO } from "../lib/types";
+import { TradeMarkers, type TradeMark } from "./trade-markers";
 import {
   readChartTheme,
   baseChartOptions,
@@ -27,39 +25,14 @@ import {
 
 type Trade = NonNullable<AssetPositionDTO["trades"]>[number];
 
-/** Trades sit on the price line (`inBar`), two markers deep.
- *
- *  Direction is carried by the arrow's silhouette, not by color. Buys were
- *  previously drawn in `--primary` — which IS `--chart-line`, so every buy was
- *  painted in the exact color of the line it sits on and disappeared into it,
- *  while sells in `--loss` read fine. Shape survives that, and survives color
- *  blindness, which is why brokers mark fills with arrows rather than dots.
- *
- *  The halo is the second layer: the markers plugin has no border property, so
- *  a larger card-colored circle is drawn first and punches a hole in the line
- *  for the arrow to sit in. The crosshair dot already separates itself from the
- *  same line this way via `crosshairMarkerBorderColor`.
- *
- *  Only the arrow carries `id` — the halo must not resolve as a hoverable
- *  trade, or the tooltip fires twice for one fill. */
-function tradeMarkers(trades: Trade[], theme: { marker: string; markerHalo: string }) {
-  return trades.flatMap((t, i) => [
-    {
-      time: t.tradeDate,
-      position: "inBar" as const,
-      color: theme.markerHalo,
-      shape: "circle" as const,
-      size: 1.6,
-    },
-    {
-      time: t.tradeDate,
-      position: "inBar" as const,
-      color: theme.marker,
-      shape: t.type === "buy" ? ("arrowUp" as const) : ("arrowDown" as const),
-      size: 1.15,
-      id: `trade-${i}`,
-    },
-  ]);
+/** Series-time + direction for each trade; the primitive turns these into
+ *  triangles on the line. `id` is what the hover tooltip resolves back. */
+function tradeMarks(trades: Trade[]): TradeMark[] {
+  return trades.map((t, i) => ({
+    time: t.tradeDate,
+    direction: t.type === "buy" ? ("buy" as const) : ("sell" as const),
+    id: `trade-${i}`,
+  }));
 }
 
 const RANGES = [
@@ -88,7 +61,11 @@ export function AssetPriceChart({ slug, initialChart, position }: AssetPriceChar
 
   const trades = React.useMemo(() => position.trades ?? [], [position.trades]);
   const [showTrades, setShowTrades] = React.useState(trades.length <= 15);
-  const markersRef = React.useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  // The primitive reads visibility each frame; a ref keeps it current without
+  // making `showTrades` a dependency of the chart-construction effect.
+  const showTradesRef = React.useRef(showTrades);
+  showTradesRef.current = showTrades;
+  const markersRef = React.useRef<TradeMarkers | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: qk.assetChart(slug, range),
@@ -139,11 +116,26 @@ export function AssetPriceChart({ slug, initialChart, position }: AssetPriceChar
       });
     }
 
-    const markerPrimitive = createSeriesMarkers(
+    // Snap a trade onto the nearest bar at or before its date. chartData is
+    // ascending, so a backward scan finds it. A trade before the first bar in
+    // this range is genuinely off-screen and is dropped.
+    const resolveBar = (time: string) => {
+      for (let i = chartData.length - 1; i >= 0; i--) {
+        const bar = chartData[i]!;
+        if (bar.time <= time) return bar;
+      }
+      return undefined;
+    };
+    const markers = new TradeMarkers(
+      chart,
       series,
-      showTrades ? tradeMarkers(trades, theme) : [],
+      resolveBar,
+      () => (showTradesRef.current ? tradeMarks(trades) : []),
+      // Re-read on every frame so a theme switch repaints without a rebuild.
+      () => readChartTheme(),
     );
-    markersRef.current = markerPrimitive;
+    series.attachPrimitive(markers);
+    markersRef.current = markers;
 
     chart.timeScale().fitContent();
 
@@ -151,7 +143,7 @@ export function AssetPriceChart({ slug, initialChart, position }: AssetPriceChar
       const t = typeof id === "string" ? trades[Number(id.slice("trade-".length))] : undefined;
       if (!t) return null;
       return {
-        // Same encoding as the marker and the legend: the arrow says which way,
+        // Same encoding as the marker and the legend: the triangle says which way,
         // in ink. Colouring "Buy" green here would reintroduce the verdict the
         // marker deliberately drops — and green is the line's own colour.
         primary: t.type === "buy" ? "▲ Buy" : "▼ Sell",
@@ -190,9 +182,9 @@ export function AssetPriceChart({ slug, initialChart, position }: AssetPriceChar
   }, [chartData, resolvedTheme, position.held, position.averageCost, trades]);
 
   React.useEffect(() => {
-    if (!markersRef.current) return;
-    const theme = readChartTheme();
-    markersRef.current.setMarkers(showTrades ? tradeMarkers(trades, theme) : []);
+    // The primitive reads `showTradesRef` when it draws; nudging the chart is
+    // what asks it to draw again.
+    chartRef.current?.applyOptions({});
   }, [showTrades, trades]);
 
   if (isLoading) return <ChartSkeleton />;
