@@ -269,4 +269,59 @@ describe("AssetDetailPage", () => {
     expect(screen.queryByText("Current yield")).not.toBeInTheDocument();
     expect(screen.queryByText("5.00%")).not.toBeInTheDocument();
   });
+
+  // The position strip took no tax rate at all, so it rendered gross while the
+  // Income card below it rendered net — the same label, the same quantity, two
+  // different numbers on one screen, with the "After tax" caption attached to a
+  // different figure in a different card. The identical defect was found and
+  // fixed once on the dividends analytics page and still shipped here, which is
+  // why this asserts the invariant rather than the two literals.
+  it("never shows the same income figure gross in one section and net in another", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "AAPL" });
+
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("AAPL"), {
+      ...FIXTURE_ASSET,
+      position: {
+        held: true,
+        quantity: "10",
+        averageCost: { amount: "100", currency: "USD" },
+        costBasis: { amount: "1000", currency: "USD" },
+        marketValue: { amount: "1800", currency: "USD" },
+        unrealizedGainLoss: { amount: "800", currency: "USD" },
+        gainLossPercent: 0.8,
+        yieldOnCost: 0.06,
+        forwardAnnualIncome: { amount: "60.00", currency: "USD" },
+        totalDividendIncome: "40.00",
+        feesPaid: null,
+        trades: [],
+      },
+      income: {
+        currentYield: 0.05,
+        yieldOnCost: 0.06,
+        annualDividend: { amount: "4.12", currency: "USD" },
+        dividendGrowth5y: null,
+        nextExDate: null,
+        payoutRatio: null,
+      },
+    });
+    qc.setQueryData(qk.userSettings(), { ...FIXTURE_SETTINGS, dividendTaxRate: 35 });
+
+    renderWithClient(<AssetDetailPage />, qc);
+
+    await waitFor(() => expect(screen.getByText("Apple Inc.")).toBeInTheDocument());
+
+    // 6.00% netted at 35% is 3.90%, and BOTH renders of yield on cost must say
+    // so. The gross figure must not appear anywhere on the page.
+    expect(screen.getAllByText("3.90%").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("6.00%")).not.toBeInTheDocument();
+
+    // The other two income figures in the strip net on the same rate.
+    expect(screen.queryByText("$60.00")).not.toBeInTheDocument();
+    expect(screen.queryByText("$40.00")).not.toBeInTheDocument();
+
+    // And the basis is stated on the figures themselves, not only in a caption
+    // belonging to a different card.
+    expect(screen.getAllByText(/after tax/i).length).toBeGreaterThanOrEqual(2);
+  });
 });
