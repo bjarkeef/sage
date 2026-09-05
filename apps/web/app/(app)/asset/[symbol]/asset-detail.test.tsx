@@ -16,7 +16,11 @@ vi.mock("lightweight-charts", () => {
   const LineStyle = { Solid: 0, Dotted: 1, Dashed: 2, LargeDashed: 3, SparseDotted: 4 };
   const ColorType = { Solid: "solid", VerticalGradient: "gradient" };
   const chartStub = {
-    addSeries: vi.fn(() => ({ setData: vi.fn(), createPriceLine: vi.fn() })),
+    addSeries: vi.fn(() => ({
+      setData: vi.fn(),
+      createPriceLine: vi.fn(),
+      attachPrimitive: vi.fn(),
+    })),
     timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
     subscribeCrosshairMove: vi.fn(),
     unsubscribeCrosshairMove: vi.fn(),
