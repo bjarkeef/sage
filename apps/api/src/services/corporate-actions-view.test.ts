@@ -67,6 +67,40 @@ describe("buildCorporateActionsView", () => {
     });
   });
 
+  // detectedFactor/mismatchedSamples/checkedSamples are keyed on whether a
+  // finding exists for the symbol, not on the verdict string — an
+  // `unadjusted` verdict with a finding still must populate them. This is
+  // what the page's unadjusted copy branches on: "a mismatch was found and
+  // the recorded split does not explain it" only shows when a finding
+  // exists, regardless of what the verdict itself says.
+  it("reports an unadjusted action with a factor, because a finding still exists", () => {
+    const view = buildCorporateActionsView({
+      txs: [tx("ACME", "2025-09-16", "2")],
+      names: new Map(),
+      pricesFrom: new Map([["ACME", "2023-03-02"]]),
+      findings: [
+        {
+          symbol: "ACME",
+          factor: new Decimal("3.12"),
+          mismatched: 4,
+          samples: 9,
+          firstDate: "2025-08-01",
+          lastDate: "2025-08-20",
+        },
+      ],
+      verdictOf: () => "unadjusted",
+      coverage: { checked: 187, total: 254 },
+    });
+
+    expect(view.actions[0]).toMatchObject({
+      symbol: "ACME",
+      verdict: "unadjusted",
+      detectedFactor: 3.12,
+      mismatchedSamples: 4,
+      checkedSamples: 9,
+    });
+  });
+
   // The boundary date is what the unverified copy names, so it must survive
   // even when nothing else about the symbol is known.
   it("carries pricesFrom for an unverified action", () => {
