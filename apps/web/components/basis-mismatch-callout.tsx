@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Callout } from "@sage/ui";
 import type { BasisFindingDTO } from "../lib/types";
 import { formatDate } from "../lib/format";
@@ -62,6 +63,17 @@ export function BasisMismatchCallout({
           {`${historyIncomplete.join(", ")} ${historyIncomplete.length === 1 ? "has" : "have"} no stored price history reaching back to when ${historyIncomplete.length === 1 ? "it was" : "they were"} first held, so the figures above cover a shorter period than the selected range.`}
         </p>
       )}
+      {/* One of the three sections above always rendered to get here, so a
+       *  top margin is always correct. Points at the full ledger-derived
+       *  accounting rather than restating any of it inline. */}
+      <p className="mt-3">
+        <Link
+          href="/corporate-actions"
+          className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+        >
+          See what Sage did →
+        </Link>
+      </p>
     </Callout>
   );
 }
