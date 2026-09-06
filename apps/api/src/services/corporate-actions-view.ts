@@ -1,4 +1,15 @@
-import { formatSplitRatio, type BasisFinding, type PositionTransaction } from "@sage/core";
+import { inArray, sql } from "drizzle-orm";
+import {
+  formatSplitRatio,
+  resolveSplitBasis,
+  type BasisFinding,
+  type PositionTransaction,
+} from "@sage/core";
+import type { IFxRateService } from "@sage/provider-interface";
+import type { Database } from "../db/client";
+import { instrument, priceDaily } from "../db/schema";
+import { findBasisMismatches } from "./basis-reconciliation";
+import { loadPortfolioBook } from "./portfolio-book";
 
 export interface CorporateActionDTO {
   symbol: string;
@@ -53,4 +64,59 @@ export function buildCorporateActionsView(input: CorporateActionsInput): Corpora
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
   return { actions, coverage: input.coverage };
+}
+
+/**
+ * Wires the pure builder above to the live book. Reads only — the ledger is
+ * never touched, historical quantities are scaled at valuation time, and this
+ * loader reports that, it does not perform it.
+ */
+export async function loadCorporateActions(
+  deps: { db: Database; fxRateService?: IFxRateService },
+  userId: string,
+): Promise<CorporateActionsViewDTO> {
+  const { txs } = await loadPortfolioBook(deps.db, userId, {});
+
+  // The same functions /performance and /portfolio call, on the same book:
+  // agreement between the three surfaces comes from the function, not from a
+  // shared cache.
+  const { findings, checkedBySymbol } = await findBasisMismatches(
+    { db: deps.db, fxRateService: deps.fxRateService },
+    userId,
+  );
+  const splitBasis = resolveSplitBasis(txs, findings, checkedBySymbol);
+
+  const splitSymbols = [...new Set(txs.filter((t) => t.type === "split").map((t) => t.symbol))];
+
+  const names = new Map<string, string>();
+  const pricesFrom = new Map<string, string>();
+  if (splitSymbols.length > 0) {
+    for (const row of await deps.db
+      .select({ symbol: instrument.symbol, name: instrument.name })
+      .from(instrument)
+      .where(inArray(instrument.symbol, splitSymbols))) {
+      if (row.name) names.set(row.symbol, row.name);
+    }
+    for (const row of await deps.db
+      .select({ symbol: priceDaily.symbol, earliest: sql<string | null>`min(${priceDaily.date})` })
+      .from(priceDaily)
+      .where(inArray(priceDaily.symbol, splitSymbols))
+      .groupBy(priceDaily.symbol)) {
+      if (row.earliest) pricesFrom.set(row.symbol, row.earliest);
+    }
+  }
+
+  // Coverage is the honest denominator: how many of the book's buys and sells
+  // could be compared against a stored bar at all.
+  const total = txs.filter((t) => t.type === "buy" || t.type === "sell").length;
+  const checked = [...checkedBySymbol.values()].reduce((a, b) => a + b, 0);
+
+  return buildCorporateActionsView({
+    txs,
+    names,
+    pricesFrom,
+    findings,
+    verdictOf: (s) => splitBasis.verdictOf(s),
+    coverage: { checked, total },
+  });
 }

@@ -29,6 +29,7 @@ import { categoriesRoutes } from "./routes/categories";
 import { systemRoutes, type SystemInfo } from "./routes/system";
 import { exportRoutes } from "./routes/export";
 import { intelRoutes } from "./routes/intel";
+import { corporateActionsRoutes } from "./routes/corporate-actions";
 import type { IsinResolver } from "./market-data/isin-resolver";
 import type { ProviderHealthRegistry } from "./market-data/provider-health";
 
@@ -153,6 +154,7 @@ export function createApp(
   app.route("/goal", goalRoutes(db, provider, fxRateService, dividendProviders));
   app.route("/custom-holdings", customHoldingsRoutes(db));
   app.route("/categories", categoriesRoutes(db, provider, fxRateService));
+  app.route("/corporate-actions", corporateActionsRoutes(db, fxRateService));
   app.route("/system", systemRoutes(db, fxRateService, options.systemInfo, options.providerHealth));
   app.route("/export", exportRoutes(db));
   if (intelProvider) {
