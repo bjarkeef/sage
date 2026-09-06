@@ -124,6 +124,15 @@ export async function buildPerformanceView(
   // performance can still say its prices are short. An empty series never
   // fetched anything, so it has nothing incomplete to report.
   const historyIncomplete = "empty" in series ? [] : series.historyIncomplete;
+  // Every split symbol in the book, not just the unverified ones — lets the
+  // web banner tell "a finding on a symbol that actually split" (which
+  // /corporate-actions has a row for) apart from "a finding on a symbol that
+  // never split at all" (which it does not), without this function forming a
+  // second opinion about the split itself.
+  const splitSymbols =
+    "empty" in series
+      ? []
+      : [...new Set(series.rows.filter((r) => r.type === "split").map((r) => r.instrumentSymbol))];
 
   if ("empty" in series || series.points.length < 2) {
     return {
@@ -145,6 +154,7 @@ export async function buildPerformanceView(
       basisMismatches,
       unverifiedSplits,
       historyIncomplete,
+      splitSymbols,
       multiCurrency: "empty" in series ? false : series.multiCurrency,
       anomalousDays: 0,
       fxApproximated: "empty" in series ? false : series.fxApproximated,
@@ -212,6 +222,7 @@ export async function buildPerformanceView(
       basisMismatches,
       unverifiedSplits,
       historyIncomplete,
+      splitSymbols,
       multiCurrency: series.multiCurrency,
       anomalousDays: anomalies,
       fxApproximated,
@@ -342,6 +353,7 @@ export async function buildPerformanceView(
     basisMismatches,
     unverifiedSplits,
     historyIncomplete,
+    splitSymbols,
     multiCurrency: series.multiCurrency,
     anomalousDays: anomalies,
     fxApproximated,

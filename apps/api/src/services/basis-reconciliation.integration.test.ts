@@ -195,4 +195,26 @@ describeDb("findBasisMismatches", () => {
     expect(findings).toEqual([]);
     expect(checkedBySymbol.size).toBe(0);
   });
+
+  it("flags a symbol as an FX gap when its bars exist but no rate could convert its trades", async () => {
+    // Without an FX service every cross-currency row is dropped, so both EUR
+    // symbols joined a bar (they are in `rows`) and checked zero samples —
+    // the FX-gap shape, not the missing-bars shape.
+    const { fxGapSymbols } = await findBasisMismatches({ db: t.db }, userId);
+    expect(fxGapSymbols).toContain("EURBUY");
+    expect(fxGapSymbols).toContain("EURSPLIT");
+  });
+
+  it("does not call a symbol an FX gap when it simply has no bars at all", async () => {
+    // NOBARS never joins a price_daily row in the first place, so its zero
+    // checked-count is the ordinary "no history" case, not an FX gap.
+    const { fxGapSymbols } = await findBasisMismatches({ db: t.db }, userId);
+    expect(fxGapSymbols).not.toContain("NOBARS");
+  });
+
+  it("does not call a clean symbol an FX gap", async () => {
+    // STEADY checked its samples successfully; it has no gap of any kind.
+    const { fxGapSymbols } = await findBasisMismatches({ db: t.db }, userId);
+    expect(fxGapSymbols).not.toContain("STEADY");
+  });
 });

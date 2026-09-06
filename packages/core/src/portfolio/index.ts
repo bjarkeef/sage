@@ -72,4 +72,5 @@ export {
   type SplitBasisVerdict,
   type SplitBasisResolution,
 } from "./split-basis";
+export { formatSplitRatio } from "./split-ratio";
 export * from "./custom-income";
