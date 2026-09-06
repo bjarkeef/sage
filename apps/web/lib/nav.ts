@@ -9,6 +9,7 @@ import {
   Newspaper,
   ChartColumn,
   Upload,
+  Split,
   Settings as SettingsIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -35,6 +36,10 @@ export const navGroups: NavGroup[] = [
       { label: "Diversification", href: "/diversification", icon: PieChart },
       { label: "Categories", href: "/categories", icon: Shapes },
       { label: "Performance", href: "/performance", icon: TrendingUp },
+      // Sits next to Performance rather than in its own group: it is read
+      // from the same ledger and stored-price data, and the basis-mismatch
+      // banner on /performance is the other entry point into this page.
+      { label: "Corporate actions", href: "/corporate-actions", icon: Split },
       { label: "News", href: "/news", icon: Newspaper },
       // Not filed under "System" with Settings, where it sat until a first-run
       // walkthrough: import is how a book gets into Sage at all, and the

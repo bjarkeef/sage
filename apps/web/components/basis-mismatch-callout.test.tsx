@@ -114,4 +114,14 @@ describe("BasisMismatchCallout", () => {
     );
     expect(container).not.toBeEmptyDOMElement();
   });
+
+  it("links from the basis banner to the corporate-actions page", () => {
+    render(
+      <BasisMismatchCallout findings={[finding()]} unverifiedSplits={[]} historyIncomplete={[]} />,
+    );
+    expect(screen.getByRole("link", { name: /see what sage did/i })).toHaveAttribute(
+      "href",
+      "/corporate-actions",
+    );
+  });
 });
