@@ -941,3 +941,21 @@ export interface AnalystRatingsDTO {
   asOf: string;
   upgradeHistory: RatingChangeDTO[];
 }
+
+export interface CorporateActionDTO {
+  symbol: string;
+  name: string | null;
+  date: string;
+  ratio: string;
+  kind: "split" | "reverse-split";
+  verdict: "adjusted" | "unadjusted" | "unverified";
+  detectedFactor: number | null;
+  mismatchedSamples: number | null;
+  checkedSamples: number | null;
+  pricesFrom: string | null;
+}
+
+export interface CorporateActionsViewDTO {
+  actions: CorporateActionDTO[];
+  coverage: { checked: number; total: number };
+}
