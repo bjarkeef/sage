@@ -3,6 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import { renderWithClient, makeTestQueryClient } from "../../../lib/test/render-with-client";
 import { qk } from "../../../lib/query/keys";
 import type { CorporateActionsViewDTO } from "../../../lib/types";
+import { formatDate } from "../../../lib/format";
 import CorporateActionsPage from "./page";
 
 vi.mock("../../../lib/api", () => ({ getCorporateActions: vi.fn() }));
@@ -82,6 +83,13 @@ describe("CorporateActionsPage", () => {
     renderWithClient(<CorporateActionsPage />, qc);
 
     await waitFor(() => expect(screen.getByText("Not checked")).toBeInTheDocument());
+    // The closing sentence ("Backfilling price history...") renders
+    // unconditionally regardless of whether the boundary clause is present,
+    // correct, or deleted — asserting it alone would pass even if the
+    // boundary date were dropped from `verdictCopy` entirely. The boundary
+    // itself, in its rendered (not raw ISO) form, is what actually proves
+    // this verdict names its own evidence.
+    expect(screen.getByText(new RegExp(formatDate("2025-09-05")))).toBeInTheDocument();
     expect(screen.getByText(/Backfilling price history/)).toBeInTheDocument();
   });
 
