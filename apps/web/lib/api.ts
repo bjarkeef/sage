@@ -25,6 +25,7 @@ import type {
   SaveCategoriesInput,
   NewsArticleDTO,
   AnalystRatingsDTO,
+  CorporateActionsViewDTO,
 } from "./types";
 
 export type PublicConfigDTO = {
@@ -601,6 +602,16 @@ export async function getPortfolioNews(): Promise<NewsArticleDTO[]> {
   const res = await apiFetch(`/news`);
   if (!res.ok) throw new Error(`portfolio news fetch failed: ${res.status}`);
   return (await res.json()) as NewsArticleDTO[];
+}
+
+export async function getCorporateActions(): Promise<CorporateActionsViewDTO> {
+  const res = await apiFetch("/corporate-actions");
+  if (res.status === 401 && isServer) {
+    const { redirect } = await import("next/navigation");
+    redirect("/sign-in");
+  }
+  if (!res.ok) throw new Error(`corporate actions fetch failed: ${res.status}`);
+  return (await res.json()) as CorporateActionsViewDTO;
 }
 
 /** Downloads an export as a file. The API sets the filename in

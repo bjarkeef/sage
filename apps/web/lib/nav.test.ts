@@ -58,6 +58,22 @@ describe("navGroups", () => {
     expect(mobileTabs.map((t) => t.href)).toContain("/dividends");
     expect(mobileTabs.map((t) => t.href)).not.toContain("/dividends/analytics");
   });
+
+  // The page exists but nothing pointed at it until this entry — reachable
+  // only from a diagnostic banner on /performance before this, which a reader
+  // would only ever see if something already looked wrong.
+  it("offers corporate actions as a real destination, beside performance", () => {
+    expect(navItems.map((i) => i.href)).toContain("/corporate-actions");
+    const group = navGroups.find((g) => g.label === null);
+    const hrefs = group!.items.map((i) => i.href);
+    expect(hrefs.indexOf("/corporate-actions")).toBe(hrefs.indexOf("/performance") + 1);
+  });
+
+  // The bottom bar is already at its four-tab ceiling (see above); a low-
+  // traffic diagnostic page does not bump one of those off.
+  it("keeps corporate actions off the bottom bar", () => {
+    expect(mobileTabs.map((t) => t.href)).not.toContain("/corporate-actions");
+  });
 });
 
 describe("activeNavHref", () => {

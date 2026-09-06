@@ -22,4 +22,5 @@ export const qk = {
   customHolding: (symbol: string) => ["custom-holding", symbol] as const,
   categoriesView: (currency?: string | null) => ["categories", currency ?? null] as const,
   systemStatus: () => ["system-status"] as const,
+  corporateActions: () => ["corporate-actions"] as const,
 };
