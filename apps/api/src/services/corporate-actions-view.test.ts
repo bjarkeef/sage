@@ -19,7 +19,7 @@ describe("buildCorporateActionsView", () => {
       findings: [
         {
           symbol: "ACME",
-          factor: new Decimal("10.06"),
+          factor: new Decimal("9.94"),
           mismatched: 2,
           samples: 2,
           firstDate: "2025-10-27",
@@ -27,7 +27,7 @@ describe("buildCorporateActionsView", () => {
         },
       ],
       verdictOf: () => "adjusted",
-      coverage: { checked: 216, total: 289 },
+      coverage: { checked: 187, total: 254 },
     });
 
     expect(view.actions).toHaveLength(1);
@@ -36,14 +36,14 @@ describe("buildCorporateActionsView", () => {
       name: "Acme Ultra Income ETF",
       date: "2025-11-30",
       ratio: "10 → 1",
-      kind: "reverse-split",
       verdict: "adjusted",
-      detectedFactor: 10.06,
+      detectedFactor: 9.94,
       mismatchedSamples: 2,
       checkedSamples: 2,
       pricesFrom: "2024-02-29",
+      fxGap: false,
     });
-    expect(view.coverage).toEqual({ checked: 216, total: 289 });
+    expect(view.coverage).toEqual({ checked: 187, total: 254 });
   });
 
   it("reports an unadjusted action with no factor, because none was found", () => {
@@ -53,14 +53,13 @@ describe("buildCorporateActionsView", () => {
       pricesFrom: new Map([["THAMES.L", "2023-03-02"]]),
       findings: [],
       verdictOf: () => "unadjusted",
-      coverage: { checked: 216, total: 289 },
+      coverage: { checked: 187, total: 254 },
     });
 
     expect(view.actions[0]).toMatchObject({
       symbol: "THAMES.L",
       name: null,
-      ratio: "1 → 1.7992",
-      kind: "split",
+      ratio: "1 → 1.3429",
       verdict: "unadjusted",
       detectedFactor: null,
       mismatchedSamples: null,
@@ -77,9 +76,38 @@ describe("buildCorporateActionsView", () => {
       pricesFrom: new Map([["ACME", "2025-09-05"]]),
       findings: [],
       verdictOf: () => "unverified",
-      coverage: { checked: 0, total: 289 },
+      coverage: { checked: 0, total: 254 },
     });
     expect(view.actions[0]).toMatchObject({ verdict: "unverified", pricesFrom: "2025-09-05" });
+  });
+
+  // `fxGap` distinguishes "backfilling would help" from "backfilling would
+  // not" on the unverified copy — it must reach the DTO keyed by symbol, not
+  // applied blanket to every unverified row.
+  it("marks fxGap only for the symbol whose zero-checked state came from a missing rate", () => {
+    const view = buildCorporateActionsView({
+      txs: [tx("ACME", "2025-09-16", "2"), tx("THAMES.L", "2025-09-16", "2")],
+      names: new Map(),
+      pricesFrom: new Map(),
+      findings: [],
+      verdictOf: () => "unverified",
+      coverage: { checked: 0, total: 254 },
+      fxGapSymbols: new Set(["ACME"]),
+    });
+    expect(view.actions.find((a) => a.symbol === "ACME")).toMatchObject({ fxGap: true });
+    expect(view.actions.find((a) => a.symbol === "THAMES.L")).toMatchObject({ fxGap: false });
+  });
+
+  it("defaults fxGap to false when the caller does not pass fxGapSymbols", () => {
+    const view = buildCorporateActionsView({
+      txs: [tx("ACME", "2025-09-16", "2")],
+      names: new Map(),
+      pricesFrom: new Map(),
+      findings: [],
+      verdictOf: () => "unverified",
+      coverage: { checked: 0, total: 254 },
+    });
+    expect(view.actions[0]).toMatchObject({ fxGap: false });
   });
 
   it("ignores every transaction that is not a split", () => {

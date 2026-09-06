@@ -146,7 +146,7 @@ describe("HoldingsList", () => {
             symbol: "SPLITCO",
             basisMismatch: {
               symbol: "SPLITCO",
-              factor: 10.06,
+              factor: 9.94,
               mismatched: 4,
               samples: 5,
               firstDate: "2025-10-27",
