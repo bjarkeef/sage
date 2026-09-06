@@ -124,4 +124,21 @@ describe("BasisMismatchCallout", () => {
       "/corporate-actions",
     );
   });
+
+  it("links to corporate-actions when there is an unverified split", () => {
+    render(
+      <BasisMismatchCallout findings={[]} unverifiedSplits={["DARKCO"]} historyIncomplete={[]} />,
+    );
+    expect(screen.getByRole("link", { name: /see what sage did/i })).toHaveAttribute(
+      "href",
+      "/corporate-actions",
+    );
+  });
+
+  it("does not link to corporate-actions for history-incomplete alone", () => {
+    render(
+      <BasisMismatchCallout findings={[]} unverifiedSplits={[]} historyIncomplete={["FIZZCO"]} />,
+    );
+    expect(screen.queryByRole("link", { name: /see what sage did/i })).not.toBeInTheDocument();
+  });
 });

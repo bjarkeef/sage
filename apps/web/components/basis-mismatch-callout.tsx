@@ -63,17 +63,20 @@ export function BasisMismatchCallout({
           {`${historyIncomplete.join(", ")} ${historyIncomplete.length === 1 ? "has" : "have"} no stored price history reaching back to when ${historyIncomplete.length === 1 ? "it was" : "they were"} first held, so the figures above cover a shorter period than the selected range.`}
         </p>
       )}
-      {/* One of the three sections above always rendered to get here, so a
-       *  top margin is always correct. Points at the full ledger-derived
-       *  accounting rather than restating any of it inline. */}
-      <p className="mt-3">
-        <Link
-          href="/corporate-actions"
-          className="underline decoration-dotted underline-offset-2 hover:text-foreground"
-        >
-          See what Sage did →
-        </Link>
-      </p>
+      {/* Only link when there is a corporate action behind this callout: a
+       *  detected mismatch or an unverified split both show up as rows on
+       *  /corporate-actions. History-incomplete alone has no split to show,
+       *  so the link would promise a page with nothing relevant on it. */}
+      {(findings.length > 0 || unverifiedSplits.length > 0) && (
+        <p className="mt-3">
+          <Link
+            href="/corporate-actions"
+            className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+          >
+            See what Sage did →
+          </Link>
+        </p>
+      )}
     </Callout>
   );
 }
