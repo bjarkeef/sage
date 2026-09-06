@@ -19,7 +19,7 @@ describe("formatSplitRatio", () => {
   // Four decimals is enough to recognise the action without printing noise.
   it("trims a fractional ratio to four decimals", () => {
     expect(formatSplitRatio(new Decimal("1.34290551"))).toEqual({
-      ratio: "1 → 1.7992",
+      ratio: "1 → 1.3429",
       kind: "split",
     });
   });

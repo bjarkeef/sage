@@ -595,6 +595,13 @@ export interface PerformanceDTO {
    *  because no transaction of theirs has a stored bar on its trade date.
    *  Nothing was corrected for these. */
   unverifiedSplits: string[];
+  /** Every symbol in the ledger carrying a split transaction, regardless of
+   *  its verdict. Lets a consumer tell a finding that corresponds to an
+   *  actual recorded split (which /corporate-actions has a row for) apart
+   *  from one on a symbol with no split at all (which it does not) — see
+   *  `BasisMismatchCallout`'s link gate. Optional so older cached responses
+   *  degrade to "assume no split", not to a crash. */
+  splitSymbols?: string[];
   /** Holdings whose stored price history begins after they were first held,
    *  so part of the measured period cannot be valued and the figures above
    *  cover a shorter span than the range claims. Empty on a complete book. */
@@ -947,12 +954,16 @@ export interface CorporateActionDTO {
   name: string | null;
   date: string;
   ratio: string;
-  kind: "split" | "reverse-split";
   verdict: "adjusted" | "unadjusted" | "unverified";
   detectedFactor: number | null;
   mismatchedSamples: number | null;
   checkedSamples: number | null;
   pricesFrom: string | null;
+  /** True when this symbol's basis could not be checked specifically because
+   *  an FX rate was missing, not because price history is missing — bars
+   *  already exist, so backfilling would not change anything. Only
+   *  meaningful when `verdict` is `"unverified"`. */
+  fxGap: boolean;
 }
 
 export interface CorporateActionsViewDTO {

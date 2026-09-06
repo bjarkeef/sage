@@ -46,11 +46,20 @@ export async function findBasisMismatches(
   deps: { db: Database; fxRateService?: IFxRateService },
   userId: string,
   opts?: { symbols?: string[] },
-): Promise<{ findings: BasisFinding[]; checkedBySymbol: Map<string, number> }> {
+): Promise<{
+  findings: BasisFinding[];
+  checkedBySymbol: Map<string, number>;
+  /** Symbols that had at least one trade land on a day with a stored bar, but
+   *  ended up checking zero samples anyway because every one of those bars was
+   *  in a different currency and no rate was available to convert it. Distinct
+   *  from a symbol that is simply missing bars: backfilling price history does
+   *  nothing for this case, since the bars already exist. */
+  fxGapSymbols: string[];
+}> {
   // An explicit empty filter means "nothing to check" — scanning the whole book
   // would be the opposite of what the caller asked for.
   if (opts?.symbols && opts.symbols.length === 0) {
-    return { findings: [], checkedBySymbol: new Map() };
+    return { findings: [], checkedBySymbol: new Map(), fxGapSymbols: [] };
   }
 
   const where = [eq(portfolio.userId, userId), inArray(transaction.type, ["buy", "sell"])];
@@ -76,7 +85,7 @@ export async function findBasisMismatches(
     )
     .where(and(...where));
 
-  if (rows.length === 0) return { findings: [], checkedBySymbol: new Map() };
+  if (rows.length === 0) return { findings: [], checkedBySymbol: new Map(), fxGapSymbols: [] };
 
   // Rates are keyed per BAR currency: `getRates(base, targets)` returns units of
   // each target per 1 base, so an amount in `txCurrency` converts into
@@ -124,5 +133,11 @@ export async function findBasisMismatches(
     checkedBySymbol.set(s.symbol, (checkedBySymbol.get(s.symbol) ?? 0) + 1);
   }
 
-  return { findings: detectBasisMismatches(samples), checkedBySymbol };
+  // A symbol that reached the join (a bar exists on its trade date) but still
+  // checked zero samples lost every one of them to a missing FX rate, not to
+  // absent price history — the only other way to drop a joined row above.
+  const joinedSymbols = new Set(rows.map((r) => r.symbol));
+  const fxGapSymbols = [...joinedSymbols].filter((s) => (checkedBySymbol.get(s) ?? 0) === 0);
+
+  return { findings: detectBasisMismatches(samples), checkedBySymbol, fxGapSymbols };
 }

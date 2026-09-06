@@ -20,6 +20,11 @@ const PORTFOLIO_WIDE = [
   "transactions",
   "asset-detail",
   "categories",
+  // An import can introduce a split transaction where there was none, or add
+  // trades that newly land on a stored bar. With a 300s `staleTime`,
+  // /corporate-actions would otherwise keep showing "No corporate actions"
+  // for up to five minutes after the ledger it reports on just changed.
+  "corporate-actions",
   // `system-status` carries `pricesMissing`, which counts held symbols with no
   // stored price — so changing what is held changes it. Without this, the
   // degraded-prices banner keeps showing a reading taken moments earlier: an

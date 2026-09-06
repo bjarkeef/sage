@@ -182,6 +182,7 @@ export function PerformanceStudio() {
         findings={data.basisMismatches}
         unverifiedSplits={data.unverifiedSplits}
         historyIncomplete={data.historyIncomplete}
+        splitSymbols={data.splitSymbols ?? []}
       />
 
       <PerfMetrics data={data} />
