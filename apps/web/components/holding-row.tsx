@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Delta } from "@sage/ui";
 import type { PositionDTO } from "../lib/types";
-import { formatMoney, formatPercent, formatQuantity, moneyToNumber } from "../lib/format";
+import { formatMoney, formatPercent, formatShares, moneyToNumber } from "../lib/format";
 import { CompanyLogo } from "./company-logo";
 import { TransactionDialog } from "./transaction-dialog";
 import { toSearchResult } from "../lib/instrument";
@@ -68,7 +68,7 @@ export function HoldingRow({
           {p.marketValue ? formatMoney(p.marketValue) : UNAVAILABLE}
         </div>
         <div className="whitespace-nowrap text-xs text-muted-foreground">
-          {formatQuantity(p.quantity)} sh
+          {formatShares(p.quantity)} sh
         </div>
       </div>
 
