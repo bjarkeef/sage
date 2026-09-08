@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatQuantity,
+  formatShares,
   formatDate,
   formatRelativeTime,
   formatSecondsAgo,
@@ -117,5 +118,32 @@ describe("formatRelativeTime", () => {
   });
   it("returns invalid input unchanged", () => {
     expect(formatRelativeTime("not-a-date", now)).toBe("not-a-date");
+  });
+});
+
+describe("formatShares", () => {
+  it("drops decimals a five-figure count cannot carry", () => {
+    expect(formatShares("41250.6633")).toBe("41,251");
+  });
+  it("allows two decimals in the hundreds", () => {
+    expect(formatShares("102.5")).toBe("102.5");
+    expect(formatShares("102.5678")).toBe("102.57");
+  });
+  it("keeps four decimals for fractional ETF lots", () => {
+    expect(formatShares("24.1487")).toBe("24.1487");
+  });
+  it("removes trailing zeros", () => {
+    expect(formatShares("14.0000")).toBe("14");
+  });
+  it("handles the band edges", () => {
+    expect(formatShares("100")).toBe("100");
+    expect(formatShares("9999.999")).toBe("10,000");
+    expect(formatShares("10000.4")).toBe("10,000");
+  });
+  it("returns the input unchanged when it is not a number", () => {
+    expect(formatShares("n/a")).toBe("n/a");
+  });
+  it("leaves formatQuantity alone for prices", () => {
+    expect(formatQuantity("0.0521")).toBe("0.0521");
   });
 });
