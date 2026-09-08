@@ -103,6 +103,16 @@
   --certainty-confirmed-border: color-mix(in srgb, var(--brand-500) 55%, transparent);
   --certainty-estimated-border: color-mix(in srgb, var(--brand-500) 30%, transparent);
 
+  /* Bar fills, light theme — an ordinal confidence ramp, so the steps step in
+     lightness. Validated against this surface (white card): adjacent ΔE 19.9
+     (normal vision, floor 15) and the lowest step 3.92:1 (floor 3:1).
+     Inverted relative to dark: on white the darkest gold reads as the most
+     certain, so `paid` is the darkest step here and the lightest one there. */
+  --certainty-paid: #201808;
+  --certainty-confirmed: #5d4618;
+  --certainty-estimated: #a27a2a;
+  --certainty-estimated-fill: rgba(162, 122, 42, 0.14);
+
   /* income vocabulary — gold's reserved job: dividend/income surfaces only */
   --income: var(--gold-500);
   --income-muted: color-mix(in srgb, var(--gold-500) 55%, transparent);
