@@ -104,14 +104,23 @@
   --certainty-estimated-border: color-mix(in srgb, var(--brand-500) 30%, transparent);
 
   /* Bar fills, light theme — an ordinal confidence ramp, so the steps step in
-     lightness. Validated against this surface (white card): adjacent ΔE 19.9
-     (normal vision, floor 15) and the lowest step 3.92:1 (floor 3:1).
+     lightness. Validated against this surface (white card): adjacent ΔE 16.3
+     (normal vision, floor 15) and the lowest step 3.69:1 (floor 3:1).
      Inverted relative to dark: on white the darkest gold reads as the most
-     certain, so `paid` is the darkest step here and the lightest one there. */
-  --certainty-paid: #201808;
-  --certainty-confirmed: #5d4618;
-  --certainty-estimated: #a27a2a;
-  --certainty-estimated-fill: rgba(162, 122, 42, 0.14);
+     certain, so `paid` is the darkest step here and the lightest one there.
+     Held to a fourth, non-validator criterion too: OKLCH chroma per step, at
+     the same hue as --income (81.7°), pushed to the edge of the sRGB gamut
+     at each step's lightness so the ramp stays visibly gold rather than
+     desaturating to near-black. Chroma 0.062 / 0.095 / 0.128 — still below
+     the validator's categorical 0.10 floor at the darkest two steps (gold is
+     gamut-starved at low lightness; the floor is a categorical-palette check
+     this ordinal ramp is exempt from), but roughly double the first pass's
+     0.03 / 0.069, which the validator's own chroma reading called "reads
+     gray" for the darkest step. */
+  --certainty-paid: #3d2a00;
+  --certainty-confirmed: #725200;
+  --certainty-estimated: #ac7d00;
+  --certainty-estimated-fill: rgba(172, 125, 0, 0.14);
 
   /* income vocabulary — gold's reserved job: dividend/income surfaces only */
   --income: var(--gold-500);
