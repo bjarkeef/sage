@@ -182,6 +182,19 @@
   --certainty-confirmed-border: color-mix(in srgb, var(--brand-400) 55%, transparent);
   --certainty-estimated-border: color-mix(in srgb, var(--brand-400) 32%, transparent);
 
+  /* Bar fills — an ordinal confidence ramp, not a categorical palette, so the
+     steps step in lightness. Validated against this surface: adjacent ΔE 16.1
+     (normal vision, floor 15) and the lowest step 3.42:1 against the card. The
+     previous ramp was --primary at 90/52/24% alpha, which resolved to ΔE 14.2
+     and 1.47:1 — indistinguishable, and invisible, respectively. Sage green
+     cannot carry this ramp: stepped properly its darkest tone still lands at
+     2.93:1, under the 3:1 floor. Gold can, and gold is already this file's
+     reserved income hue. */
+  --certainty-paid: #e8cfa6;
+  --certainty-confirmed: #c2985c;
+  --certainty-estimated: #8a6a3f;
+  --certainty-estimated-fill: rgba(138, 106, 63, 0.16);
+
   --income: var(--gold-300);
   --income-muted: color-mix(in srgb, var(--gold-300) 55%, transparent);
 
