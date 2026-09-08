@@ -6,7 +6,7 @@ import type { Quote, IFxRateService } from "@sage/provider-interface";
 import { describeDb, withTestDb, testEnv, signUpTestUser, type TestDb } from "../testing";
 import { createApp } from "../app";
 import { createAuth } from "../auth";
-import { user } from "../db/schema";
+import { user, assetProfile } from "../db/schema";
 import { buildPortfolioView } from "./portfolio-view";
 
 const aapl = {
@@ -43,6 +43,22 @@ const globix = {
   exchange: "XLON",
   currency: "GBP",
   assetType: "etf",
+};
+// The importer had nothing better and wrote the ticker in as the name -- the
+// measured, real-world shape `resolveDisplayName` exists to fix.
+const duomo = {
+  symbol: "DUOMO.MI",
+  name: "DUOMO",
+  exchange: "XMIL",
+  currency: "EUR",
+  assetType: "stock",
+};
+const acme = {
+  symbol: "ACME",
+  name: "ACME",
+  exchange: "XNAS",
+  currency: "USD",
+  assetType: "stock",
 };
 
 function quote(symbol: string, price: string, ccy: string, previousClose: string | null): Quote {
@@ -198,5 +214,55 @@ describeDb("buildPortfolioView — portfolio-level todayChange", () => {
     });
 
     expect(todayChange).toBeNull();
+  });
+
+  it("prefers the cached profile name over an echoing instrument name", async () => {
+    // instrument.name = "DUOMO" (the importer's echo); asset_profile.name real.
+    const provider = new FakeMarketDataProvider({
+      quotes: { "DUOMO.MI": quote("DUOMO.MI", "50", "EUR", "49") },
+    });
+    const auth = createAuth(tdb.db, testEnv);
+    app = createApp(tdb.db, provider, auth);
+
+    await post(
+      app,
+      { instrument: duomo, type: "buy", quantity: "3", price: "45", tradeDate: "2026-01-07" },
+      cookie,
+    );
+    await tdb.db.insert(assetProfile).values({
+      symbol: "DUOMO.MI",
+      name: "Duomo Industrials SpA",
+      exchange: "XMIL",
+      currency: "EUR",
+    });
+
+    const { body } = await buildPortfolioView({ db: tdb.db, provider }, userId, {
+      currency: null,
+    });
+
+    const pos = body.positions.find((p) => p.symbol === "DUOMO.MI");
+    expect(pos?.name).toBe("Duomo Industrials SpA");
+  });
+
+  it("falls back to the symbol when no source carries a real name", async () => {
+    // instrument.name = "ACME" (echo) and no cached asset_profile row at all.
+    const provider = new FakeMarketDataProvider({
+      quotes: { ACME: quote("ACME", "10", "USD", "9") },
+    });
+    const auth = createAuth(tdb.db, testEnv);
+    app = createApp(tdb.db, provider, auth);
+
+    await post(
+      app,
+      { instrument: acme, type: "buy", quantity: "4", price: "8", tradeDate: "2026-01-08" },
+      cookie,
+    );
+
+    const { body } = await buildPortfolioView({ db: tdb.db, provider }, userId, {
+      currency: null,
+    });
+
+    const pos = body.positions.find((p) => p.symbol === "ACME");
+    expect(pos?.name).toBe("ACME");
   });
 });
