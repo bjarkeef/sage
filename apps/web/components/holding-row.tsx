@@ -57,7 +57,9 @@ export function HoldingRow({
               />
             )}
           </div>
-          <div className="truncate text-xs text-muted-foreground">{p.name}</div>
+          {p.name !== p.symbol && (
+            <div className="truncate text-xs text-muted-foreground">{p.name}</div>
+          )}
         </div>
       </Link>
 

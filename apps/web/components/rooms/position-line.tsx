@@ -20,7 +20,9 @@ export function PositionLine({ position: p }: { position: PositionDTO }) {
         <div className="truncate font-medium" data-testid="holding-symbol">
           {p.symbol}
         </div>
-        <div className="truncate text-xs text-muted-foreground">{p.name}</div>
+        {p.name !== p.symbol && (
+          <div className="truncate text-xs text-muted-foreground">{p.name}</div>
+        )}
       </div>
       <div className="text-right">
         <div className="whitespace-nowrap font-mono text-data tabular-nums">
