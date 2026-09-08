@@ -23,7 +23,7 @@ import { AXIS_TICK, CURSOR_FILL, GRID_STROKE, LABEL_STYLE } from "../charts/char
  *  it draws for that datum, which is how a stacked bar gets per-year corners —
  *  but `Cell`'s props come from `SVGProps`, where `radius` is a scalar. The
  *  four-corner tuple is what `Bar` itself accepts, hence the widening. */
-function corners(radius: [number, number, number, number]) {
+export function corners(radius: [number, number, number, number]) {
   return { radius } as unknown as { radius: number };
 }
 
