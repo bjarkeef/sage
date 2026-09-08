@@ -476,26 +476,28 @@ export function ForwardPayments({
                     />
                   }
                 />
-                {/* Mark spec: a 2px gap between stacked segments, and a 4px
-                    radius on the free end — whichever segment is visually on
-                    top of a given month's stack, since a $0 "estimated"
-                    entry draws no rectangle and can't be assumed to be it
-                    (see `capSegment`). The gap is a `var(--card)` stroke —
-                    the same background-punch technique `--chart-marker-halo`
-                    already uses elsewhere — rather than a real inter-segment
-                    space, which stacked bars in a single dataKey can't
-                    otherwise produce. The estimated segment keeps its own
-                    certainty outline instead of the gap stroke; that outline
-                    already separates it from `confirmed`. */}
-                <Bar
-                  dataKey="paid"
-                  name="Paid"
-                  stackId="a"
-                  fill={FILL.paid}
-                  stroke="var(--card)"
-                  strokeWidth={2}
-                  maxBarSize={30}
-                >
+                {/* Mark spec: a 4px radius on the free end — whichever segment
+                    is visually on top of a given month's stack, since a $0
+                    "estimated" entry draws no rectangle and can't be assumed
+                    to be it (see `capSegment`).
+
+                    The spec also calls for a 2px gap between stacked
+                    segments. That is deliberately NOT implemented here: an
+                    earlier version simulated it with a `var(--card)` stroke
+                    on the whole `paid`/`confirmed` `<Bar>`, but an SVG
+                    `<rect>` stroke is centered on all four edges, not just
+                    top/bottom — it also punched a card-coloured inset along
+                    the left/right silhouette of every segment, and outlined
+                    the outer rounded corner too whenever `capSegment` picked
+                    that segment as the free end (`<Cell>` only overrides
+                    `radius`, not the parent `Bar`'s `stroke`). The result was
+                    a rim around the bar, not a gap inside it. Fixing that
+                    properly needs a custom Recharts `shape` that insets
+                    `y`/`height` at internal seams only, never the outer
+                    silhouette — deferred because it can't be visually
+                    verified from this worktree. No gap is honest; a rim
+                    artifact on every bar is not. */}
+                <Bar dataKey="paid" name="Paid" stackId="a" fill={FILL.paid} maxBarSize={30}>
                   {chartData.map((d) => (
                     <Cell
                       key={d.month}
@@ -508,8 +510,6 @@ export function ForwardPayments({
                   name="Confirmed"
                   stackId="a"
                   fill={FILL.confirmed}
-                  stroke="var(--card)"
-                  strokeWidth={2}
                   maxBarSize={30}
                 >
                   {chartData.map((d) => (
