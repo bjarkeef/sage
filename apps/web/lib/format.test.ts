@@ -143,7 +143,12 @@ describe("formatShares", () => {
   it("returns the input unchanged when it is not a number", () => {
     expect(formatShares("n/a")).toBe("n/a");
   });
-  it("leaves formatQuantity alone for prices", () => {
-    expect(formatQuantity("0.0521")).toBe("0.0521");
+  it("bands precision differently from formatQuantity on a five-figure count", () => {
+    // formatQuantity has no magnitude bands — it always keeps up to 4dp.
+    // formatShares must diverge from it here (0dp) or the two are the same
+    // function under a different name.
+    expect(formatQuantity("41250.6633")).toBe("41,250.6633");
+    expect(formatShares("41250.6633")).toBe("41,251");
+    expect(formatShares("41250.6633")).not.toBe(formatQuantity("41250.6633"));
   });
 });
