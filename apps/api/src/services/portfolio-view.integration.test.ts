@@ -53,11 +53,16 @@ const duomo = {
   currency: "EUR",
   assetType: "stock",
 };
-const acme = {
-  symbol: "ACME",
-  name: "ACME",
-  exchange: "XNAS",
-  currency: "USD",
+// Suffixed symbol whose instrument.name is only the pre-suffix root -- the
+// case a bare-symbol echo (e.g. "ACME" for "ACME") cannot discriminate,
+// because a no-op root-split makes old and new logic agree on any name that
+// equals the whole symbol. With no asset_profile row either, the resolved
+// name must be the full symbol "THAMES.L", not the echoing root "THAMES".
+const thames = {
+  symbol: "THAMES.L",
+  name: "THAMES",
+  exchange: "XLON",
+  currency: "GBP",
   assetType: "stock",
 };
 
@@ -244,17 +249,20 @@ describeDb("buildPortfolioView — portfolio-level todayChange", () => {
     expect(pos?.name).toBe("Duomo Industrials SpA");
   });
 
-  it("falls back to the symbol when no source carries a real name", async () => {
-    // instrument.name = "ACME" (echo) and no cached asset_profile row at all.
+  it("falls back to the full symbol, not the echoing root, when no source carries a real name", async () => {
+    // instrument.name = "THAMES" -- the root of "THAMES.L", not the whole
+    // symbol -- and no cached asset_profile row at all. A stale
+    // `nameBySymbol.get(symbol) ?? symbol` would return "THAMES"; the correct
+    // wiring must return the full symbol "THAMES.L".
     const provider = new FakeMarketDataProvider({
-      quotes: { ACME: quote("ACME", "10", "USD", "9") },
+      quotes: { "THAMES.L": quote("THAMES.L", "10", "GBP", "9") },
     });
     const auth = createAuth(tdb.db, testEnv);
     app = createApp(tdb.db, provider, auth);
 
     await post(
       app,
-      { instrument: acme, type: "buy", quantity: "4", price: "8", tradeDate: "2026-01-08" },
+      { instrument: thames, type: "buy", quantity: "4", price: "8", tradeDate: "2026-01-08" },
       cookie,
     );
 
@@ -262,7 +270,7 @@ describeDb("buildPortfolioView — portfolio-level todayChange", () => {
       currency: null,
     });
 
-    const pos = body.positions.find((p) => p.symbol === "ACME");
-    expect(pos?.name).toBe("ACME");
+    const pos = body.positions.find((p) => p.symbol === "THAMES.L");
+    expect(pos?.name).toBe("THAMES.L");
   });
 });
