@@ -46,21 +46,34 @@ export function timelineTotalLabel(point: TimelinePoint | undefined): string {
  *  segment — money that has actually arrived, never fused with the forecast
  *  above it. "" for a finished year (covered by `timelineTotalLabel`) and for
  *  a current year with nothing left expected, where `received === total` and
- *  that single total label already says everything a second label would. */
+ *  that single total label already says everything a second label would.
+ *  Also "" when nothing has arrived yet (early January, say): Recharts draws
+ *  no rectangle for a zero-height stack segment (see the `corners()` comment
+ *  below), so a label placed `insideTop` on one has nothing to sit inside —
+ *  the rounded value is checked, not the raw one, so a sub-0.5 amount that
+ *  rounds down to zero is caught the same way a literal zero is. Mirrors
+ *  `timelineExpectedLabel`'s own-value guard below — one rule, applied to
+ *  each segment's own figure. */
 export function timelineReceivedLabel(point: TimelinePoint | undefined): string {
   if (!point || point.projected <= 0) return "";
-  return Math.round(point.received).toLocaleString();
+  const received = Math.round(point.received);
+  if (received <= 0) return "";
+  return received.toLocaleString();
 }
 
 /** The still-expected figure for the year in progress, above the hatched
  *  segment, phrased as an addition — "+1,183 expected", never a bare
  *  "1,183" — so it cannot be misread as the stack's total. That fused
  *  reading is the exact defect this pair of labels replaces. "" whenever
- *  there is nothing left to expect: a finished year, or a current year that
- *  has already collected everything forecast (no `+0 expected`). */
+ *  there is nothing left to expect: a finished year, a current year that has
+ *  already collected everything forecast, or a current year whose remaining
+ *  forecast rounds down to zero (no `+0 expected`) — the same own-value
+ *  guard `timelineReceivedLabel` applies above, mirrored here. */
 export function timelineExpectedLabel(point: TimelinePoint | undefined): string {
   if (!point || point.projected <= 0) return "";
-  return `+${Math.round(point.projected).toLocaleString()} expected`;
+  const expected = Math.round(point.projected);
+  if (expected <= 0) return "";
+  return `+${expected.toLocaleString()} expected`;
 }
 
 /**

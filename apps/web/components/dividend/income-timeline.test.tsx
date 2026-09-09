@@ -32,6 +32,15 @@ const pointsWithNoExpected: TimelinePoint[] = [
   { year: 2026, received: 2800, projected: 0, total: 2800, isCurrentYear: true },
 ];
 
+// The mirror of `pointsWithNoExpected`: a current year that hasn't received
+// anything yet — early January, say. `received` is 0 on the segment
+// `timelineReceivedLabel` covers, the same way `projected` was 0 above on
+// the segment `timelineExpectedLabel` covers.
+const pointsWithNothingReceivedYet: TimelinePoint[] = [
+  { year: 2025, received: 4000, projected: 0, total: 4000, isCurrentYear: false },
+  { year: 2026, received: 0, projected: 1200, total: 1200, isCurrentYear: true },
+];
+
 describe("IncomeTimeline", () => {
   it("renders the card with its legend", () => {
     render(<IncomeTimeline points={points} currency="DKK" />);
@@ -98,6 +107,42 @@ describe("timeline bar labels", () => {
     expect(timelineTotalLabel(current)).toBe("2,800");
     expect(timelineReceivedLabel(current)).toBe("");
     expect(timelineExpectedLabel(current)).toBe("");
+  });
+
+  it("renders one label, not a stray zero, when the in-progress year has received nothing yet", () => {
+    const [, current] = pointsWithNothingReceivedYet;
+    // received is 0, mirroring the no-expected case above but on the other
+    // segment: without a guard on its own value, Math.round(0).toLocaleString()
+    // is "0", and Recharts has no rectangle to place it on (a zero-height
+    // stack segment draws nothing — see corners()), so the received segment
+    // must stay silent and the expected segment carries the only label.
+    expect(timelineReceivedLabel(current)).toBe("");
+    expect(timelineExpectedLabel(current)).toBe("+1,200 expected");
+    // Still no fused total for this point — it's in progress.
+    expect(timelineTotalLabel(current)).toBe("");
+  });
+
+  it("suppresses a segment's own label when its figure rounds down to zero, not only when it is exactly zero", () => {
+    // The mirror-hole check: a positive `received`/`projected` that rounds
+    // to zero is just as meaningless a label as a literal zero, and would
+    // slip past a guard that only checked the raw value against 0.
+    const nearZeroReceived: TimelinePoint = {
+      year: 2026,
+      received: 0.4,
+      projected: 1200,
+      total: 1200.4,
+      isCurrentYear: true,
+    };
+    expect(timelineReceivedLabel(nearZeroReceived)).toBe("");
+
+    const nearZeroExpected: TimelinePoint = {
+      year: 2026,
+      received: 2800,
+      projected: 0.3,
+      total: 2800.3,
+      isCurrentYear: true,
+    };
+    expect(timelineExpectedLabel(nearZeroExpected)).toBe("");
   });
 
   it("returns empty strings for an undefined point (Recharts payload can be undefined mid-render)", () => {
