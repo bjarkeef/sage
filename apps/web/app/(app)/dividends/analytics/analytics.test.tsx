@@ -242,18 +242,55 @@ describe("DividendAnalyticsPage — Yield card gross/net", () => {
     expect(screen.getByText(/Exchange rates are temporarily unavailable/)).toBeInTheDocument();
   });
 
+  // What this test can and cannot see under jsdom: Recharts never lays out
+  // its SVG here (`ResponsiveContainer` measures 0×0), so money drawn only
+  // inside a `LabelList`/chart never reaches `textContent` — `income-timeline`
+  // and `monthly-rhythm` are invisible to the /DKK|\$|€/ filter below no
+  // matter what their chip does, and `yield-by-holding` never renders a
+  // currency symbol at all (percentage only). In this fixture `moneyCards`
+  // collapses to `forward-payments` alone, because its figure is plain
+  // subtitle text outside the chart. That is real coverage for one card, not
+  // four — the other three are covered instead by the dedicated
+  // `renders the basis chip when taxed` tests in `income-timeline.test.tsx`,
+  // `monthly-rhythm.test.tsx`, and `yield-by-holding.test.tsx`, which assert
+  // directly on the `CardTitle` row (plain DOM, no Recharts involved) and so
+  // do not share this blind spot. Treat this test as the invariant for
+  // whatever it can actually observe, not as proof the other three are
+  // covered.
   it("shows a basis marker on every card that renders a money figure", async () => {
     const qc = makeTestQueryClient();
     qc.setQueryData(qk.dividendIncome(), GROSS_INCOME);
     qc.setQueryData(qk.portfolio(), PORTFOLIO);
 
     const { container } = renderWithClient(<DividendAnalyticsPage />, qc);
-    await waitFor(() => expect(screen.getByText(/Income by year/)).toBeInTheDocument());
+    // Every chart card on this page (IncomeComposition, IncomeTimeline,
+    // ForwardPayments, GrowthLeaders, YieldByHolding, MonthlyRhythm) is
+    // behind `next/dynamic(..., { ssr: false })` — a separate lazy import
+    // that resolves on its own microtask, not necessarily on the same tick
+    // as its siblings. Waiting on one anchor string (as this test originally
+    // did) proved to be a real, reproducible flake: `ForwardPayments` and
+    // `GrowthLeaders` were still showing their `ChartSkeleton` fallback —
+    // absent from `cards` entirely — in roughly 3 of 4 runs even though
+    // `IncomeTimeline` had already mounted. Waiting for every skeleton to
+    // clear as well, not just one title, makes the snapshot below wait for
+    // the whole grid rather than whichever card happened to win the race.
+    await waitFor(() => {
+      expect(screen.getByText(/Income by year/)).toBeInTheDocument();
+      expect(screen.queryAllByRole("status", { name: "Loading chart" })).toHaveLength(0);
+    });
 
     const cards = Array.from(container.querySelectorAll("[data-card]"));
     // Guard the guard: an empty NodeList would make the loop below pass
     // vacuously, which is how an invariant test silently stops testing.
     expect(cards.length).toBeGreaterThan(3);
+
+    // Explicit id list, not a prefix match: `startsWith("kpi-card-")` would
+    // silently exempt any *future* money card added under that same
+    // established naming convention, even one that forgot a chip entirely —
+    // exactly the failure mode this invariant exists to catch. Naming the
+    // two known exemptions here means a new `kpi-card-*` card fails loudly
+    // instead of inheriting a free pass by being named consistently.
+    const KPI_CARDS_WITHOUT_A_CHIP = ["kpi-card-income", "kpi-card-cashflow"];
 
     const moneyCards = cards.filter((c) => {
       const el = c as HTMLElement;
@@ -265,7 +302,7 @@ describe("DividendAnalyticsPage — Yield card gross/net", () => {
       // this invariant to them would fail on a card this task was never
       // asked to touch. Excluded explicitly, not silently: extending those
       // two cards is flagged as an open gap for a follow-up task.
-      if ((el.dataset.testid ?? "").startsWith("kpi-card-")) return false;
+      if (KPI_CARDS_WITHOUT_A_CHIP.includes(el.dataset.testid ?? "")) return false;
       // The consolidated Holdings table (`holdings-dividend-table.tsx`) is a
       // per-row readable-row grid, not a `CardTitle`-headlined bento tile —
       // a different, already-established DESIGN.md contract (RowGrid/
