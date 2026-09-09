@@ -1,7 +1,7 @@
 import { BasisChip, Card, CardTitle } from "@sage/ui";
 import { formatDate, formatMoney } from "../../lib/format";
 import { netAnnouncedDividends, netFactor } from "../../lib/dividend-tax";
-import type { AnnouncedDividendDTO } from "../../lib/types";
+import type { UpcomingRow } from "../../lib/types";
 
 export function UpcomingCard({
   upcoming,
@@ -9,8 +9,11 @@ export function UpcomingCard({
   taxRate,
 }: {
   /** Raw (gross) from the dashboard DTO — netted internally, same convention
-   *  as the sibling IncomeCard/OverviewStatStrip. */
-  upcoming: AnnouncedDividendDTO[];
+   *  as the sibling IncomeCard/OverviewStatStrip. Task 11 owns rendering the
+   *  `~` estimated-date mark, the announced/projected legend, and the
+   *  30-day window label this shape now carries (`dateEstimated`, `projected`)
+   *  — this component still renders it as announced-only for now. */
+  upcoming: UpcomingRow[];
   todayISO: string;
   taxRate: number | null;
 }) {
@@ -33,7 +36,7 @@ export function UpcomingCard({
         <div className="text-xs text-muted-foreground">No dividends scheduled.</div>
       ) : (
         rows.map((d) => {
-          const date = d.paymentDate ?? d.exDate;
+          const date = d.date;
           const isToday = date === todayISO;
           return (
             <div

@@ -5,6 +5,7 @@ import type {
   DashboardDTO,
   PortfolioHistoryPoint,
   PositionDTO,
+  UpcomingRow,
 } from "./types";
 import type { OverviewPrefs } from "./types";
 
@@ -46,6 +47,23 @@ function dividend(overrides: Partial<AnnouncedDividendDTO>): AnnouncedDividendDT
     shares: "100",
     income: "100",
     currency: "USD",
+    ...overrides,
+  };
+}
+
+/** `dashboard.upcomingDividends` rows arrive pre-resolved to the date they'll
+ *  display (the announced/exDate fallback now happens upstream, in the API's
+ *  `selectUpcoming` — see apps/api/src/routes/dashboard.test.ts) so, unlike
+ *  `dividend()` above, this factory takes `date` directly rather than
+ *  `paymentDate`/`exDate`. */
+function upcoming(overrides: Partial<UpcomingRow> & { symbol: string }): UpcomingRow {
+  return {
+    name: "Mpay Monthly Income",
+    date: "2026-07-10",
+    income: "100",
+    currency: "USD",
+    dateEstimated: false,
+    projected: false,
     ...overrides,
   };
 }
@@ -217,7 +235,7 @@ describe("toBriefInput", () => {
       const input = toBriefInput(
         dashboard({
           upcomingDividends: [
-            dividend({ symbol: "MPAY", paymentDate: TODAY_ISO, income: "312", currency: "USD" }),
+            upcoming({ symbol: "MPAY", date: TODAY_ISO, income: "312", currency: "USD" }),
           ],
         }),
         ALL_ON,
@@ -230,7 +248,7 @@ describe("toBriefInput", () => {
       const input = toBriefInput(
         dashboard({
           upcomingDividends: [
-            dividend({ symbol: "MPAY", paymentDate: "2026-07-17", income: "312", currency: "USD" }),
+            upcoming({ symbol: "MPAY", date: "2026-07-17", income: "312", currency: "USD" }),
           ],
         }),
         ALL_ON,
@@ -242,7 +260,7 @@ describe("toBriefInput", () => {
     it("is null when the payment is more than seven days out", () => {
       const input = toBriefInput(
         dashboard({
-          upcomingDividends: [dividend({ symbol: "MPAY", paymentDate: "2026-07-25" })],
+          upcomingDividends: [upcoming({ symbol: "MPAY", date: "2026-07-25" })],
         }),
         ALL_ON,
         NOW,
@@ -250,12 +268,10 @@ describe("toBriefInput", () => {
       expect(input.nextPayout).toBeNull();
     });
 
-    it("falls back to exDate when paymentDate is null", () => {
+    it("carries the date the API already resolved (paymentDate falling back to exDate happens upstream, in selectUpcoming)", () => {
       const input = toBriefInput(
         dashboard({
-          upcomingDividends: [
-            dividend({ symbol: "MPAY", paymentDate: null, exDate: TODAY_ISO, income: "10" }),
-          ],
+          upcomingDividends: [upcoming({ symbol: "MPAY", date: TODAY_ISO, income: "10" })],
         }),
         ALL_ON,
         NOW,
@@ -271,7 +287,7 @@ describe("toBriefInput", () => {
       const input = toBriefInput(
         dashboard({
           upcomingDividends: [
-            dividend({ symbol: "MPAY", paymentDate: TODAY_ISO, income: "312", currency: "USD" }),
+            upcoming({ symbol: "MPAY", date: TODAY_ISO, income: "312", currency: "USD" }),
           ],
           income: {
             projectedTwelveMonth: null,

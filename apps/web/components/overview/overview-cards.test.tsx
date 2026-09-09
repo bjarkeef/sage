@@ -3,7 +3,17 @@ import { describe, expect, it } from "vitest";
 import { PerformanceCard } from "./performance-card";
 import { PortfolioCard } from "./portfolio-card";
 import { UpcomingCard } from "./upcoming-card";
-import type { PositionDTO } from "../../lib/types";
+import type { PositionDTO, UpcomingRow } from "../../lib/types";
+
+const upcomingRow = (o: Partial<UpcomingRow> & { symbol: string }): UpcomingRow => ({
+  name: `${o.symbol} Inc`,
+  date: "2026-08-14",
+  income: "5.42",
+  currency: "USD",
+  dateEstimated: false,
+  projected: false,
+  ...o,
+});
 
 const pos = (o: Partial<PositionDTO>): PositionDTO => ({
   symbol: "AAPL",
@@ -122,15 +132,7 @@ describe("UpcomingCard", () => {
   it("renders upcoming dividends with human dates", () => {
     render(
       <UpcomingCard
-        upcoming={[
-          {
-            symbol: "O",
-            exDate: "2026-08-14",
-            paymentDate: "2026-08-14",
-            income: "5.42",
-            currency: "USD",
-          } as never,
-        ]}
+        upcoming={[upcomingRow({ symbol: "O", date: "2026-08-14", income: "5.42" })]}
         todayISO="2026-07-17"
         taxRate={null}
       />,
@@ -142,15 +144,7 @@ describe("UpcomingCard", () => {
   it("labels amounts 'Before tax' and renders them gross when no rate is set", () => {
     render(
       <UpcomingCard
-        upcoming={[
-          {
-            symbol: "O",
-            exDate: "2026-08-14",
-            paymentDate: "2026-08-14",
-            income: "100.00",
-            currency: "USD",
-          } as never,
-        ]}
+        upcoming={[upcomingRow({ symbol: "O", date: "2026-08-14", income: "100.00" })]}
         todayISO="2026-07-17"
         taxRate={null}
       />,
@@ -162,15 +156,7 @@ describe("UpcomingCard", () => {
   it("labels amounts 'After tax' and nets the raw (gross) amount when a rate is configured", () => {
     render(
       <UpcomingCard
-        upcoming={[
-          {
-            symbol: "O",
-            exDate: "2026-08-14",
-            paymentDate: "2026-08-14",
-            income: "100.00",
-            currency: "USD",
-          } as never,
-        ]}
+        upcoming={[upcomingRow({ symbol: "O", date: "2026-08-14", income: "100.00" })]}
         todayISO="2026-07-17"
         taxRate={35}
       />,

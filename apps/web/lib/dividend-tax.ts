@@ -1,4 +1,4 @@
-import type { AnnouncedDividendDTO, DividendIncomeDTO, IncomeGroupRow, MoneyDTO } from "./types";
+import type { DividendIncomeDTO, IncomeGroupRow, MoneyDTO } from "./types";
 
 /**
  * Net-of-tax multiplier for a flat dividend tax rate (percent). A null/undefined
@@ -79,22 +79,21 @@ export function applyDividendTax(income: DividendIncomeDTO, f: number): Dividend
 }
 
 /**
- * Net a list of announced dividends (`dashboard.upcomingDividends` /
+ * Net a list of dividend-shaped rows (`dashboard.upcomingDividends` /
  * `dashboard.recentDividends`) by scaling each row's `income` by `f`. The API
- * sends these gross straight off `income.announced`, so callers on the
- * Overview page apply this the same way `applyDividendTax` nets the
- * dividends-page DTO.
+ * sends these gross, so callers on the Overview page apply this the same way
+ * `applyDividendTax` nets the dividends-page DTO. Generic over the row shape
+ * because the two callers carry different DTOs — `recentDividends` is still
+ * `AnnouncedDividendDTO[]`, `upcomingDividends` is `UpcomingRow[]` — that
+ * otherwise share nothing but the `income` field this scales.
  *
  * Left GROSS on purpose, same reasoning as `applyDividendTax`: `amountPerShare`
  * (the issuer's declared per-share figure, cross-checked against
- * announcements) and `shares`.
+ * announcements) and `shares`, where the row carries them.
  *
  * `f === 1` (no tax configured) returns the input unchanged by reference.
  */
-export function netAnnouncedDividends(
-  rows: AnnouncedDividendDTO[],
-  f: number,
-): AnnouncedDividendDTO[] {
+export function netAnnouncedDividends<T extends { income: string }>(rows: T[], f: number): T[] {
   if (f === 1) return rows;
   return rows.map((r) => ({ ...r, income: scaleStr(r.income, f) }));
 }
