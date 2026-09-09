@@ -496,6 +496,19 @@ export interface DashboardIncomeDTO {
   dividendTaxRate: number | null;
 }
 
+export interface UpcomingRow {
+  symbol: string;
+  name: string;
+  /** The date the card displays — payment date, or ex-date when unknown. */
+  date: string;
+  income: string;
+  currency: string;
+  /** Sage predicted this date rather than the company declaring it. */
+  dateEstimated: boolean;
+  /** The whole payment is a forecast, not a declared dividend. */
+  projected: boolean;
+}
+
 export interface DashboardDTO {
   displayCurrency: string | null;
   positions: PositionDTO[];
@@ -528,7 +541,10 @@ export interface DashboardDTO {
    *  returns, so the comparison the card actually makes needs this separately. */
   benchmarkYtdTwr: number | null;
   income: DashboardIncomeDTO;
-  upcomingDividends: AnnouncedDividendDTO[];
+  /** Announced and projected rows within the next 30 days, ascending on the
+   *  date each row displays, capped at 5, floored at 3 (reaches past the
+   *  window rather than render fewer). */
+  upcomingDividends: UpcomingRow[];
   /** Announced rows paid within [previous market day, today], ascending, capped at 3. */
   recentDividends: AnnouncedDividendDTO[];
   allocation: { label: string; percent: number }[];
