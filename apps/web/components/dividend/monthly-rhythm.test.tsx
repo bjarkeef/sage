@@ -23,4 +23,21 @@ describe("MonthlyRhythm", () => {
     const { container } = render(<MonthlyRhythm rows={[]} />);
     expect(container.firstChild).toBeNull();
   });
+
+  // Recharts never lays out its SVG under jsdom, so the page-level invariant
+  // test (analytics.test.tsx) cannot see this card's money figures and so
+  // cannot confirm its BasisChip either — this is the real coverage for that
+  // gap. `CardTitle` and `BasisChip` are plain DOM, so it sidesteps the
+  // Recharts/jsdom limitation entirely rather than working around it.
+  it("carries a basis marker in its title row", () => {
+    render(<MonthlyRhythm rows={[{ month: "2026-05", amount: 40 }]} currency="DKK" taxed />);
+    expect(screen.getByText("After tax")).toBeInTheDocument();
+  });
+
+  it("says before tax when no rate is configured", () => {
+    render(
+      <MonthlyRhythm rows={[{ month: "2026-05", amount: 40 }]} currency="DKK" taxed={false} />,
+    );
+    expect(screen.getByText("Before tax")).toBeInTheDocument();
+  });
 });

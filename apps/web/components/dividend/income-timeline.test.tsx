@@ -67,6 +67,21 @@ describe("IncomeTimeline", () => {
     render(<IncomeTimeline points={[]} currency="DKK" incomeRecordingOff />);
     expect(screen.getByRole("link", { name: /settings/i })).toHaveAttribute("href", "/settings");
   });
+
+  // Recharts never lays out its SVG under jsdom, so the page-level invariant
+  // test (analytics.test.tsx) cannot see this card's money figures and so
+  // cannot confirm its BasisChip either — this is the real coverage for that
+  // gap. `CardTitle` and `BasisChip` are plain DOM, so it sidesteps the
+  // Recharts/jsdom limitation entirely rather than working around it.
+  it("carries a basis marker in its title row", () => {
+    render(<IncomeTimeline points={points} currency="DKK" taxed />);
+    expect(screen.getByText("After tax")).toBeInTheDocument();
+  });
+
+  it("says before tax when no rate is configured", () => {
+    render(<IncomeTimeline points={points} currency="DKK" taxed={false} />);
+    expect(screen.getByText("Before tax")).toBeInTheDocument();
+  });
 });
 
 // Recharts never lays out its SVG under jsdom — `ResponsiveContainer`
