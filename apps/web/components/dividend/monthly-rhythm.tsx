@@ -1,7 +1,7 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Card, CardTitle } from "@sage/ui";
+import { BasisChip, Card, CardTitle } from "@sage/ui";
 import type { MonthlyRhythmRow } from "../../lib/dividend-derive";
 import { formatMoney } from "../../lib/format";
 import { ActArrow } from "./kpi-cards";
@@ -21,9 +21,15 @@ function monthFull(month: string): string {
 export function MonthlyRhythm({
   rows,
   currency = "USD",
+  taxed = false,
 }: {
   rows: MonthlyRhythmRow[];
   currency?: string;
+  /** Whether the amounts below are net of a configured dividend tax rate —
+   *  drives the `BasisChip` in the title row. Optional so this component's
+   *  own unit tests (which don't exercise tax) don't need to thread it; the
+   *  real caller (`/dividends/analytics`) always passes it explicitly. */
+  taxed?: boolean;
 }) {
   if (rows.length === 0) return null;
 
@@ -34,7 +40,9 @@ export function MonthlyRhythm({
     >
       <ActArrow />
       <div className="mb-3.5">
-        <CardTitle className="mb-0">Monthly rhythm</CardTitle>
+        <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
+          Monthly rhythm
+        </CardTitle>
         <div className="text-xs text-muted-foreground">Received per month, last 12</div>
       </div>
 

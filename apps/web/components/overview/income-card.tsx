@@ -1,4 +1,4 @@
-import { Card, CardTitle, InfoTooltip } from "@sage/ui";
+import { BasisChip, Card, CardTitle } from "@sage/ui";
 import { formatMoney, moneyToNumber } from "../../lib/format";
 import { netFactor } from "../../lib/dividend-tax";
 import type { DashboardDTO, MoneyDTO } from "../../lib/types";
@@ -33,22 +33,16 @@ export function IncomeCard({
       : 0;
   return (
     <Card>
-      <CardTitle meta="This month">
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-income" />
-          Income
-        </span>
-      </CardTitle>
-      <div className="stat-num">{monthTotal ? formatMoney(monthTotal) : "—"}</div>
-      <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-        <span>{taxed ? "After tax" : "Before tax"}</span>
-        <InfoTooltip label="About this figure">
-          This month&apos;s full dividend income — received plus upcoming —{" "}
-          {taxed ? "after" : "before"} dividend tax
-          {taxed ? " (your single configured rate, applied flatly)" : ""}. The bar shows how much
-          has been received so far.
-        </InfoTooltip>
+      <div className="mb-3.5">
+        <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-income" />
+            Income
+          </span>
+        </CardTitle>
+        <div className="text-xs text-muted-foreground">This month</div>
       </div>
+      <div className="stat-num">{monthTotal ? formatMoney(monthTotal) : "—"}</div>
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-hairline">
         <div className="h-full rounded-full bg-income" style={{ width: `${ratio}%` }} />
       </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { screen, waitFor, cleanup } from "@testing-library/react";
+import { screen, waitFor, cleanup, within } from "@testing-library/react";
 import { renderWithClient, makeTestQueryClient } from "../../../../lib/test/render-with-client";
 import { qk } from "../../../../lib/query/keys";
 import type { DividendIncomeDTO, PortfolioDTO } from "../../../../lib/types";
@@ -22,8 +22,31 @@ const UPCOMING_PAYMENT_DATE = (() => {
   return d.toISOString().slice(0, 10);
 })();
 
+// A month ago, computed relatively for the same reason as
+// UPCOMING_PAYMENT_DATE — this needs to fall inside `monthlyRhythm`'s
+// trailing-12-month window on whatever day the suite runs.
+const RECENT_PAYMENT_DATE = (() => {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+  return d.toISOString().slice(0, 10);
+})();
+
+const LAST_CALENDAR_YEAR = String(new Date().getFullYear() - 1);
+
 const GROSS_INCOME: DividendIncomeDTO = {
-  retroactive: [],
+  retroactive: [
+    {
+      symbol: "O",
+      name: "Realty Income",
+      exDate: RECENT_PAYMENT_DATE,
+      paymentDate: RECENT_PAYMENT_DATE,
+      paymentDateEstimated: false,
+      amountPerShare: "0.26",
+      sharesHeld: "10",
+      income: "2.60",
+      currency: "USD",
+    },
+  ],
   projected: [],
   announced: [
     {
@@ -53,7 +76,11 @@ const GROSS_INCOME: DividendIncomeDTO = {
     trailingTwelveMonthIncome: [{ amount: "1000.00", currency: "USD" }],
     projectedTwelveMonthIncome: [{ amount: "1000.00", currency: "USD" }],
     monthlyBreakdown: [],
-    receivedByYear: [],
+    // A finished year, so IncomeTimeline has a column to draw — otherwise
+    // `points` comes back empty and the whole card renders null (see
+    // `incomeTimeline`'s doc comment), taking the invariant test's own
+    // anchor text ("Income by year") down with it.
+    receivedByYear: [{ year: LAST_CALENDAR_YEAR, amount: "500.00", currency: "USD" }],
   },
   incomeByGroup: { holdings: [], sector: [], currency: [] },
   dividendTaxRate: 35,
@@ -213,5 +240,45 @@ describe("DividendAnalyticsPage — Yield card gross/net", () => {
 
     await waitFor(() => expect(screen.getByText("Dividend analytics")).toBeInTheDocument());
     expect(screen.getByText(/Exchange rates are temporarily unavailable/)).toBeInTheDocument();
+  });
+
+  it("shows a basis marker on every card that renders a money figure", async () => {
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.dividendIncome(), GROSS_INCOME);
+    qc.setQueryData(qk.portfolio(), PORTFOLIO);
+
+    const { container } = renderWithClient(<DividendAnalyticsPage />, qc);
+    await waitFor(() => expect(screen.getByText(/Income by year/)).toBeInTheDocument());
+
+    const cards = Array.from(container.querySelectorAll("[data-card]"));
+    // Guard the guard: an empty NodeList would make the loop below pass
+    // vacuously, which is how an invariant test silently stops testing.
+    expect(cards.length).toBeGreaterThan(3);
+
+    const moneyCards = cards.filter((c) => {
+      const el = c as HTMLElement;
+      // kpi-cards.tsx's top KPI row (Annual income / Yield / Cash flow) is a
+      // separate, pre-existing component not among the six files Task 9
+      // names — see the task report. YieldCard already states its own basis
+      // inline ("Before tax"/net), but AnnualIncomeCard and CashFlowCard show
+      // money with no basis text outside a closed InfoTooltip, so applying
+      // this invariant to them would fail on a card this task was never
+      // asked to touch. Excluded explicitly, not silently: extending those
+      // two cards is flagged as an open gap for a follow-up task.
+      if ((el.dataset.testid ?? "").startsWith("kpi-card-")) return false;
+      // The consolidated Holdings table (`holdings-dividend-table.tsx`) is a
+      // per-row readable-row grid, not a `CardTitle`-headlined bento tile —
+      // a different, already-established DESIGN.md contract (RowGrid/
+      // DataRow) that this task's "same corner on every card" marker was
+      // never meant to sit inside. Identified structurally (it renders rows
+      // carrying this testid) rather than by title text, which would rot.
+      if (el.querySelector('[data-testid="holding-row"]')) return false;
+      return /DKK|\$|€/.test(el.textContent ?? "");
+    });
+    expect(moneyCards.length).toBeGreaterThan(0);
+
+    for (const card of moneyCards) {
+      expect(within(card as HTMLElement).getByText(/After tax|Before tax/)).toBeInTheDocument();
+    }
   });
 });
