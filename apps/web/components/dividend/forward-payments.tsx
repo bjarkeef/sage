@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, CardTitle } from "@sage/ui";
+import { BasisChip, Card, CardTitle } from "@sage/ui";
 import type {
   AnnouncedDividendDTO,
   ProjectedIncomeRowDTO,
@@ -389,12 +389,19 @@ export function ForwardPayments({
   projected,
   currentMonth,
   currency,
+  taxed = false,
 }: {
   retroactive: RetroactiveIncomeRowDTO[];
   announced: AnnouncedDividendDTO[];
   projected: ProjectedIncomeRowDTO[];
   currentMonth: string;
   currency: string;
+  /** Whether the month totals below are net of a configured dividend tax
+   *  rate — drives the `BasisChip` in the title row. Optional so this
+   *  component's own unit tests (which don't exercise tax) don't need to
+   *  thread it; the real caller (`/dividends/analytics`) always passes it
+   *  explicitly. */
+  taxed?: boolean;
 }) {
   const { chartData, byMonth, holdingsByMonth, windowed, avg } = buildForwardChartData(
     retroactive,
@@ -418,7 +425,9 @@ export function ForwardPayments({
     >
       <ActArrow />
       <div className="mb-3.5">
-        <CardTitle className="mb-0">Next 12 months</CardTitle>
+        <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
+          Next 12 months
+        </CardTitle>
         <div className="text-xs text-muted-foreground">
           Forward payments{avgLabel != null ? ` · ${avgLabel}` : ""}
         </div>

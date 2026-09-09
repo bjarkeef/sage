@@ -11,6 +11,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, compact, ...props }, ref) => (
     <div
       ref={ref}
+      data-card=""
       className={cn(
         "rounded-card border border-hairline bg-surface-card text-card-foreground",
         compact ? "p-5" : "p-6",

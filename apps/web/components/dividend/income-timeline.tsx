@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, CardTitle } from "@sage/ui";
+import { BasisChip, Card, CardTitle } from "@sage/ui";
 import type { TimelinePoint } from "../../lib/dividend-year";
 import { formatMoney } from "../../lib/format";
 import { ActArrow } from "./kpi-cards";
@@ -90,10 +90,17 @@ export function IncomeTimeline({
   points,
   currency,
   incomeRecordingOff = false,
+  taxed = false,
 }: {
   points: TimelinePoint[];
   currency: string;
   incomeRecordingOff?: boolean;
+  /** Whether the received/expected figures below are net of a configured
+   *  dividend tax rate — drives the `BasisChip` in the title row. Optional
+   *  so the component's own unit tests (which don't exercise tax at all)
+   *  don't need to thread it; the real caller (`/dividends/analytics`)
+   *  always passes it explicitly. */
+  taxed?: boolean;
 }) {
   if (points.length === 0) {
     if (!incomeRecordingOff) return null;
@@ -123,7 +130,9 @@ export function IncomeTimeline({
     >
       <ActArrow />
       <div className="mb-3.5">
-        <CardTitle className="mb-0">Income by year</CardTitle>
+        <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
+          Income by year
+        </CardTitle>
         <div className="text-xs text-muted-foreground">Received, and still expected this year</div>
       </div>
 

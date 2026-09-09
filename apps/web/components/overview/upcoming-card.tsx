@@ -1,4 +1,4 @@
-import { Card, CardTitle, InfoTooltip } from "@sage/ui";
+import { BasisChip, Card, CardTitle } from "@sage/ui";
 import { formatDate, formatMoney } from "../../lib/format";
 import { netAnnouncedDividends, netFactor } from "../../lib/dividend-tax";
 import type { AnnouncedDividendDTO } from "../../lib/types";
@@ -18,18 +18,17 @@ export function UpcomingCard({
   const taxed = taxRate != null;
   return (
     <Card>
-      <CardTitle meta={rows.length > 0 ? `${rows.length} announced` : undefined}>
-        Upcoming
-      </CardTitle>
-      {rows.length > 0 && (
-        <div className="mb-3 flex items-center gap-1 text-xs text-muted-foreground">
-          <span>{taxed ? "After tax" : "Before tax"}</span>
-          <InfoTooltip label="About this figure">
-            Payout amounts are {taxed ? "after" : "before"} your configured dividend tax rate (a
-            single flat rate, not per-country withholding).
-          </InfoTooltip>
-        </div>
-      )}
+      <div className="mb-3">
+        <CardTitle
+          className="mb-0"
+          meta={rows.length > 0 ? <BasisChip taxed={taxed} /> : undefined}
+        >
+          Upcoming
+        </CardTitle>
+        {rows.length > 0 && (
+          <div className="text-xs text-muted-foreground">{rows.length} announced</div>
+        )}
+      </div>
       {rows.length === 0 ? (
         <div className="text-xs text-muted-foreground">No dividends scheduled.</div>
       ) : (
