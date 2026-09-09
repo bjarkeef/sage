@@ -3,7 +3,7 @@ import { DiversificationPageSkeleton } from "../../../components/skeletons";
 
 export default function DiversificationLoading() {
   return (
-    <PageShell role="status" aria-label="Loading diversification">
+    <PageShell animate={false} role="status" aria-label="Loading diversification">
       <DiversificationPageSkeleton />
     </PageShell>
   );

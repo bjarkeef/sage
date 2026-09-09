@@ -179,7 +179,7 @@ export default function DividendsPage() {
 
   if (loading && !data) {
     return (
-      <PageShell>
+      <PageShell animate={false}>
         <DividendsPageSkeleton />
       </PageShell>
     );

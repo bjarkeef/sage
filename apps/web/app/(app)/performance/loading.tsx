@@ -5,7 +5,7 @@ import { PerformancePageSkeleton } from "../../../components/skeletons";
  *  (hero -> stats -> chart). */
 export default function PerformanceLoading() {
   return (
-    <PageShell>
+    <PageShell animate={false}>
       <PerformancePageSkeleton />
     </PageShell>
   );

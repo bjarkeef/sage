@@ -3,7 +3,7 @@ import { CategoriesPageSkeleton } from "../../../components/skeletons";
 
 export default function CategoriesLoading() {
   return (
-    <PageShell role="status" aria-label="Loading categories">
+    <PageShell animate={false} role="status" aria-label="Loading categories">
       <CategoriesPageSkeleton />
     </PageShell>
   );
