@@ -176,7 +176,7 @@ export default function DividendAnalyticsPage() {
 
   if (loading) {
     return (
-      <PageShell>
+      <PageShell animate={false}>
         <AnalyticsPageSkeleton />
       </PageShell>
     );

@@ -53,7 +53,7 @@ export default function AssetDetailPage() {
 
   if (isLoading) {
     return (
-      <PageShell>
+      <PageShell animate={false}>
         <AssetPageSkeleton />
       </PageShell>
     );

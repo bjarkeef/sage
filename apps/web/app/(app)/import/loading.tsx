@@ -7,7 +7,7 @@ import { ImportPageSkeleton } from "../../../components/skeletons";
 // with, unlike /goal or /dividends.
 export default function ImportLoading() {
   return (
-    <PageShell className="py-10">
+    <PageShell animate={false} className="py-10">
       <ImportPageSkeleton />
     </PageShell>
   );

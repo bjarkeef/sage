@@ -31,4 +31,22 @@ describe("PageShell", () => {
     render(<PageShell className="pb-12" data-testid="shell" />);
     expect(screen.getByTestId("shell").className).toContain("pb-12");
   });
+
+  it("cascades its children in by default", () => {
+    const { container } = render(
+      <PageShell>
+        <div>a</div>
+      </PageShell>,
+    );
+    expect(container.firstChild).toHaveClass("page-enter");
+  });
+
+  it("does not animate a skeleton shell", () => {
+    const { container } = render(
+      <PageShell animate={false}>
+        <div>a</div>
+      </PageShell>,
+    );
+    expect(container.firstChild).not.toHaveClass("page-enter");
+  });
 });

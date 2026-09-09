@@ -39,7 +39,7 @@ export function CategoriesClient() {
 
   if (isPending) {
     return (
-      <PageShell>
+      <PageShell animate={false}>
         <CategoriesPageSkeleton />
       </PageShell>
     );

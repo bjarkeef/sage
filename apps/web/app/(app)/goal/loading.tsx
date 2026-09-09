@@ -3,7 +3,7 @@ import { GoalPageSkeleton } from "../../../components/skeletons";
 
 export default function GoalLoading() {
   return (
-    <PageShell role="status" aria-label="Loading goal">
+    <PageShell animate={false} role="status" aria-label="Loading goal">
       <GoalPageSkeleton />
     </PageShell>
   );
