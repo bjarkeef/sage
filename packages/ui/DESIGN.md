@@ -144,8 +144,8 @@ Color lives on the delta text/chip only, never on surrounding chrome.
 ### Motion
 
 One `fade-up` cascade (0.3–0.5s), `prefers-reduced-motion` respected. No other
-entrance effects. (Applied per-page today via the `fade-up` utility; folding
-it into `PageShell` itself is tracked, not yet done.)
+entrance effects. (Baked into `PageShell` with `animate={false}` for skeletal
+pages; a standalone `fade-up` utility remains for pages outside `PageShell`.)
 
 Its one counterpart is `fade-out-down` (0.2s), for something that leaves under
 its own steam rather than because the user navigated — a toast expiring.
