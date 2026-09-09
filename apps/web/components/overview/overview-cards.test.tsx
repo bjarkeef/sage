@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { PerformanceCard } from "./performance-card";
 import { PortfolioCard } from "./portfolio-card";
@@ -14,6 +14,13 @@ const upcomingRow = (o: Partial<UpcomingRow> & { symbol: string }): UpcomingRow 
   projected: false,
   ...o,
 });
+
+/** Relative to `new Date()` so these fixtures never rot into past dates. */
+function daysFromNow(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 
 const pos = (o: Partial<PositionDTO>): PositionDTO => ({
   symbol: "AAPL",
@@ -170,7 +177,96 @@ describe("UpcomingCard", () => {
     render(<UpcomingCard upcoming={[]} todayISO="2026-07-17" taxRate={35} />);
     expect(screen.queryByText("After tax")).not.toBeInTheDocument();
     expect(screen.queryByText("Before tax")).not.toBeInTheDocument();
+    // The empty state itself is untouched by Task 11 (it lives entirely
+    // outside the branch this task rewrote), so this half of the assertion
+    // can't fail against the pre-Task-11 component — it's folded in here
+    // rather than kept as its own always-green test.
+    expect(screen.getByText("No dividends scheduled.")).toBeInTheDocument();
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
   });
+
+  // Two independent facts: `~` says Sage predicted the DATE, `≈` says Sage
+  // forecast the AMOUNT. An announced dividend can carry a predicted pay
+  // date, so the date mark must track `dateEstimated` alone — not `projected`.
+  it("marks a predicted date but not a declared one", () => {
+    render(
+      <UpcomingCard
+        upcoming={[
+          upcomingRow({ symbol: "O", date: daysFromNow(3), dateEstimated: false }),
+          upcomingRow({ symbol: "THAMES.L", date: daysFromNow(10), dateEstimated: true }),
+        ]}
+        todayISO={daysFromNow(0)}
+        taxRate={null}
+      />,
+    );
+    const rows = screen.getAllByRole("listitem");
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]!).queryByTestId("date-estimated-mark")).not.toBeInTheDocument();
+    expect(within(rows[1]!).getByTestId("date-estimated-mark")).toBeInTheDocument();
+    // The legend explains a mark that is actually visible on this render.
+    expect(screen.getByText("~ estimated date")).toBeInTheDocument();
+  });
+
+  it("marks a forecast amount but not a declared one", () => {
+    render(
+      <UpcomingCard
+        upcoming={[
+          upcomingRow({ symbol: "O", date: daysFromNow(3), projected: false }),
+          upcomingRow({
+            symbol: "NORDA-B",
+            date: daysFromNow(12),
+            projected: true,
+            dateEstimated: false,
+          }),
+        ]}
+        todayISO={daysFromNow(0)}
+        taxRate={null}
+      />,
+    );
+    const rows = screen.getAllByRole("listitem");
+    expect(within(rows[0]!).queryByTestId("amount-projected-mark")).not.toBeInTheDocument();
+    expect(within(rows[1]!).getByTestId("amount-projected-mark")).toBeInTheDocument();
+  });
+
+  // The original defect: a book with only forecast income (nothing a company
+  // has announced yet) rendered the empty state instead of the forecast rows.
+  it("renders rows on a book with nothing announced", () => {
+    render(
+      <UpcomingCard
+        upcoming={[
+          upcomingRow({ symbol: "O", date: daysFromNow(5), projected: true, dateEstimated: true }),
+          upcomingRow({
+            symbol: "NORDA-B",
+            date: daysFromNow(9),
+            projected: true,
+            dateEstimated: true,
+          }),
+        ]}
+        todayISO={daysFromNow(0)}
+        taxRate={null}
+      />,
+    );
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.queryByText("No dividends scheduled.")).not.toBeInTheDocument();
+  });
+
+  // The legend must read the rows actually rendered after the card's own
+  // cap, not the full input array — a book that hands the card more rows
+  // than it displays must not surface a mark for a row nobody can see.
+  it("omits the estimated-date legend when no visible row is estimated", () => {
+    const rows = [
+      upcomingRow({ symbol: "A1", date: daysFromNow(1) }),
+      upcomingRow({ symbol: "A2", date: daysFromNow(2) }),
+      upcomingRow({ symbol: "A3", date: daysFromNow(3) }),
+      upcomingRow({ symbol: "A4", date: daysFromNow(4) }),
+      upcomingRow({ symbol: "A5", date: daysFromNow(5) }),
+      upcomingRow({ symbol: "A6", date: daysFromNow(6), dateEstimated: true }),
+    ];
+    render(<UpcomingCard upcoming={rows} todayISO={daysFromNow(0)} taxRate={null} />);
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+    expect(screen.queryByText("~ estimated date")).not.toBeInTheDocument();
+  });
+
   it("marks a YTD figure computed over incomplete price history", () => {
     render(
       <PerformanceCard
