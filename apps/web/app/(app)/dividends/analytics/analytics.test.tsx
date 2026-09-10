@@ -274,10 +274,22 @@ describe("DividendAnalyticsPage — Yield card gross/net", () => {
     // `IncomeTimeline` had already mounted. Waiting for every skeleton to
     // clear as well, not just one title, makes the snapshot below wait for
     // the whole grid rather than whichever card happened to win the race.
-    await waitFor(() => {
-      expect(screen.getByText(/Income by year/)).toBeInTheDocument();
-      expect(screen.queryAllByRole("status", { name: "Loading chart" })).toHaveLength(0);
-    });
+    //
+    // Six independent lazy imports resolving is reachable well within
+    // testing-library's default 1000ms in isolation, but under a fully
+    // loaded suite (the whole monorepo running concurrently) the shared CPU
+    // can push that past the default and fail this test with the KPI row
+    // rendered but the chart cards' skeletons still up — confirmed by
+    // reproducing it under artificial CPU contention. The condition itself
+    // is unchanged and still reachable; it just needs more real time than
+    // the default budget allows when the machine is busy.
+    await waitFor(
+      () => {
+        expect(screen.getByText(/Income by year/)).toBeInTheDocument();
+        expect(screen.queryAllByRole("status", { name: "Loading chart" })).toHaveLength(0);
+      },
+      { timeout: 5000 },
+    );
 
     const cards = Array.from(container.querySelectorAll("[data-card]"));
     // Guard the guard: an empty NodeList would make the loop below pass
