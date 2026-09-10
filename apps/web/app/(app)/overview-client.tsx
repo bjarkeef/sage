@@ -1,10 +1,12 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { PageShell, EmptyState } from "@sage/ui";
 import { getDashboard, getUserSettings } from "../../lib/api";
 import { qk } from "../../lib/query/keys";
+import type { PortfolioHistoryPoint } from "../../lib/types";
 import { composeColorLine } from "../../lib/brief";
 import { toBriefInput } from "../../lib/brief-input";
 import { BriefHeader } from "../../components/brief-header";
@@ -32,6 +34,16 @@ export function OverviewClient() {
     staleTime: 300_000,
   });
 
+  // Lifted here rather than kept inside the chart: the hero numeral is a
+  // sibling, and the point of the redesign is that dragging the chart rewrites
+  // it. Null whenever the pointer is off the plot.
+  //
+  // Above the `if (!dashboard || !settings) return null` below, and it has to
+  // stay there: a hook after an early return runs in a different order on the
+  // renders that bail out, which is the one React rule that breaks silently at
+  // runtime rather than loudly at build time.
+  const [scrubbed, setScrubbed] = React.useState<PortfolioHistoryPoint | null>(null);
+
   if (!dashboard || !settings) return null; // hydrated on first paint; guards SSR fallback
 
   const prefs = settings.overviewPrefs;
@@ -57,7 +69,6 @@ export function OverviewClient() {
       : null);
   const ytdPercent = dashboard.ytdTwr != null ? dashboard.ytdTwr * 100 : null;
   const colorSegments = prefs.brief ? composeColorLine(toBriefInput(dashboard, prefs, now)) : [];
-
   return (
     <PageShell>
       {/* Wraps at both levels, same reasoning as PageHeader's actions row
@@ -81,13 +92,14 @@ export function OverviewClient() {
       </header>
 
       <section className="mb-8">
-        <OverviewHero value={lastValue} todayChange={dashboard.todayChange} />
+        <OverviewHero value={lastValue} todayChange={dashboard.todayChange} scrubbed={scrubbed} />
         <div className="mt-4">
           <PortfolioChart
             variant="ambient"
             initialHistory={dashboard.history}
             displayCurrency={dashboard.displayCurrency}
             todayChange={dashboard.todayChange}
+            onScrub={setScrubbed}
           />
         </div>
         {prefs.statStrip && (

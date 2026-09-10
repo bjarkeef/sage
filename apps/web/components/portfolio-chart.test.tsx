@@ -1,4 +1,4 @@
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithClient, makeTestQueryClient } from "../lib/test/render-with-client";
 import { qk } from "../lib/query/keys";
@@ -18,6 +18,7 @@ vi.mock("next-themes", () => ({
 
 import { PortfolioChart } from "./portfolio-chart";
 import { getPortfolioHistory } from "../lib/api";
+import * as lwc from "lightweight-charts";
 import type { PortfolioHistoryDTO, DashboardDTO } from "../lib/types";
 
 const history: PortfolioHistoryDTO = {
@@ -197,6 +198,39 @@ describe("PortfolioChart", () => {
   // recycled profit as money the user put in. Calling this line "invested"
   // made Sage look wrong against them while it was the one being precise, so
   // the word is reserved and the difference is explained.
+  it("reports the day under the crosshair, and reads its figures", () => {
+    // The chart and the hero numeral are one instrument: this is the wire that
+    // makes that true. Driven through the mocked `subscribeCrosshairMove`
+    // handler, because lightweight-charts draws nothing in jsdom and there is
+    // no canvas to move a real pointer over.
+    const onScrub = vi.fn();
+    renderWithClient(
+      <PortfolioChart
+        initialHistory={history}
+        displayCurrency={null}
+        todayChange={null}
+        onScrub={onScrub}
+      />,
+      makeTestQueryClient(),
+    );
+
+    const createChart = lwc.createChart as unknown as ReturnType<typeof vi.fn>;
+    const chart = createChart.mock.results.at(-1)!.value as {
+      subscribeCrosshairMove: ReturnType<typeof vi.fn>;
+    };
+    const onCrosshair = chart.subscribeCrosshairMove.mock.calls.at(-1)![0] as (p: unknown) => void;
+
+    // The first fixture day: money in 9,000 against a value of 10,000.
+    act(() => onCrosshair({ time: "2026-01-01" }));
+    expect(onScrub).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-01-01" }));
+    expect(screen.getByText("$9,000.00")).toBeInTheDocument();
+
+    // Off the plot: `time` is undefined, and the strip returns to the last day.
+    act(() => onCrosshair({ time: undefined }));
+    expect(onScrub).toHaveBeenLastCalledWith(null);
+    expect(screen.getByText("$9,500.00")).toBeInTheDocument();
+  });
+
   it("labels the line money in, never invested", () => {
     renderWithClient(
       <PortfolioChart initialHistory={history} displayCurrency={null} todayChange={null} />,
