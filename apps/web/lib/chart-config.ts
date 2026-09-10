@@ -28,6 +28,7 @@ export interface ChartTheme {
   comparison2: string;
   hairline: string;
   primary: string;
+  gain: string;
   loss: string;
   costLine: string;
   marker: string;
@@ -46,6 +47,7 @@ export function readChartTheme(): ChartTheme {
     comparison2: resolve("--chart-comparison-2"),
     hairline: resolve("--hairline"),
     primary: resolve("--primary"),
+    gain: resolve("--gain"),
     loss: resolve("--loss"),
     costLine: resolve("--muted-foreground"),
     marker: resolve("--chart-marker"),

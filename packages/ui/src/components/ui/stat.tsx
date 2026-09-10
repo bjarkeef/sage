@@ -8,7 +8,11 @@ const sizeClass = {
 } as const;
 
 export interface StatProps extends React.HTMLAttributes<HTMLDivElement> {
-  label: string;
+  /** Usually a caps word. A node is allowed so a figure can carry the swatch of
+   *  the series it belongs to — a legend entry and its value are one thing, and
+   *  splitting them into a chart legend plus a separate stat makes the reader
+   *  match them up by colour across a gap. */
+  label: React.ReactNode;
   value: React.ReactNode;
   /** Muted secondary line under the value (Snowball's context pairing). */
   context?: React.ReactNode;

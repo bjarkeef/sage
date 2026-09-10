@@ -18,6 +18,7 @@ const theme = {
   comparison2: "#93b0a0",
   hairline: "rgba(20, 20, 19, 0.09)",
   primary: "#3d6a4d",
+  gain: "#3dbe86",
   loss: "#b23b3b",
   costLine: "#888888",
   // Deliberately not `primary`/`line`: trade markers must never resolve to the
