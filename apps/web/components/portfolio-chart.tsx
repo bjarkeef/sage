@@ -20,12 +20,7 @@ import { AmbientChartSkeleton, HeroSkeleton } from "./skeletons";
 import { FxApproximatedCallout } from "./fx-approximated-callout";
 import { FxStaleCallout } from "./fx-stale-callout";
 import { FxUnavailableCallout } from "./fx-unavailable-callout";
-import {
-  readChartTheme,
-  baseChartOptions,
-  areaSeriesOptions,
-  attachHoverTooltip,
-} from "../lib/chart-config";
+import { readChartTheme, baseChartOptions, areaSeriesOptions } from "../lib/chart-config";
 import type { DashboardDTO, PortfolioHistoryDTO, PortfolioHistoryPoint } from "../lib/types";
 
 const RANGES = [
@@ -305,13 +300,14 @@ export function PortfolioChart({
       revealRef.current = 1;
     }
 
-    const detachTooltip = attachHoverTooltip(chart, series, containerRef.current, (v) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: data?.points[0]?.value.currency ?? "USD",
-        maximumFractionDigits: 0,
-      }).format(v),
-    );
+    // No hover bubble on this chart, deliberately. The readout above follows the
+    // crosshair now — bigger, in a fixed place the eye already knows, and it
+    // carries money in and the gain as well as the value. A bubble under the
+    // pointer would repeat the value and the date a few hundred pixels below
+    // where they are already being shown.
+    //
+    // The asset and performance charts keep theirs: neither has a headline that
+    // tracks the crosshair, so there the bubble is the only readout.
 
     // Drive the readout from the crosshair. `param.time` is the series time —
     // the ISO date these points are keyed by — so the lookup is exact rather
@@ -345,7 +341,6 @@ export function PortfolioChart({
       chart.unsubscribeCrosshairMove(onCrosshair);
       setScrubbed(null);
       onScrubRef.current?.(null);
-      detachTooltip();
       chart.remove();
       chartRef.current = null;
     };
