@@ -9,25 +9,9 @@ vi.mock("../../lib/auth-client", () => ({
   authClient: { useSession: () => useSession() },
 }));
 
-vi.mock("lightweight-charts", () => {
-  const LineStyle = { Solid: 0, Dotted: 1, Dashed: 2, LargeDashed: 3, SparseDotted: 4 };
-  const ColorType = { Solid: "solid", VerticalGradient: "gradient" };
-  const chartStub = {
-    addSeries: vi.fn(() => ({ setData: vi.fn() })),
-    timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
-    subscribeCrosshairMove: vi.fn(),
-    unsubscribeCrosshairMove: vi.fn(),
-    applyOptions: vi.fn(),
-    priceScale: vi.fn(() => ({ applyOptions: vi.fn() })),
-    remove: vi.fn(),
-  };
-  return {
-    createChart: vi.fn(() => chartStub),
-    AreaSeries: "Area",
-    LineSeries: "Line",
-    LineStyle,
-    ColorType,
-  };
+vi.mock("lightweight-charts", async () => {
+  const { lightweightChartsStub } = await import("../../lib/test/lightweight-charts-stub");
+  return lightweightChartsStub();
 });
 
 vi.mock("next-themes", () => ({

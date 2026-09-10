@@ -3,11 +3,12 @@
 import * as React from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { createChart, AreaSeries, LineSeries, LineStyle, type IChartApi } from "lightweight-charts";
+import { createGainBand, type GainBandPoint } from "./charts/gain-band";
 import { useTheme } from "next-themes";
-import { SegmentedControl, Delta } from "@sage/ui";
+import { SegmentedControl, Delta, Stat, StatStrip } from "@sage/ui";
 import { getPortfolioHistory } from "../lib/api";
 import { qk } from "../lib/query/keys";
-import { moneyToNumber } from "../lib/format";
+import { moneyToNumber, formatMoney } from "../lib/format";
 import { AmbientChartSkeleton, HeroSkeleton } from "./skeletons";
 import { FxApproximatedCallout } from "./fx-approximated-callout";
 import { FxStaleCallout } from "./fx-stale-callout";
@@ -95,7 +96,6 @@ export function PortfolioChart({
 }: PortfolioChartProps) {
   const ambient = variant === "ambient";
   const [range, setRange] = React.useState(INITIAL_RANGE);
-  const [showInvested, setShowInvested] = React.useState(true);
   // The server-rendered initialHistory was fetched with whatever displayCurrency
   // this component first mounted with; capture it once so a later currency
   // change (a new prop value, same mounted instance) doesn't keep seeding stale
@@ -130,6 +130,25 @@ export function PortfolioChart({
     [data],
   );
 
+  /** Value and money in on one row per day, for the band between them. */
+  const bandData = React.useMemo<GainBandPoint[]>(
+    () =>
+      data?.points.map((p) => ({
+        time: p.date,
+        value: Number(p.value.amount),
+        invested: Number(p.invested.amount),
+      })) ?? [],
+    [data],
+  );
+  const bandRef = React.useRef<GainBandPoint[]>([]);
+  bandRef.current = bandData;
+
+  // The entrance is once per MOUNT, not per render: switching range refetches
+  // and rebuilds the chart, and replaying the draw every time would be a
+  // stutter rather than a welcome. See DESIGN.md, Motion.
+  const hasEnteredRef = React.useRef(false);
+  const revealRef = React.useRef(1);
+
   React.useEffect(() => {
     if (!containerRef.current || chartData.length === 0) return;
 
@@ -152,22 +171,121 @@ export function PortfolioChart({
       chart.priceScale("right").applyOptions({ visible: false });
     }
 
-    const series = chart.addSeries(AreaSeries, areaSeriesOptions(theme));
+    // The area's own gradient fills from the value line to the floor of the
+    // pane, which is very nearly the same region the gain band fills — two
+    // washes over one area, and the band stops reading as a *band*. With the
+    // fill off, the only shaded region on the chart is the space between value
+    // and money in, and the empty ground beneath money in is what makes that
+    // space legible as a quantity. The series stays an AreaSeries for its
+    // crosshair marker options.
+    const series = chart.addSeries(AreaSeries, {
+      ...areaSeriesOptions(theme),
+      ...(investedData.length > 0 ? { topColor: "transparent", bottomColor: "transparent" } : {}),
+    });
     series.setData(chartData);
 
-    if (showInvested && investedData.length > 0) {
-      const investedSeries = chart.addSeries(LineSeries, {
-        color: withAlpha(theme.text, 0.55),
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        lastValueVisible: false,
-        priceLineVisible: false,
-        crosshairMarkerVisible: false,
-      });
-      investedSeries.setData(investedData);
+    // Money in is drawn always, not behind a toggle. Without it the band has no
+    // floor and the gain has nothing to be measured from — it is structure now,
+    // not an option, and the toggle it replaced was off by default, so the
+    // honest reading was the one nobody saw.
+    const investedSeries =
+      investedData.length > 0
+        ? chart.addSeries(LineSeries, {
+            color: withAlpha(theme.text, 0.55),
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            lastValueVisible: false,
+            priceLineVisible: false,
+            crosshairMarkerVisible: false,
+          })
+        : null;
+    investedSeries?.setData(investedData);
+
+    if (investedSeries) {
+      series.attachPrimitive(
+        createGainBand({
+          points: () => bandRef.current,
+          gainFill: () => withAlpha(theme.gain, 0.15),
+          lossFill: () => withAlpha(theme.loss, 0.14),
+          progress: () => revealRef.current,
+        }),
+      );
     }
 
     chart.timeScale().fitContent();
+
+    // ---- data-bearing entrance (DESIGN.md, Motion) ----------------------
+    // Both series draw left to right under ONE clock, and the band's reveal
+    // reads the same clock, so the fill can never run ahead of the lines that
+    // bound it. The price scale is frozen for the duration: without that, a
+    // chart holding two days of data autoscales to those two days and the whole
+    // drawing lurches as more arrives.
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let raf = 0;
+    // The flag has to mean "an entrance FINISHED", not "one was started".
+    // React StrictMode invokes this effect twice on mount in development: the
+    // first pass started the animation and set the flag, the cleanup cancelled
+    // it, and the second pass saw the flag and drew the chart instantly — so the
+    // entrance never once played, and looked from the outside exactly like a
+    // reduced-motion machine.
+    let entranceCompleted = false;
+
+    const finish = () => {
+      entranceCompleted = true;
+      series.setData(chartData);
+      investedSeries?.setData(investedData);
+      series.priceScale().setAutoScale(true);
+      revealRef.current = 1;
+    };
+
+    if (!hasEnteredRef.current && !prefersReduced && chartData.length > 8) {
+      hasEnteredRef.current = true;
+      // Every day the chart will ever show is present from the first frame;
+      // the ones that have not been reached yet are WHITESPACE — a time with no
+      // value, which holds its slot on the axis and draws nothing.
+      //
+      // The obvious implementation, feeding a growing slice, does not work: the
+      // time scale re-fits to whatever it has, so a chart two days in spans two
+      // days, and the whole drawing slides and rescales under the reader as it
+      // fills. Pinning the logical range each frame does not hold it either.
+      // Whitespace fixes the axis at its final extent from the start, so the
+      // only thing that moves is the line, which is the point.
+      series.priceScale().setAutoScale(false);
+      revealRef.current = 0;
+      const start = performance.now();
+      const DURATION_MS = 900;
+      const step = (now: number) => {
+        const t = Math.min(1, (now - start) / DURATION_MS);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const k = Math.max(2, Math.ceil(eased * chartData.length));
+        series.setData([
+          ...chartData.slice(0, k),
+          ...chartData.slice(k).map((p) => ({ time: p.time })),
+        ]);
+        investedSeries?.setData([
+          ...investedData.slice(0, k),
+          ...investedData.slice(k).map((p) => ({ time: p.time })),
+        ]);
+        revealRef.current = eased;
+        if (t < 1) {
+          raf = requestAnimationFrame(step);
+        } else {
+          raf = 0;
+          finish();
+        }
+      };
+      raf = requestAnimationFrame(step);
+    } else {
+      // Reduced motion, a range change, or too few points to be worth
+      // animating: the resting state IS the truth, so it is simply drawn. This
+      // counts as complete so the cleanup below does not re-arm the entrance and
+      // make the NEXT range change animate.
+      hasEnteredRef.current = true;
+      entranceCompleted = true;
+      revealRef.current = 1;
+    }
 
     const detachTooltip = attachHoverTooltip(chart, series, containerRef.current, (v) =>
       new Intl.NumberFormat("en-US", {
@@ -186,6 +304,10 @@ export function PortfolioChart({
     resizeObserver.observe(containerRef.current);
 
     return () => {
+      if (raf) cancelAnimationFrame(raf);
+      // Torn down before it finished (StrictMode's first pass, or a fast
+      // unmount): give the entrance back, so the mount that survives plays it.
+      if (!entranceCompleted) hasEnteredRef.current = false;
       resizeObserver.disconnect();
       detachTooltip();
       chart.remove();
@@ -194,7 +316,7 @@ export function PortfolioChart({
     // data?.points is already captured via chartData (derived from it); adding it
     // would rebuild the chart on every refetch that produced identical points.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartData, investedData, showInvested, resolvedTheme, ambient]);
+  }, [chartData, investedData, resolvedTheme, ambient]);
 
   if (isLoading) return ambient ? <AmbientChartSkeleton /> : <HeroSkeleton />;
   if (!data || data.points.length === 0) {
@@ -202,6 +324,11 @@ export function PortfolioChart({
   }
 
   const lastPoint = data.points[data.points.length - 1]!;
+  // Value minus money in. Both are already in the display currency by the time
+  // they reach here, so this is a subtraction rather than a conversion.
+  const gainAmount = Number(lastPoint.value.amount) - Number(lastPoint.invested.amount);
+  const investedNow = Number(lastPoint.invested.amount);
+  const gainPercent = investedNow > 0 ? (gainAmount / investedNow) * 100 : null;
   const rangeLabel = RANGE_LABEL[range] ?? range;
 
   return (
@@ -260,35 +387,71 @@ export function PortfolioChart({
         )}
       </div>
 
-      <div className="flex items-center gap-4 text-xs">
-        <button
-          type="button"
-          onClick={() => setShowInvested((v) => !v)}
-          // "Money in", not "Invested". The line is contributions minus
-          // withdrawals — the same series the return figures net their flows
-          // against — which sits BELOW the cost of the current holdings once
-          // anything has been sold at a profit, because those gains were
-          // reinvested. Trackers that plot cost-of-current-holdings instead
-          // count recycled profit as money the user put in; this does not, and
-          // the label has to say which of the two it is.
+      {/* The honest triple. What it is worth, what was paid in, and the space
+          between them — which is the one figure on this chart that a deposit
+          cannot move, because a deposit lifts the first two by the same amount
+          on the same day. The swatches live on the labels so a figure and the
+          line it names are one object rather than a colour match across a gap. */}
+      <StatStrip>
+        <Stat
+          size="sm"
+          label={
+            <span className="flex items-center gap-2">
+              <span
+                data-series-swatch
+                className="h-0.5 w-4 flex-none"
+                style={{ background: "var(--chart-line)" }}
+              />
+              Worth
+            </span>
+          }
+          value={formatMoney(lastPoint.value)}
+        />
+        <Stat
+          size="sm"
+          label={
+            <span className="flex items-center gap-2">
+              <span
+                data-series-swatch
+                className="h-0.5 w-4 flex-none"
+                style={{
+                  background:
+                    "repeating-linear-gradient(to right, var(--muted-foreground) 0 3px, transparent 3px 6px)",
+                }}
+              />
+              Money in
+            </span>
+          }
+          value={formatMoney(lastPoint.invested)}
+          // Kept from the toggle this replaced: the distinction is easy to get
+          // wrong and the label alone cannot carry it.
           title="Contributions minus withdrawals. Sits below the cost of your current holdings once you have sold at a profit, because those gains were reinvested."
-          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-colors ${
-            showInvested
-              ? "bg-surface-hover text-foreground"
-              : "text-muted-foreground opacity-60 hover:opacity-100"
-          }`}
-        >
-          <span
-            data-series-swatch
-            className="h-0.5 w-4 flex-none"
-            style={{
-              background:
-                "repeating-linear-gradient(to right, var(--muted-foreground) 0 3px, transparent 3px 6px)",
-            }}
-          />
-          Money in
-        </button>
-      </div>
+        />
+        <Stat
+          size="sm"
+          label={
+            <span className="flex items-center gap-2">
+              <span
+                data-series-swatch
+                className="h-2.5 w-3.5 flex-none rounded-badge border"
+                style={{
+                  background: gainAmount >= 0 ? "var(--gain)" : "var(--loss)",
+                  borderColor: gainAmount >= 0 ? "var(--gain)" : "var(--loss)",
+                  opacity: 0.5,
+                }}
+              />
+              Gain
+            </span>
+          }
+          value={
+            <Delta
+              value={gainAmount}
+              percent={gainPercent ?? undefined}
+              currency={lastPoint.value.currency}
+            />
+          }
+        />
+      </StatStrip>
 
       {data.fxIncomplete && (
         <FxUnavailableCallout>

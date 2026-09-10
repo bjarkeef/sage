@@ -7,24 +7,9 @@ vi.mock("../lib/api", () => ({
   getPortfolioHistory: vi.fn(),
 }));
 
-vi.mock("lightweight-charts", () => {
-  const LineStyle = { Solid: 0, Dotted: 1, Dashed: 2, LargeDashed: 3, SparseDotted: 4 };
-  const ColorType = { Solid: "solid", VerticalGradient: "gradient" };
-  const chartStub = {
-    addSeries: vi.fn(() => ({ setData: vi.fn() })),
-    timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
-    subscribeCrosshairMove: vi.fn(),
-    unsubscribeCrosshairMove: vi.fn(),
-    applyOptions: vi.fn(),
-    remove: vi.fn(),
-  };
-  return {
-    createChart: vi.fn(() => chartStub),
-    AreaSeries: "Area",
-    LineSeries: "Line",
-    LineStyle,
-    ColorType,
-  };
+vi.mock("lightweight-charts", async () => {
+  const { lightweightChartsStub } = await import("../lib/test/lightweight-charts-stub");
+  return lightweightChartsStub();
 });
 
 vi.mock("next-themes", () => ({
@@ -217,8 +202,11 @@ describe("PortfolioChart", () => {
       <PortfolioChart initialHistory={history} displayCurrency={null} todayChange={null} />,
       makeTestQueryClient(),
     );
-    expect(screen.getByRole("button", { name: /money in/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^invested$/i })).not.toBeInTheDocument();
+    // A stat label since 2026-09-10, not a toggle: the line is structural now,
+    // because the shaded gain between it and the value line has no floor
+    // without it. The wording rule it guards is unchanged.
+    expect(screen.getByText(/money in/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^invested$/i)).not.toBeInTheDocument();
   });
 
   it("explains why money in can sit below the cost of current holdings", () => {
@@ -246,9 +234,9 @@ describe("PortfolioChart", () => {
       <PortfolioChart initialHistory={history} displayCurrency={null} todayChange={null} />,
       makeTestQueryClient(),
     );
-    // "Money in" proves the legend rendered at all, so the absences below are
+    // "Money in" proves the readout rendered at all, so the absences below are
     // evidence rather than a query that ran before anything mounted.
-    expect(await screen.findByRole("button", { name: /Money in/ })).toBeInTheDocument();
+    expect(await screen.findByText(/Money in/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /S&P 500/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /MSCI World/ })).not.toBeInTheDocument();
   });

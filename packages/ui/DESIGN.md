@@ -143,9 +143,42 @@ Color lives on the delta text/chip only, never on surrounding chrome.
 
 ### Motion
 
-One `fade-up` cascade (0.3–0.5s), `prefers-reduced-motion` respected. No other
-entrance effects. (Baked into `PageShell` with `animate={false}` for skeletal
-pages; a standalone `fade-up` utility remains for pages outside `PageShell`.)
+**Chrome enters once, one way.** One `fade-up` cascade (0.3–0.5s),
+`prefers-reduced-motion` respected. (Baked into `PageShell` with
+`animate={false}` for skeletal pages; a standalone `fade-up` utility remains for
+pages outside `PageShell`.) No decorative entrance anywhere — no staggered
+letters, no scale-ins, no scroll-triggered reveals.
+
+**One exception, and it is narrow: a data-bearing entrance, where the motion IS
+the data.** A series drawing along its own axis; a figure travelling its own
+range. Permitted only when every one of these holds:
+
+- The movement traces a real quantity. A line drawing left to right is time
+  passing. A hero numeral counting _from the range's opening value to today's_
+  travels the distance the chart travels — the same fact, told twice, at one
+  speed. A numeral spinning up from zero traces nothing and is decoration.
+- **900ms ceiling**, once per mount. Never on a re-render, a refetch, or a range
+  change: an entrance that replays every time data arrives is a stutter, not a
+  welcome.
+- The resting state is the truth. If the animation never ran — reduced motion,
+  a dropped frame, a screenshot — the reader sees the finished chart, not an
+  empty one.
+- Off wholesale under `prefers-reduced-motion`, not slowed down.
+
+This exists because the overview hero is the one screen where the chart _is_ the
+product rather than an illustration of it, and a chart that assembles itself in
+front of you says "these are your numbers, arriving" in a way a static PNG
+cannot. Everywhere else, the cascade is enough. If you are reaching for this
+clause to make a card livelier, the answer is no.
+
+**Interaction motion is separate from entrance motion and has its own budget.**
+Hover and state transitions: 120–200ms, ease-out. A crosshair or pointer-follower
+eases toward its target (~120ms) rather than welding to the cursor — weight
+reads as precision, and a line rigidly attached to the pointer reads as a
+tooltip. **Figures under a moving pointer change instantly**: tweening several
+numerals while the hand is moving turns a readout into a slot machine. Colour is
+the exception — a value crossing zero cross-fades `--gain`/`--loss` over ~200ms
+so the sign change registers rather than flickering.
 
 Its one counterpart is `fade-out-down` (0.2s), for something that leaves under
 its own steam rather than because the user navigated — a toast expiring.
