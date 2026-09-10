@@ -1,7 +1,7 @@
 import { BasisChip, Card, CardTitle } from "@sage/ui";
 import { formatDate, formatMoney } from "../../lib/format";
 import { netAnnouncedDividends, netFactor } from "../../lib/dividend-tax";
-import { CERTAINTY_STROKE } from "../charts/certainty-bars";
+import { CERTAINTY_FILL } from "../charts/certainty-bars";
 import type { UpcomingRow } from "../../lib/types";
 
 /** Matches `selectUpcoming`'s own cap (`apps/api/src/routes/dashboard.ts`) —
@@ -83,7 +83,7 @@ export function UpcomingCard({
                     {d.dateEstimated && (
                       <span
                         data-testid="date-estimated-mark"
-                        style={{ color: CERTAINTY_STROKE.estimated }}
+                        style={{ color: CERTAINTY_FILL.estimated }}
                       >
                         ~{" "}
                       </span>

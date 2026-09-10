@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CERTAINTY_FILL, CERTAINTY_STROKE } from "./certainty-bars";
+import { CERTAINTY_FILL } from "./certainty-bars";
 
 describe("certainty-bars tokens", () => {
   // The alpha ramp failed precisely because three "different" fills resolved to
@@ -17,9 +17,11 @@ describe("certainty-bars tokens", () => {
     }
   });
 
-  it("outlines the estimated level and only that level", () => {
-    expect(CERTAINTY_STROKE.estimated).toMatch(/^var\(--certainty-/);
-    expect(CERTAINTY_STROKE.paid).toBeUndefined();
-    expect(CERTAINTY_STROKE.confirmed).toBeUndefined();
+  // Estimated used to carry a faint fill plus a dashed outline — the outline
+  // was what made it legible. At real (thin, twelve-bar) chart scale that
+  // read as a row of near-empty boxes, so estimated is solid again, same as
+  // paid and confirmed: no separate stroke token to pin here anymore.
+  it("gives estimated the same solid treatment as paid and confirmed", () => {
+    expect(CERTAINTY_FILL.estimated).toBe("var(--certainty-estimated)");
   });
 });

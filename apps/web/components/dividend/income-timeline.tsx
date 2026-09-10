@@ -156,7 +156,7 @@ export function IncomeTimeline({
 
       <div className="flex-1" style={{ minHeight: 196 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={points} margin={{ top: 20, right: 8, left: 8, bottom: 0 }}>
+          <BarChart data={points} margin={{ top: 34, right: 8, left: 8, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke={GRID_STROKE} />
             <XAxis dataKey="year" tickLine={false} axisLine={false} tick={AXIS_TICK} dy={4} />
             <YAxis hide domain={[0, "dataMax"]} />

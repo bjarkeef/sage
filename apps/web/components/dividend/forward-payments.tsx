@@ -23,12 +23,7 @@ import { formatMoney } from "../../lib/format";
 import { ActArrow } from "./kpi-cards";
 import { corners } from "./income-timeline";
 import { AXIS_TICK, CURSOR_FILL, GRID_STROKE } from "../charts/chart-theme";
-import {
-  CERTAINTY_FILL as FILL,
-  CERTAINTY_STROKE,
-  CertaintyBarsLegend,
-  type Cert,
-} from "../charts/certainty-bars";
+import { CERTAINTY_FILL as FILL, CertaintyBarsLegend, type Cert } from "../charts/certainty-bars";
 
 /** Strongest certainty wins when a holding pays more than once in a month. */
 const CERT_RANK: Record<Cert, number> = { paid: 0, confirmed: 1, estimated: 2 };
@@ -464,13 +459,13 @@ export function ForwardPayments({
                 {avg != null && avg > 0 && (
                   <ReferenceLine
                     y={avg}
-                    stroke={CERTAINTY_STROKE.estimated}
+                    stroke={FILL.estimated}
                     strokeDasharray="4 4"
                     strokeOpacity={0.5}
                     label={{
                       value: "avg",
                       position: "insideTopLeft",
-                      fill: CERTAINTY_STROKE.estimated,
+                      fill: FILL.estimated,
                       fontSize: 10,
                     }}
                   />
@@ -533,8 +528,6 @@ export function ForwardPayments({
                   name="Estimated"
                   stackId="a"
                   fill={FILL.estimated}
-                  stroke={CERTAINTY_STROKE.estimated}
-                  strokeDasharray="3 3"
                   maxBarSize={30}
                 >
                   {chartData.map((d) => (
