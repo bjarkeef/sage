@@ -4,7 +4,7 @@
 import type { MonthlyBreakdownDTO } from "../lib/types";
 import { filterMonthlyBreakdown, monthsOfYear, sumIncome } from "../lib/dividend-year";
 import type { CalendarStatus } from "../lib/dividend-events";
-import { CERTAINTY_FILL, CERTAINTY_STROKE, CertaintyBarsLegend } from "./charts/certainty-bars";
+import { CERTAINTY_FILL, CertaintyBarsLegend } from "./charts/certainty-bars";
 
 interface DividendIncomeBarsProps {
   data: MonthlyBreakdownDTO[];
@@ -125,11 +125,10 @@ export function DividendIncomeBars({
                   {projHeight > 0 && (
                     <div
                       data-seg="estimated"
-                      className="w-full rounded-t-badge border border-dashed"
+                      className="w-full rounded-t-badge"
                       style={{
                         height: projHeight,
                         background: CERTAINTY_FILL.estimated,
-                        borderColor: CERTAINTY_STROKE.estimated,
                       }}
                     />
                   )}

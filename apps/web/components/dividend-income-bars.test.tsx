@@ -10,7 +10,7 @@ const breakdown = [
 ];
 
 describe("DividendIncomeBars", () => {
-  it("fills each certainty segment (no outline convention on the bars)", () => {
+  it("fills each certainty segment (no outline convention on any of them)", () => {
     const { container } = render(
       <DividendIncomeBars data={breakdown} year={2026} currentMonth="2026-07" />,
     );
@@ -19,12 +19,14 @@ describe("DividendIncomeBars", () => {
     const estimated = container.querySelector("[data-seg='estimated']")!;
     expect(paid).toBeTruthy();
     expect(confirmed).toBeTruthy();
+    expect(estimated).toBeTruthy();
     // Unified with the analytics forward chart: bars are filled, so the old
-    // outline-border classes are gone from paid/confirmed.
+    // outline-border classes are gone from paid/confirmed. Estimated's dashed
+    // outline is gone too — at real (thin, twelve-bar) scale it read as a row
+    // of near-empty boxes, so estimated is a solid fill like the other two.
     expect(paid.className).not.toContain("border-certainty-paid-border");
     expect(confirmed.className).not.toContain("border-certainty-confirmed-border");
-    // Estimated still signals uncertainty with a dashed edge.
-    expect(estimated.className).toContain("border-dashed");
+    expect(estimated.className).not.toContain("border-dashed");
   });
 
   it("renders the legend", () => {

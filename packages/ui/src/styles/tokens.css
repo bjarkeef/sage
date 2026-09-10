@@ -120,7 +120,6 @@
   --certainty-paid: #3d2a00;
   --certainty-confirmed: #725200;
   --certainty-estimated: #ac7d00;
-  --certainty-estimated-fill: rgba(172, 125, 0, 0.14);
 
   /* income vocabulary — gold's reserved job: dividend/income surfaces only */
   --income: var(--gold-500);
@@ -212,7 +211,6 @@
   --certainty-paid: #e8cfa6;
   --certainty-confirmed: #c2985c;
   --certainty-estimated: #8a6a3f;
-  --certainty-estimated-fill: rgba(138, 106, 63, 0.16);
 
   --income: var(--gold-300);
   --income-muted: color-mix(in srgb, var(--gold-300) 55%, transparent);
