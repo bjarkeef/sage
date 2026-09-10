@@ -93,7 +93,7 @@ describeDb("GET /performance", () => {
     const provider = new FakeMarketDataProvider({
       history: {
         AAPL: [bar(daysAgo(365), "100"), bar(daysAgo(182), "110"), bar(daysAgo(1), "121")],
-        "GSPC.INDX": [bar(daysAgo(365), "100"), bar(daysAgo(1), "110")],
+        "SP500TR.INDX": [bar(daysAgo(365), "100"), bar(daysAgo(1), "110")],
       },
     });
     const auth = createAuth(tdb.db, testEnv);
@@ -199,7 +199,7 @@ describeDb("GET /performance", () => {
     const body = (await res.json()) as PerformanceBody;
     expect(body.relative).not.toBeNull();
     expect(body.relative!.benchmarkId).toBe("sp500");
-    expect(body.relative!.benchmarkName).toBe("S&P 500");
+    expect(body.relative!.benchmarkName).toBe("S&P 500 (TR)");
   });
 
   it("states the paired-day floor it applied", async () => {
@@ -405,7 +405,7 @@ describeDb("GET /performance — benchmark-relative risk", () => {
     const provider = new FakeMarketDataProvider({
       history: {
         AAPL: alternatingBars(40, 0.02, -0.012),
-        "GSPC.INDX": alternatingBars(40, 0.01, -0.006),
+        "SP500TR.INDX": alternatingBars(40, 0.01, -0.006),
       },
     });
     const auth = createAuth(tdb.db, testEnv);
@@ -501,7 +501,7 @@ describeDb("GET /performance — a holding whose price history starts mid-window
       history: {
         STEADY: flatBars(40, "100"),
         LATEBARS: flatBars(10, "500"),
-        "GSPC.INDX": flatBars(40, "100"),
+        "SP500TR.INDX": flatBars(40, "100"),
       },
     });
     const auth = createAuth(tdb.db, testEnv);
@@ -711,7 +711,7 @@ describeDb("GET /performance — benchmark aligned to the portfolio's window", (
     const provider = new FakeMarketDataProvider({
       history: {
         AAPL: [bar(FIRST_VALUED, "100"), bar(daysAgo(15), "100"), bar(daysAgo(0), "100")],
-        "GSPC.INDX": [
+        "SP500TR.INDX": [
           bar(BUY, "1000"),
           bar(FIRST_VALUED, "2000"),
           bar(daysAgo(15), "2000"),

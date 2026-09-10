@@ -23,6 +23,7 @@ import {
   yearProgressFromEvents,
   paymentYearBounds,
   monthlyTotalsForYear,
+  yearRunsPastForecast,
 } from "../../../lib/dividend-year";
 import { buildCalendarEvents } from "../../../lib/dividend-events";
 import { DividendStatusFilter } from "../../../components/dividend/dividend-status-filter";
@@ -36,6 +37,8 @@ import {
 } from "../../../components/dividend-calendar-grid";
 import { DividendsPageSkeleton } from "../../../components/skeletons";
 import { TaxBasisNote } from "../../../components/tax-basis-note";
+import { formatDate } from "../../../lib/format";
+import Link from "next/link";
 
 const VIEW_OPTIONS = [
   { label: "Calendar", value: "calendar" },
@@ -138,6 +141,14 @@ export default function DividendsPage() {
     [bounds],
   );
   const selectedYear = calendarDate.getFullYear();
+
+  // The year picker offers next year in full while projections stop one year
+  // from today, so picking next year renders its later months as an empty
+  // calendar — which reads as "this portfolio earns nothing then", the opposite
+  // of what is true. Predicate and date both come from shared code so the note
+  // can never name a date the projection did not honour.
+  const horizonIso = data?.projectedThrough;
+  const yearRunsPastHorizon = yearRunsPastForecast(selectedYear, now, horizonIso);
 
   const yieldMap = React.useMemo(() => {
     if (!income || !portfolio) return undefined;
@@ -260,6 +271,25 @@ export default function DividendsPage() {
               )}
             </Card>
           </section>
+
+          {/* Directly under the monthly bars rather than at the foot of the
+              page: the empty months are visible *here*, and a calendar grid's
+              worth of scrolling between the gap and its explanation is the same
+              as having no explanation. */}
+          {yearRunsPastHorizon && (
+            <p className="-mt-6 mb-8 text-xs text-muted-foreground">
+              Payments are only forecast to {formatDate(horizonIso!, { year: "always" })}. Later
+              months in {selectedYear} are empty because the forecast ends there, not because
+              nothing is expected — for a longer horizon see{" "}
+              <Link
+                href="/goal"
+                className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+              >
+                your goal
+              </Link>
+              , which projects income across scenarios.
+            </p>
+          )}
 
           <div className="mb-4">
             <DividendStatusFilter active={activeStatuses} onToggle={toggleStatus} />

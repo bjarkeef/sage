@@ -152,6 +152,21 @@ function medianPaymentLag(history: DividendHistoryRow[]): number {
   return lags.length > 0 ? lags[Math.floor(lags.length / 2)]! : DEFAULT_PAYMENT_LAG_DAYS;
 }
 
+/** The last ex-date `projectDividendSchedule` will generate: one year from
+ *  `asOf`.
+ *
+ *  Exported because the UI has to be able to *name* this date. The dividends
+ *  year picker offers next year in full, but a projection stops here, so the
+ *  months after it render as an empty calendar — and an empty December has to
+ *  read as "past the forecast" rather than "no payments expected", which is the
+ *  opposite claim. A second copy of the one-year rule living in the web app
+ *  would drift the first time the horizon moved; this is the single source. */
+export function projectionHorizonIso(asOf: Date): string {
+  const d = new Date(asOf);
+  d.setUTCFullYear(d.getUTCFullYear() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 /**
  * Announced-first, frequency-aware dividend projection.
  *
@@ -179,11 +194,7 @@ export function projectDividendSchedule(input: {
 }): ProjectedDividendRow[] {
   const { symbol, quantity, history, announced, asOf } = input;
   const asOfIso = asOf.toISOString().slice(0, 10);
-  const windowEndIso = (() => {
-    const d = new Date(asOf);
-    d.setUTCFullYear(d.getUTCFullYear() + 1);
-    return d.toISOString().slice(0, 10);
-  })();
+  const windowEndIso = projectionHorizonIso(asOf);
 
   const rows: ProjectedDividendRow[] = announced
     .filter((a) => a.exDate <= windowEndIso)

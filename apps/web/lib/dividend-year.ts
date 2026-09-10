@@ -59,6 +59,32 @@ export function paymentYearBounds(
   return { first, last: currentYear + 1 };
 }
 
+/** True when the calendar year on screen runs past the last date Sage will
+ *  project to — so its later months are empty for want of a forecast, not for
+ *  want of payments.
+ *
+ *  The year picker offers next year in full (`paymentYearBounds` ends at
+ *  `currentYear + 1`) while `projectDividendSchedule` stops one year from
+ *  today, so the two disagree for most of the calendar. A past year is never
+ *  flagged: it was never forecast, and its gaps are history.
+ *
+ *  `horizonIso` is the server's own `projectedThrough`, never recomputed here:
+ *  the rule lives in `@sage/core`, which `apps/web` does not depend on, and a
+ *  second copy would drift the moment the horizon moved. Undefined (an older
+ *  API, or a payload that carries none) means say nothing rather than guess.
+ *
+ *  Note the boundary: on 31 December the horizon is next 31 December, next year
+ *  is forecast in full, and this correctly returns false. */
+export function yearRunsPastForecast(
+  selectedYear: number,
+  today: Date,
+  horizonIso: string | undefined,
+): boolean {
+  if (horizonIso === undefined) return false;
+  if (selectedYear < today.getFullYear()) return false;
+  return `${selectedYear}-12-31` > horizonIso;
+}
+
 /** Twelve rows, always, so a caller can index the year by month rather than
  *  having to reconcile a sparse list against the months that happen to have
  *  payments. */

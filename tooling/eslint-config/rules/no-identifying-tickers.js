@@ -64,11 +64,18 @@ const ALLOWED = new Set([
   // Real, and load-bearing: universal placeholder in provider-format tests
   "AAPL.MX",
   "AAPL.US",
-  // Real, and load-bearing: benchmark definitions in valuation-series.ts. These
-  // are product configuration, not fixtures — the MSCI World benchmark has to
-  // name the ETF it actually tracks.
-  "GSPC.INDX",
-  "URTH.US",
+  // Real, and load-bearing: benchmark definitions in valuation-series.ts, and
+  // the fixtures that seed them. These are product configuration, not fixtures
+  // — a benchmark has to name the series it actually tracks. They reveal
+  // nothing about anyone's holdings; every Sage instance uses the same two.
+  //
+  // Both must be TOTAL-RETURN series; see the `BENCHMARKS` doc comment for why
+  // a price index cannot be compared to a portfolio TWR. The price-return
+  // predecessors (`GSPC.INDX`, `URTH.US`) were retired on 2026-09-10 and are
+  // deliberately NOT kept here: an allowlist entry with no call site is an
+  // invitation to reintroduce the thing it used to permit.
+  "SP500TR.INDX",
+  "IWDA.L",
 ]);
 
 /**

@@ -169,6 +169,50 @@ describe("DividendsPage", () => {
     expect(portfolioSpy).not.toHaveBeenCalled();
   });
 
+  // The year picker always offers next year (`paymentYearBounds` ends at
+  // `currentYear + 1`) while projections stop one year from today, so picking
+  // next year shows a calendar whose later months are empty for want of a
+  // forecast. Without the note those months read as "this portfolio earns
+  // nothing then", which is the opposite claim.
+  describe("forecast horizon note", () => {
+    // Relative to the real clock, like every other date in this file: a pinned
+    // horizon would stop being "next year" the moment the year turned.
+    const horizon = (() => {
+      const d = new Date(today);
+      d.setUTCFullYear(d.getUTCFullYear() + 1);
+      return d.toISOString().slice(0, 10);
+    })();
+    const withHorizon: DividendIncomeDTO = { ...FIXTURE_INCOME, projectedThrough: horizon };
+
+    async function renderAndPickYear(income: DividendIncomeDTO, year: number) {
+      const qc = makeTestQueryClient();
+      qc.setQueryData(qk.dividendIncome(), income);
+      qc.setQueryData(qk.portfolio(), FIXTURE_PORTFOLIO);
+      renderWithClient(<DividendsPage />, qc);
+      await waitFor(() => expect(screen.getByText("Dividends")).toBeInTheDocument());
+      await userEvent.selectOptions(screen.getByLabelText("Year"), String(year));
+    }
+
+    it("stays silent on the current year, which the forecast covers in full", async () => {
+      await renderAndPickYear(withHorizon, today.getFullYear());
+      expect(screen.queryByText(/only forecast to/i)).not.toBeInTheDocument();
+    });
+
+    it("explains the empty months when the picked year runs past the forecast", async () => {
+      await renderAndPickYear(withHorizon, today.getFullYear() + 1);
+      const note = await screen.findByText(/only forecast to/i);
+      expect(note).toBeInTheDocument();
+      // Names the server's own horizon rather than a date the web app invented.
+      expect(note).toHaveTextContent(String(new Date(`${horizon}T00:00:00`).getFullYear()));
+    });
+
+    it("says nothing when the payload carries no horizon to name", async () => {
+      // An older API. Guessing one would print a promise the server never made.
+      await renderAndPickYear(FIXTURE_INCOME, today.getFullYear() + 1);
+      expect(screen.queryByText(/only forecast to/i)).not.toBeInTheDocument();
+    });
+  });
+
   it("nets the year-progress figures when a dividend tax rate is configured", async () => {
     // The fixture's two in-year payments are $2.71 + $4.20 = $6.91 gross; at a
     // 35% flat tax rate the netted total must be $4.49 ($6.91 * 0.65). This is

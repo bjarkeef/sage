@@ -25,6 +25,7 @@ export {
   excludeSpecialDividends,
   regularDividendAmount,
   projectDividendSchedule,
+  projectionHorizonIso,
   classifyDividendTrend,
   clampDividendGrowth,
   FREQUENCY_INTERVAL_DAYS,

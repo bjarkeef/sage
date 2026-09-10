@@ -150,7 +150,7 @@ export function PerfMetrics({ data }: { data: PerformanceDTO }) {
       <MetricCard
         className="md:col-span-2"
         title="Against the benchmarks"
-        definition="Time-weighted return strips out when you added or sold, so it compares like for like with an index — which is why it can differ sharply from what your money actually earned. Gaps are in percentage points."
+        definition="Time-weighted return strips out when you added or sold, so it compares like for like with an index — which is why it can differ sharply from what your money actually earned. The benchmarks are total-return series: they reinvest the index's own dividends, because your figure counts yours. That makes them read higher than the price index quoted in the news. Gaps are in percentage points."
         figure={primaryGapPp != null ? formatGapPp(primaryGapPp) : "—"}
         sub={
           data.benchmarks.length > 0

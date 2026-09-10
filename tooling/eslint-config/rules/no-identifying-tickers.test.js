@@ -21,7 +21,8 @@ describe("no-identifying-tickers", () => {
         { code: `const s = "NORDLAS-B.ST";` },
         { code: `const s = "0THAM.L";` },
         // Benchmark configuration, deliberately real.
-        { code: `const s = "URTH.US";` },
+        { code: `const s = "IWDA.L";` },
+        { code: `const s = "SP500TR.INDX";` },
         // Bare tickers are out of scope — no suffix, nothing to check against.
         { code: `const s = "AAPL";` },
         { code: `const s = "NORDA-B";` },
