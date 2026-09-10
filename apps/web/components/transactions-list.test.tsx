@@ -185,6 +185,29 @@ describe("TransactionsList", () => {
     expect(await screen.findByText(/2\.3119 sh @ 0\.8238/)).toBeInTheDocument();
   });
 
+  it("bands a five-figure share count while keeping the sub-cent price at full precision", async () => {
+    renderSeeded([
+      {
+        id: "p2",
+        instrumentSymbol: "VWCE",
+        name: "Globix All-World",
+        type: "dividend" as const,
+        quantity: "41250.6633",
+        price: "0.0521",
+        currency: "EUR",
+        fee: null,
+        feeCurrency: null,
+        tradeDate: "2026-07-05",
+        source: null,
+      },
+    ]);
+    // The share count is a five-figure quantity, so formatShares bands it to
+    // 0 decimals ("41,251 sh"); the price beside it must stay on
+    // formatQuantity at full precision, or a 5-cent price would render as
+    // "0.05" instead of "0.0521".
+    expect(await screen.findByText(/41,251 sh @ 0\.0521/)).toBeInTheDocument();
+  });
+
   it("renders seeded cache data without refetching", async () => {
     const listSpy = vi.spyOn(api, "listTransactions");
     renderSeeded(fixtures);

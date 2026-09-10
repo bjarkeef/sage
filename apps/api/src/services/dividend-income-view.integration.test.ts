@@ -804,8 +804,9 @@ describeDb(
       // which nothing else in this book holds once GBP_SAVE is sold out — never
       // reached the FX rate request. `convertAmount` then returned the GBP
       // amount unconverted, and `inDisplay` (keyed on displayCcy === "DKK")
-      // silently dropped it — the exact live bug against a sold-out
-      // foreign-currency custom holding.
+      // silently dropped it — this is the shape of a real live bug: a
+      // sold-out foreign-currency custom holding whose dividend income
+      // vanished from the converted total.
       const fxStub: IFxRateService = {
         getRate: () => Promise.resolve(new Decimal(0.1)),
         getRates: (_base, targets) =>

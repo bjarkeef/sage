@@ -70,6 +70,7 @@ export default function DividendAnalyticsPage() {
     gross: grossIncome,
     isLoading: incomeLoading,
     factor,
+    taxed,
   } = useNetDividendIncome();
   const { data: portfolio, isLoading: portfolioLoading } = useQuery({
     queryKey: qk.portfolio(),
@@ -175,7 +176,7 @@ export default function DividendAnalyticsPage() {
 
   if (loading) {
     return (
-      <PageShell>
+      <PageShell animate={false}>
         <AnalyticsPageSkeleton />
       </PageShell>
     );
@@ -219,6 +220,7 @@ export default function DividendAnalyticsPage() {
               points={timelinePoints}
               currency={trailing?.currency ?? "USD"}
               incomeRecordingOff={income.incomeRecordingOff}
+              taxed={taxed}
             />
           </div>
 
@@ -230,6 +232,7 @@ export default function DividendAnalyticsPage() {
               projected={income.projected}
               currentMonth={currentMonth}
               currency={displayCurrency}
+              taxed={taxed}
             />
           </div>
           {/* Dividend growth leaders — 5y CAGR */}
@@ -239,11 +242,11 @@ export default function DividendAnalyticsPage() {
 
           {/* Yield by holding */}
           <div className="col-span-12 md:col-span-6">
-            <YieldByHolding rows={yieldRows} />
+            <YieldByHolding rows={yieldRows} taxed={taxed} />
           </div>
           {/* Monthly rhythm — trailing 12 received per month */}
           <div className="col-span-12 md:col-span-6">
-            <MonthlyRhythm rows={rhythmRows} currency={trailing?.currency} />
+            <MonthlyRhythm rows={rhythmRows} currency={trailing?.currency} taxed={taxed} />
           </div>
           {/* Consolidated holdings table — Annual, share-of-income bar,
               Yield, Yield on cost, Growth (CAGR); rows link to /asset/[symbol]. */}

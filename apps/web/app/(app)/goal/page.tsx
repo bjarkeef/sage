@@ -35,7 +35,7 @@ export default function GoalPage() {
 
   if (isLoading) {
     return (
-      <PageShell>
+      <PageShell animate={false}>
         <GoalPageSkeleton />
       </PageShell>
     );

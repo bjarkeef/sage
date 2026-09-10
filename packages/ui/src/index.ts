@@ -2,6 +2,7 @@ export * from "./lib/utils";
 export * from "./components/ui/button";
 export * from "./components/ui/card";
 export * from "./components/ui/chip";
+export * from "./components/ui/basis-chip";
 export * from "./components/ui/separator";
 export * from "./components/ui/input";
 export * from "./components/ui/field";

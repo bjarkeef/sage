@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, CardTitle } from "@sage/ui";
+import { BasisChip, Card, CardTitle } from "@sage/ui";
 import type { YieldByHoldingRow } from "../../lib/dividend-derive";
 import { ActArrow } from "./kpi-cards";
 import { ChartTooltip } from "../charts/chart-tooltip";
@@ -28,7 +28,20 @@ export function topYields(rows: YieldByHoldingRow[]): YieldByHoldingRow[] {
 
 /** Horizontal gold (income accent) bars — forward yield per holding,
  *  descending. Rows are already derived/sorted by `yieldByHolding`. */
-export function YieldByHolding({ rows }: { rows: YieldByHoldingRow[] }) {
+export function YieldByHolding({
+  rows,
+  taxed = false,
+}: {
+  rows: YieldByHoldingRow[];
+  /** Whether `currentYield` below divides a tax-netted forward income by
+   *  market value — drives the `BasisChip` in the title row. The figure is
+   *  a percentage, not money, but its numerator is scaled by the same
+   *  factor as every other card on this page, so the same basis marker
+   *  applies. Optional so this component's own unit tests (which don't
+   *  exercise tax) don't need to thread it; the real caller
+   *  (`/dividends/analytics`) always passes it explicitly. */
+  taxed?: boolean;
+}) {
   if (rows.length === 0) return null;
   const shown = topYields(rows);
 
@@ -39,7 +52,9 @@ export function YieldByHolding({ rows }: { rows: YieldByHoldingRow[] }) {
     >
       <ActArrow />
       <div className="mb-3.5">
-        <CardTitle className="mb-0">Yield by holding</CardTitle>
+        <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
+          Yield by holding
+        </CardTitle>
         <div className="text-xs text-muted-foreground">Forward yield on current price</div>
       </div>
 

@@ -42,4 +42,17 @@ describe("PositionLine", () => {
     render(<PositionLine position={position({ dailyChangePercent: -2.5 })} />);
     expect(screen.getByText("-2.50% today")).toHaveClass("text-loss");
   });
+
+  it("renders no secondary line when the position has no real name", () => {
+    render(<PositionLine position={position({ symbol: "ACME", name: "ACME" })} />);
+    // The symbol appears exactly once — as the primary, not echoed beneath it.
+    // CompanyLogo's decorative initials fallback is a 2-char slice, so it
+    // cannot collide with the full 4-char symbol here.
+    expect(screen.getAllByText("ACME")).toHaveLength(1);
+  });
+
+  it("renders the name when there is a real one", () => {
+    render(<PositionLine position={position({ symbol: "THAMES.L", name: "Thames Water plc" })} />);
+    expect(screen.getByText("Thames Water plc")).toBeInTheDocument();
+  });
 });

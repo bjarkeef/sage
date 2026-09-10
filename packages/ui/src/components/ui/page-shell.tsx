@@ -4,10 +4,18 @@ import { cn } from "../../lib/utils";
 export interface PageShellProps extends React.HTMLAttributes<HTMLDivElement> {
   /** "narrow" is for focused single-column pages (Settings). */
   width?: "default" | "narrow";
+  /** Skeleton shells pass false: a skeleton that animates in, then is replaced
+   *  by content that animates in again, reads as two loads rather than one. */
+  animate?: boolean;
 }
 
 /** Centered page container — the app-wide content column. */
-export function PageShell({ width = "default", className, ...props }: PageShellProps) {
+export function PageShell({
+  width = "default",
+  animate = true,
+  className,
+  ...props
+}: PageShellProps) {
   return (
     <div
       className={cn(
@@ -16,6 +24,7 @@ export function PageShell({ width = "default", className, ...props }: PageShellP
         // the content back; the desktop rhythm is unchanged from sm up.
         "mx-auto w-full px-4 sm:px-8",
         width === "narrow" ? "max-w-narrow" : "max-w-page",
+        animate && "page-enter",
         className,
       )}
       {...props}

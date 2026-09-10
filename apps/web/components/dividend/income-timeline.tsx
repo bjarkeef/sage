@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, CardTitle } from "@sage/ui";
+import { BasisChip, Card, CardTitle } from "@sage/ui";
 import type { TimelinePoint } from "../../lib/dividend-year";
 import { formatMoney } from "../../lib/format";
 import { ActArrow } from "./kpi-cards";
@@ -23,8 +23,57 @@ import { AXIS_TICK, CURSOR_FILL, GRID_STROKE, LABEL_STYLE } from "../charts/char
  *  it draws for that datum, which is how a stacked bar gets per-year corners —
  *  but `Cell`'s props come from `SVGProps`, where `radius` is a scalar. The
  *  four-corner tuple is what `Bar` itself accepts, hence the widening. */
-function corners(radius: [number, number, number, number]) {
+export function corners(radius: [number, number, number, number]) {
   return { radius } as unknown as { radius: number };
+}
+
+/** The year's total, drawn above the `received` bar. A finished year's cap
+ *  IS that bar, so its one figure belongs there. The year in progress states
+ *  its two parts separately instead (`timelineReceivedLabel` /
+ *  `timelineExpectedLabel`) — this returns "" for it, including a current
+ *  year with nothing left expected (`projected` already 0), where the
+ *  received-segment label below covers the same ground. Pulled out as a pure
+ *  function, like `forwardBarLabel` in the sibling chart, because Recharts
+ *  never lays out its SVG under jsdom (`ResponsiveContainer` measures 0×0
+ *  there), so a `screen.getByText` on chart label text cannot discriminate
+ *  pass from fail — only a direct call on the decision itself can. */
+export function timelineTotalLabel(point: TimelinePoint | undefined): string {
+  if (!point || point.projected > 0) return "";
+  return Math.round(point.total).toLocaleString();
+}
+
+/** The received figure for the year in progress, drawn inside its own solid
+ *  segment — money that has actually arrived, never fused with the forecast
+ *  above it. "" for a finished year (covered by `timelineTotalLabel`) and for
+ *  a current year with nothing left expected, where `received === total` and
+ *  that single total label already says everything a second label would.
+ *  Also "" when nothing has arrived yet (early January, say): Recharts draws
+ *  no rectangle for a zero-height stack segment (see the `corners()` comment
+ *  below), so a label placed `insideTop` on one has nothing to sit inside —
+ *  the rounded value is checked, not the raw one, so a sub-0.5 amount that
+ *  rounds down to zero is caught the same way a literal zero is. Mirrors
+ *  `timelineExpectedLabel`'s own-value guard below — one rule, applied to
+ *  each segment's own figure. */
+export function timelineReceivedLabel(point: TimelinePoint | undefined): string {
+  if (!point || point.projected <= 0) return "";
+  const received = Math.round(point.received);
+  if (received <= 0) return "";
+  return received.toLocaleString();
+}
+
+/** The still-expected figure for the year in progress, above the hatched
+ *  segment, phrased as an addition — "+1,183 expected", never a bare
+ *  "1,183" — so it cannot be misread as the stack's total. That fused
+ *  reading is the exact defect this pair of labels replaces. "" whenever
+ *  there is nothing left to expect: a finished year, a current year that has
+ *  already collected everything forecast, or a current year whose remaining
+ *  forecast rounds down to zero (no `+0 expected`) — the same own-value
+ *  guard `timelineReceivedLabel` applies above, mirrored here. */
+export function timelineExpectedLabel(point: TimelinePoint | undefined): string {
+  if (!point || point.projected <= 0) return "";
+  const expected = Math.round(point.projected);
+  if (expected <= 0) return "";
+  return `+${expected.toLocaleString()} expected`;
 }
 
 /**
@@ -41,10 +90,17 @@ export function IncomeTimeline({
   points,
   currency,
   incomeRecordingOff = false,
+  taxed = false,
 }: {
   points: TimelinePoint[];
   currency: string;
   incomeRecordingOff?: boolean;
+  /** Whether the received/expected figures below are net of a configured
+   *  dividend tax rate — drives the `BasisChip` in the title row. Optional
+   *  so the component's own unit tests (which don't exercise tax at all)
+   *  don't need to thread it; the real caller (`/dividends/analytics`)
+   *  always passes it explicitly. */
+  taxed?: boolean;
 }) {
   if (points.length === 0) {
     if (!incomeRecordingOff) return null;
@@ -74,7 +130,9 @@ export function IncomeTimeline({
     >
       <ActArrow />
       <div className="mb-3.5">
-        <CardTitle className="mb-0">Income by year</CardTitle>
+        <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
+          Income by year
+        </CardTitle>
         <div className="text-xs text-muted-foreground">Received, and still expected this year</div>
       </div>
 
@@ -129,11 +187,28 @@ export function IncomeTimeline({
               <LabelList
                 position="top"
                 style={LABEL_STYLE}
-                valueAccessor={(entry) => {
-                  const point = entry.payload as TimelinePoint | undefined;
-                  if (!point || point.projected > 0) return "";
-                  return Math.round(point.total).toLocaleString();
-                }}
+                valueAccessor={(entry) =>
+                  timelineTotalLabel(entry.payload as TimelinePoint | undefined)
+                }
+              />
+              {/* The year in progress only: the received figure, set inside
+                  its own solid segment rather than above it — "above" would
+                  land inside the hatched segment stacked directly on top,
+                  since there is no gap at the seam (see the corners() comment
+                  below). `--background` is used instead of the shared
+                  LABEL_STYLE's muted-foreground fill because muted-foreground
+                  is tuned to read against the card, not against solid
+                  `--income`: at gold-500/gray-50 (light) that pairing is
+                  ~5.8:1, at gold-300/gray-950 (dark) ~10.5:1 — both clear the
+                  4.5:1 text floor, and both hold because `--background` is
+                  chosen to sit at the opposite end of the lightness scale
+                  from whichever `--income` step is active in that theme. */}
+              <LabelList
+                position="insideTop"
+                style={{ ...LABEL_STYLE, fill: "var(--background)" }}
+                valueAccessor={(entry) =>
+                  timelineReceivedLabel(entry.payload as TimelinePoint | undefined)
+                }
               />
             </Bar>
             <Bar
@@ -146,16 +221,16 @@ export function IncomeTimeline({
               radius={[6, 6, 0, 0]}
               maxBarSize={54}
             >
-              {/* The year in progress: its total goes above the hatched
-                  remainder, which is the top of that stack. Without these
-                  labels the figures would be hover-only — a step down from the
-                  chart this replaced. */}
+              {/* The year in progress: what's still expected, above the
+                  hatched remainder, phrased as an addition so it can never
+                  read as the stack's total (see `timelineExpectedLabel`).
+                  Without this the figure would be hover-only — a step down
+                  from the chart this replaced. */}
               <LabelList
-                dataKey="total"
                 position="top"
                 style={LABEL_STYLE}
-                formatter={(value) =>
-                  value == null ? "" : Math.round(Number(value)).toLocaleString()
+                valueAccessor={(entry) =>
+                  timelineExpectedLabel(entry.payload as TimelinePoint | undefined)
                 }
               />
             </Bar>

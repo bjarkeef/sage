@@ -50,6 +50,24 @@ export function formatQuantity(value: string): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
 }
 
+/** Display-only: a share count at a precision its magnitude can carry.
+ *
+ *  Money is disciplined to 2dp everywhere in this app; quantities were not, so
+ *  a cash-tracking holding printed `41,250.6633 sh` — ten significant figures
+ *  for a number nobody holds to that precision. Precision falls as magnitude
+ *  rises.
+ *
+ *  Deliberately NOT `formatQuantity`: that one also formats prices, where a
+ *  small magnitude genuinely needs four decimals, and split ratios, which are
+ *  not share counts. Never use either for math. */
+export function formatShares(value: string): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  const abs = Math.abs(n);
+  const maximumFractionDigits = abs >= 10_000 ? 0 : abs >= 100 ? 2 : 4;
+  return n.toLocaleString("en-US", { maximumFractionDigits });
+}
+
 /** Display-only: a signed percentage, "+3.42%" / "-1.10%". The explicit plus is
  *  the DESIGN.md delta grammar — an unsigned gain reads as a bare measurement.
  *  For a figure that also carries an absolute amount, use `<Delta>` instead of

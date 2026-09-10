@@ -3,7 +3,7 @@ import { NewsPageSkeleton } from "../../../components/skeletons";
 
 export default function NewsLoading() {
   return (
-    <PageShell>
+    <PageShell animate={false}>
       <NewsPageSkeleton />
     </PageShell>
   );

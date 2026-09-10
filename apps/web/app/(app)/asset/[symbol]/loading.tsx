@@ -3,7 +3,7 @@ import { AssetPageSkeleton } from "../../../../components/skeletons";
 
 export default function AssetLoading() {
   return (
-    <PageShell role="status" aria-label="Loading asset">
+    <PageShell animate={false} role="status" aria-label="Loading asset">
       <AssetPageSkeleton />
     </PageShell>
   );

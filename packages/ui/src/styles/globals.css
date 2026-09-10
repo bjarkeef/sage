@@ -163,9 +163,38 @@
   }
 }
 
+/** The app-wide entrance: every page's sections rise in once, staggered.
+ *  Capped at six steps — beyond that the delay stops reading as a cascade and
+ *  starts reading as lag, so the seventh child onward shares the sixth's
+ *  delay. */
+@utility page-enter {
+  > * {
+    animation: fade-up 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  > *:nth-child(2) {
+    animation-delay: 40ms;
+  }
+  > *:nth-child(3) {
+    animation-delay: 80ms;
+  }
+  > *:nth-child(4) {
+    animation-delay: 120ms;
+  }
+  > *:nth-child(5) {
+    animation-delay: 160ms;
+  }
+  > *:nth-child(n + 6) {
+    animation-delay: 200ms;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-up,
-  .fade-out-down {
+  .fade-out-down,
+  .page-enter > * {
     animation: none;
   }
 }
