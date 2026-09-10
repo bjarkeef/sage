@@ -8,14 +8,19 @@
 [![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-3d6a4d)](./LICENSE)
 [![Self-hosted: Docker Compose](https://img.shields.io/badge/self--hosted-Docker%20Compose-3d6a4d)](./docs/DEPLOYMENT.md)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-3d6a4d)](./CONTRIBUTING.md)
+[![Status: public beta](https://img.shields.io/badge/status-public%20beta-3d6a4d)](./CHANGELOG.md)
 
 Sage is an open-source, self-hostable dividend and investment portfolio
 tracker. You run it on your own machine, so tracking your holdings, your
 dividend income and your performance doesn't mean handing your financial life
 to somebody else's SaaS.
 
-**Status:** active development, Phase 1–2 MVP (portfolio, dividends,
-performance, categories, custom holdings). It's usable and it's not finished.
+**Status:** public beta — `v1.0.0-beta.1`. Portfolio, dividends, performance,
+diversification, categories and custom holdings are all built and in daily use
+on the maintainer's own instance. Beta means the shape is settled and the
+arithmetic is tested, not that nothing will change: read
+[`docs/MARKET-DATA.md`](./docs/MARKET-DATA.md) before you rely on it, because
+the default price source is an unofficial one that can break without warning.
 
 <p align="center">
   <img alt="The Sage overview page: portfolio value, allocation and upcoming dividends" src="docs/assets/shot-overview.png" width="880">
@@ -119,7 +124,7 @@ analyst ratings. A goal page that runs your own assumptions forward and says
 plainly that the result is arithmetic applied to your inputs, not a forecast.
 
 <p align="center">
-  <img alt="An asset page: instrument profile, fundamentals and dividend history" src="docs/assets/shot-asset.png" width="880">
+  <img alt="An asset page: price history and your position in it — cost basis, market value, yield on cost and forward income" src="docs/assets/shot-asset.png" width="880">
 </p>
 
 <p align="center">
