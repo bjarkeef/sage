@@ -15,7 +15,6 @@ import {
 import { BasisChip, Card, CardTitle } from "@sage/ui";
 import type { TimelinePoint } from "../../lib/dividend-year";
 import { formatMoney } from "../../lib/format";
-import { ActArrow } from "./kpi-cards";
 import { ChartTooltip } from "../charts/chart-tooltip";
 import { AXIS_TICK, CURSOR_FILL, GRID_STROKE, LABEL_STYLE } from "../charts/chart-theme";
 
@@ -124,11 +123,7 @@ export function IncomeTimeline({
   const money = (v: unknown) => formatMoney({ amount: String(v), currency });
 
   return (
-    <Card
-      compact
-      className="group relative flex h-full flex-col transition-colors hover:bg-surface-hover/60"
-    >
-      <ActArrow />
+    <Card compact className="relative flex h-full flex-col">
       <div className="mb-3.5">
         <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
           Income by year

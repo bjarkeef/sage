@@ -13,7 +13,6 @@ import {
 } from "recharts";
 import { Card, CardTitle } from "@sage/ui";
 import type { DividendPerHoldingDTO } from "../../lib/types";
-import { ActArrow } from "./kpi-cards";
 import { ChartTooltip } from "../charts/chart-tooltip";
 import { AXIS_TICK, CURSOR_FILL, GRID_STROKE, LABEL_STYLE } from "../charts/chart-theme";
 
@@ -50,11 +49,7 @@ export function GrowthLeaders({ perHolding }: { perHolding: DividendPerHoldingDT
   const max = Math.max(0, ...rows.map((r) => r.pct));
 
   return (
-    <Card
-      compact
-      className="group relative flex h-full flex-col transition-colors hover:bg-surface-hover/60"
-    >
-      <ActArrow />
+    <Card compact className="relative flex h-full flex-col">
       <div className="mb-3.5">
         <CardTitle className="mb-0">Dividend growth</CardTitle>
         <div className="text-xs text-muted-foreground">Fastest dividend growers, 5-yr CAGR</div>

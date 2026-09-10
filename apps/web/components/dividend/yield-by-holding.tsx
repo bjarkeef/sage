@@ -12,7 +12,6 @@ import {
 } from "recharts";
 import { BasisChip, Card, CardTitle } from "@sage/ui";
 import type { YieldByHoldingRow } from "../../lib/dividend-derive";
-import { ActArrow } from "./kpi-cards";
 import { ChartTooltip } from "../charts/chart-tooltip";
 import { AXIS_TICK, CURSOR_FILL, GRID_STROKE, LABEL_STYLE } from "../charts/chart-theme";
 
@@ -46,11 +45,7 @@ export function YieldByHolding({
   const shown = topYields(rows);
 
   return (
-    <Card
-      compact
-      className="group relative flex h-full flex-col transition-colors hover:bg-surface-hover/60"
-    >
-      <ActArrow />
+    <Card compact className="relative flex h-full flex-col">
       <div className="mb-3.5">
         <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
           Yield by holding

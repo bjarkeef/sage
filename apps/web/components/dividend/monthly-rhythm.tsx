@@ -4,7 +4,6 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { BasisChip, Card, CardTitle } from "@sage/ui";
 import type { MonthlyRhythmRow } from "../../lib/dividend-derive";
 import { formatMoney } from "../../lib/format";
-import { ActArrow } from "./kpi-cards";
 import { ChartTooltip } from "../charts/chart-tooltip";
 import { AXIS_TICK, CURSOR_FILL, GRID_STROKE } from "../charts/chart-theme";
 
@@ -34,11 +33,7 @@ export function MonthlyRhythm({
   if (rows.length === 0) return null;
 
   return (
-    <Card
-      compact
-      className="group relative flex h-full flex-col transition-colors hover:bg-surface-hover/60"
-    >
-      <ActArrow />
+    <Card compact className="relative flex h-full flex-col">
       <div className="mb-3.5">
         <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
           Monthly rhythm
