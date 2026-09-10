@@ -68,9 +68,9 @@ this section overstated it:
   forecloses it permanently, or forces you to identify and reimplement that
   contribution years later.
 
-The whole history is solo-authored (804 commits, one email, no co-author
-trailers), so there is nothing to backfill — the agreement only ever has to
-cover contributors from here forward.
+The whole history is solo-authored (one email, no co-author trailers), so
+there is nothing to backfill — the agreement only ever has to cover
+contributors from here forward.
 
 **One-time setup** before the check can pass — create the signature store:
 
