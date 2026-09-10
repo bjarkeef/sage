@@ -6,7 +6,7 @@ import { OverviewPageSkeleton } from "../../components/skeletons";
  *  and heights the loaded page occupies so data arriving causes no layout shift. */
 export default function OverviewLoading() {
   return (
-    <PageShell role="status" aria-label="Loading overview">
+    <PageShell animate={false} role="status" aria-label="Loading overview">
       <OverviewPageSkeleton />
     </PageShell>
   );

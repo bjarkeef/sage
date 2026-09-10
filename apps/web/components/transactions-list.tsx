@@ -8,7 +8,7 @@ import { qk } from "../lib/query/keys";
 import { invalidateFor } from "../lib/query/invalidation";
 import type { TransactionRow } from "../lib/types";
 import { RowsSkeleton } from "./skeletons";
-import { formatQuantity } from "../lib/format";
+import { formatQuantity, formatShares } from "../lib/format";
 import { typeChipTone, totalLabel } from "../lib/transaction-display";
 import { TransactionDialog } from "./transaction-dialog";
 import { describeSavedTransaction } from "./transaction-summary";
@@ -153,7 +153,7 @@ export function TransactionsList() {
                   secondary={
                     r.type === "split"
                       ? "split ratio"
-                      : `${formatQuantity(r.quantity)} sh @ ${formatQuantity(r.price)}`
+                      : `${formatShares(r.quantity)} sh @ ${formatQuantity(r.price)}`
                   }
                 />
                 <span className="flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">

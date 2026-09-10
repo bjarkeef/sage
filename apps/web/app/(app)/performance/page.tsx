@@ -23,7 +23,7 @@ export default async function PerformancePage() {
       {perf.insufficientData ? (
         <PerformanceEmptyState />
       ) : (
-        <div className="fade-up mt-6">
+        <div className="mt-6">
           <HydrationBoundary state={dehydrate(queryClient)}>
             <PerformanceStudio />
           </HydrationBoundary>

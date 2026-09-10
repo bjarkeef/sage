@@ -2,7 +2,7 @@ import type { BriefInput } from "./brief";
 import { netAnnouncedDividends, netFactor } from "./dividend-tax";
 import { formatMoney } from "./format";
 import { topMovers } from "./insight";
-import type { AnnouncedDividendDTO, DashboardDTO, OverviewPrefs } from "./types";
+import type { DashboardDTO, OverviewPrefs, UpcomingRow } from "./types";
 
 const DAY_MS = 86_400_000;
 
@@ -80,13 +80,9 @@ export function toBriefInput(dashboard: DashboardDTO, prefs: OverviewPrefs, now:
   };
 }
 
-function toNextPayout(
-  next: AnnouncedDividendDTO | undefined,
-  todayISO: string,
-): BriefInput["nextPayout"] {
+function toNextPayout(next: UpcomingRow | undefined, todayISO: string): BriefInput["nextPayout"] {
   if (!next) return null;
-  const date = next.paymentDate ?? next.exDate;
-  const days = daysBetween(todayISO, date);
+  const days = daysBetween(todayISO, next.date);
   if (days === 0) {
     return { symbol: next.symbol, income: formatMoney(moneyOf(next)), when: "today" };
   }
@@ -96,6 +92,6 @@ function toNextPayout(
   return null;
 }
 
-function moneyOf(d: AnnouncedDividendDTO): { amount: string; currency: string } {
+function moneyOf(d: UpcomingRow): { amount: string; currency: string } {
   return { amount: d.income, currency: d.currency };
 }

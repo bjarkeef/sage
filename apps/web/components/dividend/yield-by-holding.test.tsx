@@ -32,4 +32,20 @@ describe("YieldByHolding", () => {
     const { container } = render(<YieldByHolding rows={[]} />);
     expect(container.firstChild).toBeNull();
   });
+
+  // Recharts never lays out its SVG under jsdom, and this card never renders
+  // a currency symbol at all (percentage only), so the page-level invariant
+  // test (analytics.test.tsx) cannot see this card's figure and so cannot
+  // confirm its BasisChip either — this is the real coverage for that gap.
+  // `CardTitle` and `BasisChip` are plain DOM, so it sidesteps the
+  // Recharts/jsdom limitation entirely rather than working around it.
+  it("carries a basis marker in its title row", () => {
+    render(<YieldByHolding rows={[{ symbol: "HIYLD", currentYield: 9.1 }]} taxed />);
+    expect(screen.getByText("After tax")).toBeInTheDocument();
+  });
+
+  it("says before tax when no rate is configured", () => {
+    render(<YieldByHolding rows={[{ symbol: "HIYLD", currentYield: 9.1 }]} taxed={false} />);
+    expect(screen.getByText("Before tax")).toBeInTheDocument();
+  });
 });

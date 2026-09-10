@@ -20,7 +20,7 @@ import {
 import { listTransactions, deleteTransaction } from "../../../../lib/api";
 import { qk } from "../../../../lib/query/keys";
 import { invalidateFor } from "../../../../lib/query/invalidation";
-import { formatDate, formatQuantity } from "../../../../lib/format";
+import { formatDate, formatQuantity, formatShares } from "../../../../lib/format";
 import { typeChipTone, totalLabel } from "../../../../lib/transaction-display";
 import type { TransactionRow } from "../../../../lib/types";
 import { RowsSkeleton } from "../../../../components/skeletons";
@@ -161,7 +161,7 @@ export function TransactionsSection({
                     secondary={
                       r.type === "split"
                         ? "split ratio"
-                        : `${formatQuantity(r.quantity)} sh @ ${formatQuantity(r.price)}`
+                        : `${formatShares(r.quantity)} sh @ ${formatQuantity(r.price)}`
                     }
                   />
                   <div

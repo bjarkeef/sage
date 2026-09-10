@@ -15,6 +15,7 @@ import { instrument, dividendHistory, assetProfile, customHolding } from "../db/
 import { loadPortfolioBook, type PortfolioBook } from "./portfolio-book";
 import { getRatesWithProvenance } from "../market-data/fx-provenance";
 import { findBasisMismatches, toBasisFindingBody } from "./basis-reconciliation";
+import { resolveDisplayName } from "./display-name";
 
 interface PricedPosition {
   position: Position;
@@ -113,12 +114,20 @@ export async function buildPortfolioView(
 
   // Company website per held symbol, for logo rendering on the client.
   const websiteBySymbol = new Map<string, string | null>();
+  const profileNameBySymbol = new Map<string, string | null>();
   if (heldSymbols.length > 0) {
     const profileRows = await db
-      .select({ symbol: assetProfile.symbol, website: assetProfile.website })
+      .select({
+        symbol: assetProfile.symbol,
+        website: assetProfile.website,
+        name: assetProfile.name,
+      })
       .from(assetProfile)
       .where(inArray(assetProfile.symbol, heldSymbols));
-    for (const p of profileRows) websiteBySymbol.set(p.symbol, p.website);
+    for (const p of profileRows) {
+      websiteBySymbol.set(p.symbol, p.website);
+      profileNameBySymbol.set(p.symbol, p.name);
+    }
   }
 
   // Contractual income rate for custom holdings (e.g. savings 4.25%). Used for
@@ -260,7 +269,11 @@ export async function buildPortfolioView(
 
       return {
         symbol: position.symbol,
-        name: nameBySymbol.get(position.symbol) ?? position.symbol,
+        name: resolveDisplayName(
+          position.symbol,
+          nameBySymbol.get(position.symbol) ?? null,
+          profileNameBySymbol.get(position.symbol) ?? null,
+        ),
         exchange: exchangeBySymbol.get(position.symbol) ?? "",
         currency: positionDisplayCcy(position.currency),
         // The currency this position's buy lots are actually recorded in.

@@ -14,14 +14,65 @@ import { reconcileDividends } from "../services/dividend-reconciliation";
 
 type IncomeView = Awaited<ReturnType<typeof buildDividendIncomeView>>;
 type AnnouncedRow = IncomeView["announced"][number];
+type ProjectedRow = IncomeView["projected"][number];
 type MonthlyBreakdownRow = IncomeView["summary"]["monthlyBreakdown"][number];
 
-/** Announced rows with an ex-date today or later, ascending, capped at 4. */
-function selectUpcomingDividends(announced: AnnouncedRow[], todayIso: string): AnnouncedRow[] {
-  return announced
-    .filter((row) => row.exDate >= todayIso)
-    .sort((a, b) => a.exDate.localeCompare(b.exDate))
-    .slice(0, 4);
+const WINDOW_DAYS = 30;
+const MAX_ROWS = 5;
+const MIN_ROWS = 3;
+
+export interface UpcomingRow {
+  symbol: string;
+  name: string;
+  /** The date the card displays — payment date, or ex-date when unknown. */
+  date: string;
+  income: string;
+  currency: string;
+  /** Sage predicted this date rather than the company declaring it. */
+  dateEstimated: boolean;
+  /** The whole payment is a forecast, not a declared dividend. */
+  projected: boolean;
+}
+
+/** Announced and projected rows within the next 30 days, ascending on the
+ *  date the card displays (paymentDate, falling back to the ex-date — never
+ *  the exDate alone, which the old selector filtered and sorted on while the
+ *  card rendered paymentDate, letting the two axes diverge), capped at 5.
+ *  Floored at 3: when fewer than three fall inside the 30-day window the
+ *  list reaches past it rather than collapsing to a couple of rows beside a
+ *  full Portfolio card. Exported for direct unit testing (pure — "today" is
+ *  an argument rather than read from the clock). */
+export function selectUpcoming(
+  announced: AnnouncedRow[],
+  projected: ProjectedRow[],
+  todayIso: string,
+): UpcomingRow[] {
+  const horizon = addDays(todayIso, WINDOW_DAYS);
+  const rows: UpcomingRow[] = [
+    ...announced.map((a) => ({
+      symbol: a.symbol,
+      name: a.name,
+      date: a.paymentDate ?? a.exDate,
+      income: a.income,
+      currency: a.currency,
+      dateEstimated: a.paymentDateEstimated,
+      projected: false,
+    })),
+    ...projected.map((p) => ({
+      symbol: p.symbol,
+      name: p.name,
+      date: p.paymentDate ?? p.projectedExDate,
+      income: p.income,
+      currency: p.currency,
+      dateEstimated: p.paymentDateEstimated,
+      projected: true,
+    })),
+  ]
+    .filter((r) => r.date >= todayIso)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const inWindow = rows.filter((r) => r.date <= horizon);
+  return (inWindow.length >= MIN_ROWS ? inWindow : rows).slice(0, MAX_ROWS);
 }
 
 /** Monday reaches back to Friday; other weekdays to yesterday.
@@ -30,6 +81,14 @@ export function previousMarketDay(todayIso: string): string {
   const d = new Date(`${todayIso}T00:00:00Z`);
   const back = d.getUTCDay() === 1 ? 3 : 1;
   d.setUTCDate(d.getUTCDate() - back);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Adds `n` days to an ISO date, in UTC — same arithmetic shape as
+ *  previousMarketDay, so callers stay immune to local-timezone drift. */
+function addDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
 
@@ -155,7 +214,7 @@ export function dashboardRoutes(
     const todayIso = new Date().toISOString().slice(0, 10);
     const currentMonth = todayIso.slice(0, 7);
 
-    const upcomingDividends = selectUpcomingDividends(income.announced, todayIso);
+    const upcomingDividends = selectUpcoming(income.announced, income.projected, todayIso);
     const recentDividends = selectRecentDividends(income.announced, todayIso);
     const thisMonth = selectThisMonth(income.summary.monthlyBreakdown, currentMonth);
     const allocation = selectAllocation(

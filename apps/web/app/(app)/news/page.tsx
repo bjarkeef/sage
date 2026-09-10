@@ -16,7 +16,7 @@ export default function NewsPage() {
 
   if (isLoading) {
     return (
-      <PageShell>
+      <PageShell animate={false}>
         <NewsPageSkeleton />
       </PageShell>
     );

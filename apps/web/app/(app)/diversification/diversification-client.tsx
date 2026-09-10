@@ -98,7 +98,7 @@ export function DiversificationClient() {
 
   if (isPending) {
     return (
-      <PageShell>
+      <PageShell animate={false}>
         <DiversificationPageSkeleton />
       </PageShell>
     );

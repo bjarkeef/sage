@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   LabelList,
   ReferenceLine,
   ResponsiveContainer,
@@ -11,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, CardTitle } from "@sage/ui";
+import { BasisChip, Card, CardTitle } from "@sage/ui";
 import type {
   AnnouncedDividendDTO,
   ProjectedIncomeRowDTO,
@@ -20,18 +21,29 @@ import type {
 import { sumIncome } from "../../lib/dividend-year";
 import { formatMoney } from "../../lib/format";
 import { ActArrow } from "./kpi-cards";
+import { corners } from "./income-timeline";
 import { AXIS_TICK, CURSOR_FILL, GRID_STROKE } from "../charts/chart-theme";
-import { CERTAINTY_FILL as FILL, CertaintyBarsLegend, type Cert } from "../charts/certainty-bars";
+import {
+  CERTAINTY_FILL as FILL,
+  CERTAINTY_STROKE,
+  CertaintyBarsLegend,
+  type Cert,
+} from "../charts/certainty-bars";
 
 /** Strongest certainty wins when a holding pays more than once in a month. */
 const CERT_RANK: Record<Cert, number> = { paid: 0, confirmed: 1, estimated: 2 };
 
-/** Short axis label; January carries the year so the boundary reads. */
-function monthTick(month: string): string {
+/** Short axis label; January carries the year so the boundary reads. A `~`
+ *  prefix marks a month whose payment date Sage predicted rather than one a
+ *  broker or announcement confirmed — the same uncertainty the estimated
+ *  bar's outline already carries, surfaced on the axis too. */
+export function monthTick(month: string, dateEstimated: boolean): string {
   const d = new Date(`${month}-01T00:00:00Z`);
-  return d.getUTCMonth() === 0
-    ? `Jan '${String(d.getUTCFullYear()).slice(2)}`
-    : d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  const label =
+    d.getUTCMonth() === 0
+      ? `Jan '${String(d.getUTCFullYear()).slice(2)}`
+      : d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  return dateEstimated ? `~ ${label}` : label;
 }
 
 function monthFull(month: string): string {
@@ -75,6 +87,12 @@ export interface MonthDatum {
    *  which reads an already-server-aggregated `MonthlyBreakdownDTO` row where
    *  that conflict can't arise within a single row. */
   mixedCurrency: boolean;
+  /** True when any payment contributing to the month has an estimated
+   *  (Sage-predicted) payment date, as opposed to one a broker export or
+   *  company announcement confirmed. Drives the `~` prefix on the x-axis
+   *  tick — independent of `estimated` certainty, since a *confirmed*
+   *  dividend can still carry a predicted, not-yet-announced pay date. */
+  dateEstimated: boolean;
 }
 
 interface Payment {
@@ -83,6 +101,7 @@ interface Payment {
   income: number;
   cert: Cert;
   currency: string;
+  dateEstimated: boolean;
 }
 
 export interface ForwardChartData {
@@ -131,6 +150,7 @@ export function buildForwardChartData(
       income: Number(r.income),
       cert: cashDate <= todayIso ? "paid" : "confirmed",
       currency: r.currency,
+      dateEstimated: r.paymentDateEstimated,
     });
   }
   for (const a of announced) {
@@ -140,6 +160,7 @@ export function buildForwardChartData(
       income: Number(a.income),
       cert: "confirmed",
       currency: a.currency,
+      dateEstimated: a.paymentDateEstimated,
     });
   }
   for (const p of projected) {
@@ -149,6 +170,7 @@ export function buildForwardChartData(
       income: Number(p.income),
       cert: "estimated",
       currency: p.currency,
+      dateEstimated: p.paymentDateEstimated,
     });
   }
   const windowed = payments.filter((p) => inWindow.has(p.month) && p.income > 0);
@@ -156,7 +178,15 @@ export function buildForwardChartData(
   const byMonth = new Map<string, MonthDatum>(
     months.map((month) => [
       month,
-      { month, paid: 0, confirmed: 0, estimated: 0, total: 0, mixedCurrency: false },
+      {
+        month,
+        paid: 0,
+        confirmed: 0,
+        estimated: 0,
+        total: 0,
+        mixedCurrency: false,
+        dateEstimated: false,
+      },
     ]),
   );
   const paymentsByMonth = new Map<string, Payment[]>();
@@ -166,6 +196,7 @@ export function buildForwardChartData(
     const d = byMonth.get(p.month)!;
     d[p.cert] += p.income;
     d.total += p.income;
+    if (p.dateEstimated) d.dateEstimated = true;
 
     const monthPayments = paymentsByMonth.get(p.month) ?? [];
     monthPayments.push(p);
@@ -225,6 +256,51 @@ const MAX_TOOLTIP_ROWS = 8;
 export function forwardBarLabel(datum: MonthDatum | undefined): string | null {
   if (!datum || !datum.total) return null;
   return datum.mixedCurrency ? "—" : Math.round(datum.total).toLocaleString();
+}
+
+/** Which months get a direct label: the peak, the trough, and the current
+ *  month — deduplicated, because on a one-payment book a single month is all
+ *  three. A number on every bar is an axis doing its job badly; three numbers
+ *  are the ones a reader actually wants. */
+export function labelledMonthIndices(data: MonthDatum[]): Set<number> {
+  if (!data.some((d) => d.total > 0)) return new Set();
+
+  // Index 0 is always the current month — the window is forward from today
+  // (see `forwardWindowMonths`) — and is worth labelling even in a month with
+  // nothing in it, for the same reason an empty bar still gets drawn.
+  const indices = new Set<number>([0]);
+
+  let peakIndex = -1;
+  let peakTotal = -Infinity;
+  let troughIndex = -1;
+  let troughTotal = Infinity;
+  data.forEach((d, i) => {
+    if (d.total <= 0) return; // ignore empty months when picking peak/trough
+    if (d.total > peakTotal) {
+      peakTotal = d.total;
+      peakIndex = i;
+    }
+    if (d.total < troughTotal) {
+      troughTotal = d.total;
+      troughIndex = i;
+    }
+  });
+  if (peakIndex >= 0) indices.add(peakIndex);
+  if (troughIndex >= 0) indices.add(troughIndex);
+  return indices;
+}
+
+/** Which certainty segment is the visual cap of one month's stack — the
+ *  topmost segment (estimated, then confirmed, then paid) that actually has
+ *  a nonzero value. A $0 "estimated" entry draws no rectangle, so without
+ *  this a month with only paid/confirmed income would leave a square-topped
+ *  confirmed segment passing for the top of the stack. `null` for an empty
+ *  month, where no segment draws at all. */
+export function capSegment(datum: MonthDatum): Cert | null {
+  if (datum.estimated > 0) return "estimated";
+  if (datum.confirmed > 0) return "confirmed";
+  if (datum.paid > 0) return "paid";
+  return null;
 }
 
 export function ForwardTooltip({
@@ -313,12 +389,19 @@ export function ForwardPayments({
   projected,
   currentMonth,
   currency,
+  taxed = false,
 }: {
   retroactive: RetroactiveIncomeRowDTO[];
   announced: AnnouncedDividendDTO[];
   projected: ProjectedIncomeRowDTO[];
   currentMonth: string;
   currency: string;
+  /** Whether the month totals below are net of a configured dividend tax
+   *  rate — drives the `BasisChip` in the title row. Optional so this
+   *  component's own unit tests (which don't exercise tax) don't need to
+   *  thread it; the real caller (`/dividends/analytics`) always passes it
+   *  explicitly. */
+  taxed?: boolean;
 }) {
   const { chartData, byMonth, holdingsByMonth, windowed, avg } = buildForwardChartData(
     retroactive,
@@ -326,6 +409,14 @@ export function ForwardPayments({
     projected,
     currentMonth,
   );
+  // The average used to be an in-plot ReferenceLine label, which an 8px right
+  // margin clipped to a sliver. The figure survives; only where it's drawn
+  // changed — the subtitle has no edge to clip against.
+  const avgLabel =
+    avg != null && avg > 0
+      ? `${formatMoney({ amount: avg.toFixed(2), currency })} / mo average`
+      : null;
+  const labelledIndices = labelledMonthIndices(chartData);
 
   return (
     <Card
@@ -334,8 +425,12 @@ export function ForwardPayments({
     >
       <ActArrow />
       <div className="mb-3.5">
-        <CardTitle className="mb-0">Next 12 months</CardTitle>
-        <div className="text-xs text-muted-foreground">Forward payments</div>
+        <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
+          Next 12 months
+        </CardTitle>
+        <div className="text-xs text-muted-foreground">
+          Forward payments{avgLabel != null ? ` · ${avgLabel}` : ""}
+        </div>
       </div>
 
       {windowed.length === 0 ? (
@@ -344,28 +439,38 @@ export function ForwardPayments({
         <>
           <div className="flex-1" style={{ minHeight: 176 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 18, right: 8, left: 8, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 18, right: 8, left: 20, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke={GRID_STROKE} />
                 <XAxis
                   dataKey="month"
                   tickLine={false}
                   axisLine={false}
                   tick={AXIS_TICK}
-                  tickFormatter={monthTick}
+                  tickFormatter={(month: string) =>
+                    monthTick(month, byMonth.get(month)?.dateEstimated ?? false)
+                  }
                   interval={0}
                   dy={4}
                 />
-                <YAxis hide domain={[0, "dataMax"]} />
+                <YAxis
+                  domain={[0, "dataMax"]}
+                  tickCount={3}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={AXIS_TICK}
+                  width={36}
+                  tickFormatter={(v: number) => Math.round(v).toLocaleString()}
+                />
                 {avg != null && avg > 0 && (
                   <ReferenceLine
                     y={avg}
-                    stroke="var(--primary)"
+                    stroke={CERTAINTY_STROKE.estimated}
                     strokeDasharray="4 4"
                     strokeOpacity={0.5}
                     label={{
                       value: "avg",
-                      position: "right",
-                      fill: "var(--primary)",
+                      position: "insideTopLeft",
+                      fill: CERTAINTY_STROKE.estimated,
                       fontSize: 10,
                     }}
                   />
@@ -380,24 +485,64 @@ export function ForwardPayments({
                     />
                   }
                 />
-                <Bar dataKey="paid" name="Paid" stackId="a" fill={FILL.paid} maxBarSize={30} />
+                {/* Mark spec: a 4px radius on the free end — whichever segment
+                    is visually on top of a given month's stack, since a $0
+                    "estimated" entry draws no rectangle and can't be assumed
+                    to be it (see `capSegment`).
+
+                    The spec also calls for a 2px gap between stacked
+                    segments. That is deliberately NOT implemented here: an
+                    earlier version simulated it with a `var(--card)` stroke
+                    on the whole `paid`/`confirmed` `<Bar>`, but an SVG
+                    `<rect>` stroke is centered on all four edges, not just
+                    top/bottom — it also punched a card-coloured inset along
+                    the left/right silhouette of every segment, and outlined
+                    the outer rounded corner too whenever `capSegment` picked
+                    that segment as the free end (`<Cell>` only overrides
+                    `radius`, not the parent `Bar`'s `stroke`). The result was
+                    a rim around the bar, not a gap inside it. Fixing that
+                    properly needs a custom Recharts `shape` that insets
+                    `y`/`height` at internal seams only, never the outer
+                    silhouette — deferred because it can't be visually
+                    verified from this worktree. No gap is honest; a rim
+                    artifact on every bar is not. */}
+                <Bar dataKey="paid" name="Paid" stackId="a" fill={FILL.paid} maxBarSize={30}>
+                  {chartData.map((d) => (
+                    <Cell
+                      key={d.month}
+                      {...corners(capSegment(d) === "paid" ? [4, 4, 0, 0] : [0, 0, 0, 0])}
+                    />
+                  ))}
+                </Bar>
                 <Bar
                   dataKey="confirmed"
                   name="Confirmed"
                   stackId="a"
                   fill={FILL.confirmed}
                   maxBarSize={30}
-                />
+                >
+                  {chartData.map((d) => (
+                    <Cell
+                      key={d.month}
+                      {...corners(capSegment(d) === "confirmed" ? [4, 4, 0, 0] : [0, 0, 0, 0])}
+                    />
+                  ))}
+                </Bar>
                 <Bar
                   dataKey="estimated"
                   name="Estimated"
                   stackId="a"
                   fill={FILL.estimated}
-                  stroke="var(--certainty-estimated-border)"
+                  stroke={CERTAINTY_STROKE.estimated}
                   strokeDasharray="3 3"
-                  radius={[2, 2, 0, 0]}
                   maxBarSize={30}
                 >
+                  {chartData.map((d) => (
+                    <Cell
+                      key={d.month}
+                      {...corners(capSegment(d) === "estimated" ? [4, 4, 0, 0] : [0, 0, 0, 0])}
+                    />
+                  ))}
                   <LabelList
                     dataKey="total"
                     content={(props: {
@@ -407,7 +552,11 @@ export function ForwardPayments({
                       index?: number;
                     }) => {
                       const { x, y, width, index } = props;
-                      const datum = index != null ? chartData[index] : undefined;
+                      // Only the peak, the trough and the current month get a
+                      // direct figure — a number on every bar is an axis
+                      // doing its job badly, and the chart now has one.
+                      if (index == null || !labelledIndices.has(index)) return null;
+                      const datum = chartData[index];
                       const text = forwardBarLabel(datum);
                       if (text == null || typeof x !== "number" || typeof width !== "number") {
                         return null;

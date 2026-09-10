@@ -63,7 +63,7 @@ export function OverviewClient() {
       {/* Wraps at both levels, same reasoning as PageHeader's actions row
           (packages/ui/src/components/ui/page-header.tsx): a rigid group next
           to a flexible title runs the page sideways on a phone. */}
-      <header className="fade-up mb-8 flex flex-wrap items-start justify-between gap-4">
+      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <BriefHeader
           segments={colorSegments}
           marketStateEnabled={prefs.marketState}
@@ -80,7 +80,7 @@ export function OverviewClient() {
         </div>
       </header>
 
-      <section className="fade-up mb-8" style={{ animationDelay: "60ms" }}>
+      <section className="mb-8">
         <OverviewHero value={lastValue} todayChange={dashboard.todayChange} />
         <div className="mt-4">
           <PortfolioChart

@@ -6,7 +6,7 @@ import type { Quote, IFxRateService } from "@sage/provider-interface";
 import { describeDb, withTestDb, testEnv, signUpTestUser, type TestDb } from "../testing";
 import { createApp } from "../app";
 import { createAuth } from "../auth";
-import { user } from "../db/schema";
+import { user, assetProfile } from "../db/schema";
 import { buildPortfolioView } from "./portfolio-view";
 
 const aapl = {
@@ -43,6 +43,27 @@ const globix = {
   exchange: "XLON",
   currency: "GBP",
   assetType: "etf",
+};
+// The importer had nothing better and wrote the ticker in as the name -- the
+// measured, real-world shape `resolveDisplayName` exists to fix.
+const duomo = {
+  symbol: "DUOMO.MI",
+  name: "DUOMO",
+  exchange: "XMIL",
+  currency: "EUR",
+  assetType: "stock",
+};
+// Suffixed symbol whose instrument.name is only the pre-suffix root -- the
+// case a bare-symbol echo (e.g. "ACME" for "ACME") cannot discriminate,
+// because a no-op root-split makes old and new logic agree on any name that
+// equals the whole symbol. With no asset_profile row either, the resolved
+// name must be the full symbol "THAMES.L", not the echoing root "THAMES".
+const thames = {
+  symbol: "THAMES.L",
+  name: "THAMES",
+  exchange: "XLON",
+  currency: "GBP",
+  assetType: "stock",
 };
 
 function quote(symbol: string, price: string, ccy: string, previousClose: string | null): Quote {
@@ -198,5 +219,58 @@ describeDb("buildPortfolioView — portfolio-level todayChange", () => {
     });
 
     expect(todayChange).toBeNull();
+  });
+
+  it("prefers the cached profile name over an echoing instrument name", async () => {
+    // instrument.name = "DUOMO" (the importer's echo); asset_profile.name real.
+    const provider = new FakeMarketDataProvider({
+      quotes: { "DUOMO.MI": quote("DUOMO.MI", "50", "EUR", "49") },
+    });
+    const auth = createAuth(tdb.db, testEnv);
+    app = createApp(tdb.db, provider, auth);
+
+    await post(
+      app,
+      { instrument: duomo, type: "buy", quantity: "3", price: "45", tradeDate: "2026-01-07" },
+      cookie,
+    );
+    await tdb.db.insert(assetProfile).values({
+      symbol: "DUOMO.MI",
+      name: "Duomo Industrials SpA",
+      exchange: "XMIL",
+      currency: "EUR",
+    });
+
+    const { body } = await buildPortfolioView({ db: tdb.db, provider }, userId, {
+      currency: null,
+    });
+
+    const pos = body.positions.find((p) => p.symbol === "DUOMO.MI");
+    expect(pos?.name).toBe("Duomo Industrials SpA");
+  });
+
+  it("falls back to the full symbol, not the echoing root, when no source carries a real name", async () => {
+    // instrument.name = "THAMES" -- the root of "THAMES.L", not the whole
+    // symbol -- and no cached asset_profile row at all. A stale
+    // `nameBySymbol.get(symbol) ?? symbol` would return "THAMES"; the correct
+    // wiring must return the full symbol "THAMES.L".
+    const provider = new FakeMarketDataProvider({
+      quotes: { "THAMES.L": quote("THAMES.L", "10", "GBP", "9") },
+    });
+    const auth = createAuth(tdb.db, testEnv);
+    app = createApp(tdb.db, provider, auth);
+
+    await post(
+      app,
+      { instrument: thames, type: "buy", quantity: "4", price: "8", tradeDate: "2026-01-08" },
+      cookie,
+    );
+
+    const { body } = await buildPortfolioView({ db: tdb.db, provider }, userId, {
+      currency: null,
+    });
+
+    const pos = body.positions.find((p) => p.symbol === "THAMES.L");
+    expect(pos?.name).toBe("THAMES.L");
   });
 });
