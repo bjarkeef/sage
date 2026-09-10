@@ -10,6 +10,28 @@ import type { UpcomingRow } from "../../lib/types";
  *  a well-defined meaning independent of the API. */
 const MAX_VISIBLE_ROWS = 5;
 
+const DAY_MS = 86_400_000;
+
+function daysBetween(fromISO: string, toISO: string): number {
+  const from = Date.parse(`${fromISO}T00:00:00Z`);
+  const to = Date.parse(`${toISO}T00:00:00Z`);
+  return Math.round((to - from) / DAY_MS);
+}
+
+/** `selectUpcoming` deliberately reaches past its 30-day window when fewer
+ *  than `MIN_ROWS` payments fall inside it (`apps/api/src/routes/dashboard.ts`),
+ *  rather than rendering a couple of rows beside a full Portfolio card. A
+ *  fixed "next 30 days" caption would then lie about a row 45+ days out, so
+ *  this derives the caption from what's actually rendered: the normal
+ *  30-day frame when every visible row fits inside it, or the true span out
+ *  to the furthest visible date otherwise. Exported for direct unit
+ *  testing. */
+export function upcomingWindowLabel(rows: UpcomingRow[], todayISO: string): string {
+  if (rows.length === 0) return "next 30 days";
+  const furthest = rows.reduce((max, r) => (r.date > max ? r.date : max), rows[0]!.date);
+  return `next ${Math.max(daysBetween(todayISO, furthest), 30)} days`;
+}
+
 export function UpcomingCard({
   upcoming,
   todayISO,
@@ -39,7 +61,9 @@ export function UpcomingCard({
         >
           Upcoming
         </CardTitle>
-        {rows.length > 0 && <div className="text-xs text-muted-foreground">next 30 days</div>}
+        {rows.length > 0 && (
+          <div className="text-xs text-muted-foreground">{upcomingWindowLabel(rows, todayISO)}</div>
+        )}
       </div>
       {rows.length === 0 ? (
         <div className="text-xs text-muted-foreground">No dividends scheduled.</div>
