@@ -1,3 +1,4 @@
+import { Chip } from "./chip";
 import { InfoTooltip } from "./tooltip";
 import { cn } from "../../lib/utils";
 
@@ -23,25 +24,23 @@ export interface BasisChipProps {
  * were dropped rather than copied — they would misdescribe a chart card with
  * no bar.
  *
- * Deliberately NOT `label-caps`: DESIGN.md's one-caps-per-region rule counts
- * `label-caps` elements, and a card's own `Stat`/eyebrow label already
- * claims that budget. This chip is mono context — DESIGN.md lists chips as
- * a legitimate one — styled by hand instead of the shared `label-caps`
- * utility class, so it never competes for that slot.
+ * Built on the shared `Chip` primitive rather than a hand-tuned near-copy of
+ * it: `Chip` already composes `rounded-badge px-1.5 py-0.5 label-caps`, and
+ * `label-caps` is DESIGN.md's one caps utility, explicitly shared by `Stat`
+ * labels, `Chip` text, and `RowHeader` column headers — not a separate size
+ * per use. None of this chip's six call sites (`IncomeCard`, `UpcomingCard`,
+ * `ForwardPayments`, `MonthlyRhythm`, `YieldByHolding`, `IncomeTimeline`)
+ * pair it with a `Stat`/eyebrow label in the same card, so the
+ * one-caps-per-region budget DESIGN.md guards isn't spent twice here.
  */
 export function BasisChip({ taxed, className }: BasisChipProps) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap rounded-badge bg-surface-hover px-1.5 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-muted-foreground",
-        className,
-      )}
-    >
+    <Chip className={cn("gap-1 whitespace-nowrap", className)}>
       {taxed ? "After tax" : "Before tax"}
       <InfoTooltip label="About this figure">
         {taxed ? "After" : "Before"} dividend tax
         {taxed ? " (your single configured rate, applied flatly)" : ""}.
       </InfoTooltip>
-    </span>
+    </Chip>
   );
 }
