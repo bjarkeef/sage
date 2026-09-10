@@ -20,7 +20,6 @@ import type {
 } from "../../lib/types";
 import { sumIncome } from "../../lib/dividend-year";
 import { formatMoney } from "../../lib/format";
-import { ActArrow } from "./kpi-cards";
 import { corners } from "./income-timeline";
 import { AXIS_TICK, CURSOR_FILL, GRID_STROKE } from "../charts/chart-theme";
 import { CERTAINTY_FILL as FILL, CertaintyBarsLegend, type Cert } from "../charts/certainty-bars";
@@ -414,11 +413,7 @@ export function ForwardPayments({
   const labelledIndices = labelledMonthIndices(chartData);
 
   return (
-    <Card
-      compact
-      className="group relative flex h-full flex-col transition-colors hover:bg-surface-hover/60"
-    >
-      <ActArrow />
+    <Card compact className="relative flex h-full flex-col">
       <div className="mb-3.5">
         <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
           Next 12 months

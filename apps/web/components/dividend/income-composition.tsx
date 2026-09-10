@@ -4,7 +4,6 @@ import * as React from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardTitle, SegmentedControl } from "@sage/ui";
 import type { DividendIncomeDTO, IncomeGroupRow } from "../../lib/types";
-import { ActArrow } from "./kpi-cards";
 import { ChartTooltip } from "../charts/chart-tooltip";
 import { CURSOR_FILL, segColor } from "../charts/chart-theme";
 
@@ -50,12 +49,7 @@ export function IncomeComposition({ groups }: { groups: DividendIncomeDTO["incom
   const rows = React.useMemo(() => toDisplayRows(groups[group]), [groups, group]);
 
   return (
-    <Card
-      compact
-      className="group relative flex h-full flex-col transition-colors hover:bg-surface-hover/60"
-    >
-      <ActArrow />
-
+    <Card compact className="relative flex h-full flex-col">
       <div className="mb-3.5 flex items-start justify-between gap-3">
         <div>
           <CardTitle className="mb-0">Income composition</CardTitle>

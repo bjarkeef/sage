@@ -5,21 +5,6 @@ import { Card, InfoTooltip } from "@sage/ui";
 import type { MoneyDTO } from "../../lib/types";
 import { formatDate, formatMoney, formatMoneyWhole } from "../../lib/format";
 
-/** Shared "act" affordance: hairline hover + a ↗ glyph that fades in, matching
- *  the bento mockup's `.card.act` — cards are visually poised to drill down
- *  even before a destination exists (composition/growth cards land in
- *  Tasks 3-5). */
-export function ActArrow() {
-  return (
-    <span
-      aria-hidden
-      className="pointer-events-none absolute right-4 top-4 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-70"
-    >
-      ↗
-    </span>
-  );
-}
-
 function pct(v: number | null): string {
   return v == null ? "—" : `${v.toFixed(2)}%`;
 }
@@ -38,9 +23,8 @@ export function AnnualIncomeCard({
     <Card
       compact
       data-testid="kpi-card-income"
-      className="group relative flex h-full min-h-[138px] flex-col transition-colors hover:bg-surface-hover/60"
+      className="relative flex h-full min-h-[138px] flex-col"
     >
-      <ActArrow />
       <div className="flex items-center gap-2 label-caps text-muted-foreground">
         <span className="h-2 w-2 rounded-full bg-income" />
         <span>Annual income</span>
@@ -85,9 +69,8 @@ export function YieldCard({
     <Card
       compact
       data-testid="kpi-card-yield"
-      className="group relative flex h-full min-h-[138px] flex-col transition-colors hover:bg-surface-hover/60"
+      className="relative flex h-full min-h-[138px] flex-col"
     >
-      <ActArrow />
       <div className="flex items-center gap-1 label-caps text-muted-foreground">
         <span>Yield</span>
         <InfoTooltip label="About this figure">
@@ -145,9 +128,8 @@ export function CashFlowCard({
     <Card
       compact
       data-testid="kpi-card-cashflow"
-      className="group relative flex h-full min-h-[138px] flex-col transition-colors hover:bg-surface-hover/60"
+      className="relative flex h-full min-h-[138px] flex-col"
     >
-      <ActArrow />
       <div className="flex items-center gap-1 label-caps text-muted-foreground">
         <span>Cash flow</span>
         <InfoTooltip label="About this figure">

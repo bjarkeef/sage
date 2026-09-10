@@ -186,6 +186,33 @@ Exits are quicker than entrances: an exit that lingers reads as lag. Anything
 using it must stay mounted for the duration, or it blinks out instead of
 fading.
 
+### Affordance — a hover state is a promise
+
+Anything that changes under the pointer is telling the reader it will do
+something. If it will not, the change is a lie, and the reader learns to
+distrust every other hover in the app.
+
+- **A hover background belongs to something that responds** — a link, a button,
+  a row that opens. `--surface-hover` is the row/nav hover; it is not decoration
+  for a static card.
+- **Never reveal a chevron, arrow or ↗ on something with no destination.** Nine
+  analytics cards carried a fade-in ↗ and a hover wash with no `href` and no
+  `onClick` between them, from a mockup where the destinations were "coming in a
+  later task" and never arrived. Removed 2026-09-10.
+- **The cursor states the truth.** Interactive elements are `<a>` or `<button>`,
+  which get the right cursor for free. A `cursor-pointer` on a `<div>` usually
+  means the element should have been a button — and would then also be
+  focusable and reachable by keyboard, which a styled `<div>` is not.
+- **What is hoverable is focusable.** Any state reachable with a pointer has a
+  visible `:focus-visible` equivalent, or the affordance simply does not exist
+  for keyboard users. Row actions that fade in on hover pair
+  `group-hover:opacity-100` with `focus-within:opacity-100`, and
+  `[@media(hover:none)]:opacity-100` so a touch device is not left with a
+  control it can never reveal — see `holding-row.tsx`.
+
+The inverse is a bug too: a control with no hover state at all reads as
+decoration. Every interactive element gets one, on the 120–200ms budget above.
+
 ## 2. The contracts
 
 Each one-line rule, with the real component APIs.
