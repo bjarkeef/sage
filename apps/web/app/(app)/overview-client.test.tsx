@@ -287,5 +287,27 @@ describe("OverviewClient", () => {
       expect(await screen.findByText("$4,550.00")).toBeInTheDocument();
       expect(screen.queryByText("$1.00")).not.toBeInTheDocument();
     });
+
+    it("prints the portfolio's value once, not once per component that knows it", async () => {
+      // The chart's stat strip briefly carried a "Worth" cell repeating the
+      // hero numeral a few pixels below it. Locally the assertion above raced
+      // past it — the chart is lazily imported, so the hero resolved first and
+      // `findByText` was satisfied before the duplicate mounted. CI, on
+      // different timing, found both and failed. An explicit count cannot race:
+      // it waits for the chart, then counts.
+      renderWithDashboard({
+        subtotalsByCurrency: [
+          {
+            currency: "USD",
+            costBasis: { amount: "1", currency: "USD" },
+            marketValue: { amount: "1", currency: "USD" },
+            gainLoss: { amount: "0", currency: "USD" },
+          },
+        ],
+      });
+
+      await screen.findByText(/Money in/);
+      expect(screen.getAllByText("$4,550.00")).toHaveLength(1);
+    });
   });
 });

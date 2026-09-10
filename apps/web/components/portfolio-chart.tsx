@@ -387,26 +387,19 @@ export function PortfolioChart({
         )}
       </div>
 
-      {/* The honest triple. What it is worth, what was paid in, and the space
-          between them — which is the one figure on this chart that a deposit
-          cannot move, because a deposit lifts the first two by the same amount
-          on the same day. The swatches live on the labels so a figure and the
-          line it names are one object rather than a colour match across a gap. */}
+      {/* What was paid in, and the space between that and the value — the one
+          figure on this chart a deposit cannot move, since a deposit lifts value
+          and money in by the same amount on the same day.
+
+          Deliberately NOT three cells. Both variants already print the value as
+          the hero numeral directly above, so a "Worth" cell repeats it a few
+          pixels lower; CI caught the duplicate before the design review did.
+          The hero IS the worth, and the strip finishes the sentence: worth that
+          much, this much put in, so this much is gain.
+
+          The swatch sits on the label so a figure and the line it names are one
+          object rather than a colour match across a gap. */}
       <StatStrip>
-        <Stat
-          size="sm"
-          label={
-            <span className="flex items-center gap-2">
-              <span
-                data-series-swatch
-                className="h-0.5 w-4 flex-none"
-                style={{ background: "var(--chart-line)" }}
-              />
-              Worth
-            </span>
-          }
-          value={formatMoney(lastPoint.value)}
-        />
         <Stat
           size="sm"
           label={
