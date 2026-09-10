@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { createChart, AreaSeries, LineSeries, LineStyle, type IChartApi } from "lightweight-charts";
+import {
+  createChart,
+  AreaSeries,
+  LineSeries,
+  LineStyle,
+  type IChartApi,
+  type MouseEventParams,
+} from "lightweight-charts";
 import { createGainBand, type GainBandPoint } from "./charts/gain-band";
 import { useTheme } from "next-themes";
 import { SegmentedControl, Delta, Stat, StatStrip } from "@sage/ui";
@@ -19,7 +26,7 @@ import {
   areaSeriesOptions,
   attachHoverTooltip,
 } from "../lib/chart-config";
-import type { DashboardDTO, PortfolioHistoryDTO } from "../lib/types";
+import type { DashboardDTO, PortfolioHistoryDTO, PortfolioHistoryPoint } from "../lib/types";
 
 const RANGES = [
   { label: "1W", value: "1W" },
@@ -80,6 +87,10 @@ function withAlpha(color: string, alpha: number): string {
 }
 
 export interface PortfolioChartProps {
+  /** The day under the pointer, or null on the way out. Lets an owner render
+   *  the hero numeral from the chart, so the two are one instrument rather than
+   *  a figure stacked above a picture. */
+  onScrub?: (point: PortfolioHistoryPoint | null) => void;
   initialHistory: PortfolioHistoryDTO;
   displayCurrency: string | null;
   todayChange: DashboardDTO["todayChange"];
@@ -93,6 +104,7 @@ export function PortfolioChart({
   displayCurrency,
   todayChange,
   variant = "default",
+  onScrub,
 }: PortfolioChartProps) {
   const ambient = variant === "ambient";
   const [range, setRange] = React.useState(INITIAL_RANGE);
@@ -100,6 +112,12 @@ export function PortfolioChart({
   // this component first mounted with; capture it once so a later currency
   // change (a new prop value, same mounted instance) doesn't keep seeding stale
   // initialData forever -- it only seeds the exact key the server prefetched.
+  const [scrubbed, setScrubbed] = React.useState<PortfolioHistoryPoint | null>(null);
+  // Held in a ref so a new callback identity never rebuilds the chart: the
+  // effect below tears down and recreates it, which would restart the entrance.
+  const onScrubRef = React.useRef(onScrub);
+  onScrubRef.current = onScrub;
+
   const initialCurrencyRef = React.useRef(displayCurrency ?? undefined);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
@@ -295,6 +313,21 @@ export function PortfolioChart({
       }).format(v),
     );
 
+    // Drive the readout from the crosshair. `param.time` is the series time —
+    // the ISO date these points are keyed by — so the lookup is exact rather
+    // than a nearest-x search.
+    const pointByDate = new Map((data?.points ?? []).map((p) => [p.date, p]));
+    const onCrosshair = (param: MouseEventParams) => {
+      const t = param.time;
+      const hit = typeof t === "string" ? (pointByDate.get(t) ?? null) : null;
+      setScrubbed((prev) => {
+        if (prev?.date === hit?.date) return prev;
+        onScrubRef.current?.(hit);
+        return hit;
+      });
+    };
+    chart.subscribeCrosshairMove(onCrosshair);
+
     chartRef.current = chart;
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -309,6 +342,9 @@ export function PortfolioChart({
       // unmount): give the entrance back, so the mount that survives plays it.
       if (!entranceCompleted) hasEnteredRef.current = false;
       resizeObserver.disconnect();
+      chart.unsubscribeCrosshairMove(onCrosshair);
+      setScrubbed(null);
+      onScrubRef.current?.(null);
       detachTooltip();
       chart.remove();
       chartRef.current = null;
@@ -326,9 +362,13 @@ export function PortfolioChart({
   const lastPoint = data.points[data.points.length - 1]!;
   // Value minus money in. Both are already in the display currency by the time
   // they reach here, so this is a subtraction rather than a conversion.
-  const gainAmount = Number(lastPoint.value.amount) - Number(lastPoint.invested.amount);
-  const investedNow = Number(lastPoint.invested.amount);
-  const gainPercent = investedNow > 0 ? (gainAmount / investedNow) * 100 : null;
+  // The strip reads the day under the pointer, falling back to the last day.
+  // Figures change instantly rather than tweening: several numerals easing
+  // under a moving hand reads as a slot machine (DESIGN.md, Motion).
+  const shown = scrubbed ?? lastPoint;
+  const gainAmount = Number(shown.value.amount) - Number(shown.invested.amount);
+  const investedShown = Number(shown.invested.amount);
+  const gainPercent = investedShown > 0 ? (gainAmount / investedShown) * 100 : null;
   const rangeLabel = RANGE_LABEL[range] ?? range;
 
   return (
@@ -346,7 +386,7 @@ export function PortfolioChart({
 
       {!ambient && (
         <div>
-          <HeroMoney money={lastPoint.value} />
+          <HeroMoney money={shown.value} />
           {todayChange && (
             <div className="mt-1.5 flex items-center gap-1.5">
               <Delta
@@ -415,7 +455,7 @@ export function PortfolioChart({
               Money in
             </span>
           }
-          value={formatMoney(lastPoint.invested)}
+          value={formatMoney(shown.invested)}
           // Kept from the toggle this replaced: the distinction is easy to get
           // wrong and the label alone cannot carry it.
           title="Contributions minus withdrawals. Sits below the cost of your current holdings once you have sold at a profit, because those gains were reinvested."
@@ -440,7 +480,7 @@ export function PortfolioChart({
             <Delta
               value={gainAmount}
               percent={gainPercent ?? undefined}
-              currency={lastPoint.value.currency}
+              currency={shown.value.currency}
             />
           }
         />
