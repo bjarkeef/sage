@@ -16,7 +16,6 @@ import {
   readChartTheme,
   baseChartOptions,
   areaSeriesOptions,
-  comparisonSeriesOptions,
   attachHoverTooltip,
 } from "../lib/chart-config";
 import type { DashboardDTO, PortfolioHistoryDTO } from "../lib/types";
@@ -41,27 +40,25 @@ const RANGE_LABEL: Record<string, string> = {
 
 const INITIAL_RANGE = "1Y";
 
-const COMPARISON_INDEX: Record<string, 0 | 1> = { sp500: 0, "msci-world": 1 };
-
-/** Toggle order and colour per benchmark, and the label to show before the
- *  series is on.
+/* Benchmark overlays were removed from this chart on 2026-09-10, deliberately.
  *
- *  Both toggles start OFF and the history query only asks for the ones that are
- *  on, so `data.benchmarks` is empty in the default state and `label` — not the
- *  server's name — is what a visitor actually reads. It therefore has to carry
- *  the same "(TR)" qualifier the server uses, or the toggle reads "S&P 500"
- *  beside a card reading "versus S&P 500 (TR)" on the same screen, as it did
- *  before 2026-09-10.
+ * This series is your portfolio's ABSOLUTE VALUE in the display currency, so it
+ * steps up the moment you deposit. A benchmark can only be drawn here as a
+ * percentage, on its own independent price scale — which meant one line moved
+ * with your cash flows and the other structurally could not, on two axes that
+ * autoscaled separately. Where the lines sat relative to each other, and where
+ * they crossed, carried no information at all: a book with steady inflows drew
+ * itself above the index for depositing money.
  *
- *  This IS a second copy of a name that belongs to `BENCHMARKS` in
- *  `apps/api/src/services/valuation-series.ts`, and there is no build-time link
- *  between them: `apps/web` cannot import from the API. Turning a toggle on
- *  replaces this with the server's own name, so a drift shows up as the label
- *  changing when you click it. Keep them in step by hand. */
-const BENCHMARKS = [
-  { key: "sp500", label: "S&P 500 (TR)", cssVar: "var(--chart-comparison-1)" },
-  { key: "msci-world", label: "MSCI World (TR)", cssVar: "var(--chart-comparison-2)" },
-];
+ * `/performance` compares against benchmarks correctly and still does — there
+ * the portfolio is an index too, so both sides are percentages on one scale.
+ *
+ * The right version of this chart is an index-equivalent line: the same cash
+ * flows, on the same dates, invested into the index instead, drawn in currency
+ * beside the value and "Money in". Until that exists, no benchmark belongs
+ * here. `/portfolio/history` still accepts a `benchmarks` param, and this was
+ * its only caller.
+ */
 
 /** Apply an alpha to a resolved CSS color. Theme tokens resolve to either hex
  *  or rgb()/rgba() strings, so handle both (a bare hex-suffix on an rgba string
@@ -99,10 +96,6 @@ export function PortfolioChart({
   const ambient = variant === "ambient";
   const [range, setRange] = React.useState(INITIAL_RANGE);
   const [showInvested, setShowInvested] = React.useState(true);
-  const [showBenchmarks, setShowBenchmarks] = React.useState<Record<string, boolean>>({
-    sp500: false,
-    "msci-world": false,
-  });
   // The server-rendered initialHistory was fetched with whatever displayCurrency
   // this component first mounted with; capture it once so a later currency
   // change (a new prop value, same mounted instance) doesn't keep seeding stale
@@ -112,17 +105,9 @@ export function PortfolioChart({
   const chartRef = React.useRef<IChartApi | null>(null);
   const { resolvedTheme } = useTheme();
 
-  const activeBenchmarks = React.useMemo(
-    () =>
-      Object.entries(showBenchmarks)
-        .filter(([, v]) => v)
-        .map(([k]) => k),
-    [showBenchmarks],
-  );
-
   const { data, isLoading, isPlaceholderData } = useQuery({
-    queryKey: qk.portfolioHistory(range, displayCurrency ?? undefined, activeBenchmarks),
-    queryFn: () => getPortfolioHistory(range, displayCurrency ?? undefined, activeBenchmarks),
+    queryKey: qk.portfolioHistory(range, displayCurrency ?? undefined),
+    queryFn: () => getPortfolioHistory(range, displayCurrency ?? undefined),
     staleTime: 300_000,
     // Keep the previous range's chart on screen while a new range fetches, so
     // switching timelines never collapses the block into a skeleton (no CLS,
@@ -130,9 +115,7 @@ export function PortfolioChart({
     // genuine first load with no seeded/cached data.
     placeholderData: keepPreviousData,
     initialData:
-      range === INITIAL_RANGE &&
-      (displayCurrency ?? undefined) === initialCurrencyRef.current &&
-      activeBenchmarks.length === 0
+      range === INITIAL_RANGE && (displayCurrency ?? undefined) === initialCurrencyRef.current
         ? initialHistory
         : undefined,
   });
@@ -184,16 +167,6 @@ export function PortfolioChart({
       investedSeries.setData(investedData);
     }
 
-    if (data?.benchmarks && data.benchmarks.length > 0) {
-      for (const bm of data.benchmarks) {
-        const bmSeries = chart.addSeries(LineSeries, {
-          ...comparisonSeriesOptions(theme, COMPARISON_INDEX[bm.symbol] ?? 0),
-          priceScaleId: "benchmark",
-        });
-        bmSeries.setData(bm.points.map((p) => ({ time: p.date, value: p.percentChange })));
-      }
-    }
-
     chart.timeScale().fitContent();
 
     const detachTooltip = attachHoverTooltip(chart, series, containerRef.current, (v) =>
@@ -221,7 +194,7 @@ export function PortfolioChart({
     // data?.points is already captured via chartData (derived from it); adding it
     // would rebuild the chart on every refetch that produced identical points.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartData, investedData, showInvested, resolvedTheme, data?.benchmarks, ambient]);
+  }, [chartData, investedData, showInvested, resolvedTheme, ambient]);
 
   if (isLoading) return ambient ? <AmbientChartSkeleton /> : <HeroSkeleton />;
   if (!data || data.points.length === 0) {
@@ -315,31 +288,6 @@ export function PortfolioChart({
           />
           Money in
         </button>
-        {BENCHMARKS.map(({ key, label, cssVar }) => {
-          const active = showBenchmarks[key] ?? false;
-          const name = data?.benchmarks?.find((b) => b.symbol === key)?.name ?? label;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setShowBenchmarks((prev) => ({ ...prev, [key]: !prev[key] }))}
-              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-colors ${
-                active
-                  ? "bg-surface-hover text-foreground"
-                  : "text-muted-foreground opacity-60 hover:opacity-100"
-              }`}
-            >
-              <span
-                data-series-swatch
-                className="h-0.5 w-4 flex-none"
-                style={{
-                  background: `repeating-linear-gradient(to right, ${cssVar} 0 3px, transparent 3px 6px)`,
-                }}
-              />
-              {name}
-            </button>
-          );
-        })}
       </div>
 
       {data.fxIncomplete && (

@@ -229,22 +229,27 @@ describe("PortfolioChart", () => {
     expect(screen.getByTitle(/contributions minus withdrawals/i)).toBeInTheDocument();
   });
 
-  // jsdom's cssstyle does not resolve CSS custom properties, so this can only
-  // catch a literal copy-paste typo (e.g. both swatches wired to the same
-  // `--chart-comparison-*` variable name). It cannot tell whether the two
-  // variables resolve to the same colour -- that guarantee lives in
-  // packages/ui/src/styles/tokens.test.ts, which reads tokens.css and compares
-  // the actual resolved values.
-  it("wires each benchmark legend swatch to its own CSS variable, not a shared one", async () => {
+  // A regression guard, not a coverage box. Benchmark overlays were removed
+  // from this chart on 2026-09-10 because they could not be drawn honestly
+  // here: this series is absolute portfolio value, so it steps up when you
+  // deposit, while a benchmark can only be a percentage on its own
+  // independently-autoscaled axis. One line moved with cash flows, the other
+  // structurally could not, and a book with steady inflows drew itself above
+  // the index for the act of depositing money.
+  //
+  // If someone re-adds a toggle here, this fails and they have to read why.
+  // The honest version is an index-equivalent line in currency (same flows,
+  // same dates, invested into the index) — that is a different series, and it
+  // would not be labelled with a bare index name, so this stays valid.
+  it("offers no benchmark overlay, because value and an index share no scale", async () => {
     renderWithClient(
       <PortfolioChart initialHistory={history} displayCurrency={null} todayChange={null} />,
       makeTestQueryClient(),
     );
-    const sp = await screen.findByRole("button", { name: /S&P 500/ });
-    const msci = await screen.findByRole("button", { name: /MSCI World/ });
-    const swatch = (b: HTMLElement) => b.querySelector("[data-series-swatch]") as HTMLElement;
-    expect(swatch(sp)).toBeTruthy();
-    expect(swatch(msci)).toBeTruthy();
-    expect(swatch(sp).style.background).not.toBe(swatch(msci).style.background);
+    // "Money in" proves the legend rendered at all, so the absences below are
+    // evidence rather than a query that ran before anything mounted.
+    expect(await screen.findByRole("button", { name: /Money in/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /S&P 500/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /MSCI World/ })).not.toBeInTheDocument();
   });
 });
