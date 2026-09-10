@@ -76,11 +76,12 @@ describe("buildReceivedDividends", () => {
     // confirmed quantity x price already equals the provider's GROSS
     // per-share amount x shares, with a separately-recorded fee sitting
     // alongside it rather than already netted into the price — the shape a
-    // foreign dividend with withholding tax takes at some brokers (not a
-    // deduction already baked into price). `LedgerDividendRow` doesn't even
-    // carry a `fee` field into this function — by design, nothing here ever
-    // nets it. If a future change starts subtracting or adding fee here, this
-    // assertion (unchanged from the pre-fee-aware fixture) is what breaks.
+    // foreign-listed dividend with withholding tax takes when a broker
+    // records the withheld amount as its own fee row. `LedgerDividendRow`
+    // doesn't even carry a `fee` field into this function — by design,
+    // nothing here ever nets it. If a future change starts subtracting or
+    // adding fee here, this assertion is what breaks. Figures are invented,
+    // chosen only to keep the arithmetic exact.
     const out = buildReceivedDividends(
       [row({ quantity: "12.5", price: "0.6784", currency: "EUR" })],
       "2026-07-21",
