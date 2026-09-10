@@ -43,9 +43,24 @@ const INITIAL_RANGE = "1Y";
 
 const COMPARISON_INDEX: Record<string, 0 | 1> = { sp500: 0, "msci-world": 1 };
 
+/** Toggle order and colour per benchmark, and the label to show before the
+ *  series is on.
+ *
+ *  Both toggles start OFF and the history query only asks for the ones that are
+ *  on, so `data.benchmarks` is empty in the default state and `label` — not the
+ *  server's name — is what a visitor actually reads. It therefore has to carry
+ *  the same "(TR)" qualifier the server uses, or the toggle reads "S&P 500"
+ *  beside a card reading "versus S&P 500 (TR)" on the same screen, as it did
+ *  before 2026-09-10.
+ *
+ *  This IS a second copy of a name that belongs to `BENCHMARKS` in
+ *  `apps/api/src/services/valuation-series.ts`, and there is no build-time link
+ *  between them: `apps/web` cannot import from the API. Turning a toggle on
+ *  replaces this with the server's own name, so a drift shows up as the label
+ *  changing when you click it. Keep them in step by hand. */
 const BENCHMARKS = [
-  { key: "sp500", label: "S&P 500", cssVar: "var(--chart-comparison-1)" },
-  { key: "msci-world", label: "MSCI World", cssVar: "var(--chart-comparison-2)" },
+  { key: "sp500", label: "S&P 500 (TR)", cssVar: "var(--chart-comparison-1)" },
+  { key: "msci-world", label: "MSCI World (TR)", cssVar: "var(--chart-comparison-2)" },
 ];
 
 /** Apply an alpha to a resolved CSS color. Theme tokens resolve to either hex
@@ -302,6 +317,7 @@ export function PortfolioChart({
         </button>
         {BENCHMARKS.map(({ key, label, cssVar }) => {
           const active = showBenchmarks[key] ?? false;
+          const name = data?.benchmarks?.find((b) => b.symbol === key)?.name ?? label;
           return (
             <button
               key={key}
@@ -320,7 +336,7 @@ export function PortfolioChart({
                   background: `repeating-linear-gradient(to right, ${cssVar} 0 3px, transparent 3px 6px)`,
                 }}
               />
-              {label}
+              {name}
             </button>
           );
         })}

@@ -605,9 +605,43 @@ export async function buildValuationSeries(
   };
 }
 
+/**
+ * Benchmarks, and the one rule that governs what may appear here: **every
+ * series must be a TOTAL-RETURN series.**
+ *
+ * A portfolio's TWR folds dividend income into the return —
+ * `r_t = (MV_t + D_t - F_t) / MV_{t-1} - 1` in `computeDailyReturns`. Measuring
+ * it against a *price* index compares a book that keeps its dividends to an
+ * index that throws them away, and the gap the UI prints is then the
+ * portfolio's skill plus the index's yield. That is not a rounding error:
+ * measured 2026-09-10, `^GSPC` returned +16.22% over one year against
+ * `^SP500TR`'s +17.58%, so the old pairing flattered every book by 1.36pp a
+ * year, compounding over longer ranges. On the maintainer's demo book it turned
+ * a real +0.5pp into a printed +1.8pp.
+ *
+ * Two ways to get a total return, both used here:
+ *  - a total-return *index* (`^SP500TR`), where the reinvestment is in the
+ *    index itself. History reaches 1988.
+ *  - an *accumulating* ETF (`IWDA.L`), which reinvests distributions internally
+ *    rather than paying them out, so its own price is the total return. Chosen
+ *    over the distributing `URTH` deliberately: same USD quote, no adjusted-close
+ *    plumbing needed, and history back to 2009 rather than 2012. Its return is
+ *    net of a 0.20% TER, which is honest — it is what you could actually have
+ *    bought.
+ *
+ * **There is deliberately no price-index fallback.** Falling back from
+ * `^SP500TR` to `^GSPC` would silently restore the bias on exactly the days the
+ * TR series is unavailable, and a silently-wrong comparison is worse than an
+ * absent one. `fetchBenchmarkSeries` drops a benchmark it cannot fetch, and
+ * `performance-view` renders nothing for it.
+ *
+ * Note for upgrades: these symbols are cold in an existing `price_daily`, so the
+ * first load after this change has no benchmark until the store warms. It
+ * self-heals; see `PersistedPriceProvider`'s refresh budget.
+ */
 export const BENCHMARKS: Record<string, { name: string; symbols: string[] }> = {
-  sp500: { name: "S&P 500", symbols: ["GSPC.INDX", "^GSPC", "SPX"] },
-  "msci-world": { name: "MSCI World", symbols: ["URTH.US", "URTH"] },
+  sp500: { name: "S&P 500 (TR)", symbols: ["SP500TR.INDX", "^SP500TR"] },
+  "msci-world": { name: "MSCI World (TR)", symbols: ["IWDA.L"] },
 };
 
 export async function fetchBenchmarkSeries(

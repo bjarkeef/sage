@@ -10,6 +10,7 @@ import {
   monthsOfYear,
   daysInYear,
   sumIncome,
+  yearRunsPastForecast,
 } from "./dividend-year";
 
 // Every fixture is built against an explicit `today`, never `new Date()`.
@@ -450,5 +451,46 @@ describe("yearProgress currency conflicts", () => {
       { month: "2026-08", retroactive: "40", announced: "10", projected: "0", currency: "DKK" },
     ];
     expect(yearProgress(uniform, 2026, TODAY).mixedCurrency).toBe(false);
+  });
+});
+
+describe("yearRunsPastForecast", () => {
+  // `today` and the horizon are both arguments, so the absolute dates below are
+  // inputs rather than an implicit "now" — they cannot rot the way a fixture
+  // pinned to the real clock does.
+  const horizonFor = (iso: string) => {
+    const d = new Date(`${iso}T00:00:00Z`);
+    d.setUTCFullYear(d.getUTCFullYear() + 1);
+    return d.toISOString().slice(0, 10);
+  };
+
+  it("flags next year, whose last months lie past the forecast", () => {
+    const today = new Date("2026-09-10T00:00:00Z");
+    expect(yearRunsPastForecast(2027, today, horizonFor("2026-09-10"))).toBe(true);
+  });
+
+  it("does not flag the current year, which the forecast always covers", () => {
+    const today = new Date("2026-09-10T00:00:00Z");
+    expect(yearRunsPastForecast(2026, today, horizonFor("2026-09-10"))).toBe(false);
+  });
+
+  it("does not flag a past year, whose gaps are history rather than missing forecast", () => {
+    const today = new Date("2026-09-10T00:00:00Z");
+    expect(yearRunsPastForecast(2024, today, horizonFor("2026-09-10"))).toBe(false);
+  });
+
+  it("does not flag next year on 31 December, when the forecast covers it in full", () => {
+    // The boundary the `>` comparison exists for: the horizon is next 31
+    // December, so every month of next year is forecast and the note would be
+    // a lie. A `>=` here would fire on exactly this day.
+    const today = new Date("2026-12-31T00:00:00Z");
+    expect(yearRunsPastForecast(2027, today, horizonFor("2026-12-31"))).toBe(false);
+  });
+
+  it("says nothing when the payload carries no horizon", () => {
+    // An older API, or a response that omitted it: guessing a horizon would
+    // print a date the server never promised.
+    const today = new Date("2026-09-10T00:00:00Z");
+    expect(yearRunsPastForecast(2027, today, undefined)).toBe(false);
   });
 });

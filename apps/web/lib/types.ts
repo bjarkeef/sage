@@ -228,6 +228,12 @@ export interface DividendIncomeDTO {
   /** Single configurable dividend tax rate (0-100), null when unset. Drives
    *  the Yield card's net-after-tax headline; see `apps/web/lib/portfolio-yields.ts`. */
   dividendTaxRate: number | null;
+  /** The last date any projection in this payload reaches. The year picker
+   *  offers next year in full, so months past this date are empty for want of
+   *  a forecast rather than for want of payments — see `yearRunsPastForecast`.
+   *  Server-sent: the projection rule lives in `@sage/core`, which the web app
+   *  deliberately does not depend on. */
+  projectedThrough?: string;
   /** True when a received dividend was excluded from totals for want of an FX rate. */
   fxIncomplete: boolean;
   /** True when the stored ECB rates used for conversion are older than the

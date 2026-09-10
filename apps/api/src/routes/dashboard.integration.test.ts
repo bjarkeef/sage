@@ -773,10 +773,10 @@ describeDb("GET /dashboard — ytdTwrIncomplete: does not fetch extra upstream h
     // Task 9: the dashboard's embedded YTD call now requests the "sp500"
     // benchmark (see dashboard.ts), so it too must be fully covered here or
     // this fixture's "zero upstream calls" premise would break on a call this
-    // test isn't about — "GSPC.INDX" is the first symbol variant
+    // test isn't about — "SP500TR.INDX" is the first symbol variant
     // fetchBenchmarkSeries tries for "sp500".
     await store.writeBars(
-      "GSPC.INDX",
+      "SP500TR.INDX",
       [priceBar(PRE_BAR, "4000"), priceBar(TODAY, "4200")],
       new Date(),
     );
@@ -914,12 +914,12 @@ describeDb("GET /dashboard — relative", () => {
 
     const store = new PriceStore(tdb.db);
     await store.writeBars("AAPL", [priceBar(BUY, "90"), priceBar(TODAY, "121")], new Date());
-    // Benchmark index bars ("GSPC.INDX" is the first symbol variant
+    // Benchmark index bars ("SP500TR.INDX" is the first symbol variant
     // fetchBenchmarkSeries tries for the "sp500" id) spanning the same window,
     // seeded directly into the store so PersistedPriceProvider has coverage
     // and serves them without blocking on upstream.
     await store.writeBars(
-      "GSPC.INDX",
+      "SP500TR.INDX",
       [priceBar(BUY, "4000"), priceBar(TODAY, "4200")],
       new Date(),
     );
@@ -1058,10 +1058,10 @@ describeDb("GET /dashboard — relative: cold benchmark does not block or fetch 
   // blocks UNCONDITIONALLY when a symbol's `coverage` is `null` (never fetched
   // into the store before) -- regardless of `requireFrom`, and with no
   // `deadline` escape hatch on that branch (that only exists on the "some
-  // coverage already" branch). `fetchBenchmarkSeries` tries three symbol
-  // variants for "sp500" (GSPC.INDX, ^GSPC, SPX) SEQUENTIALLY, so a fresh
-  // self-host's first `/dashboard` load could make up to three sequential
-  // blocking upstream calls with no bound at all. The fix is
+  // coverage already" branch). `fetchBenchmarkSeries` tries each symbol
+  // variant for "sp500" (SP500TR.INDX, ^SP500TR) SEQUENTIALLY, so a fresh
+  // self-host's first `/dashboard` load could make one blocking upstream call
+  // per variant with no bound at all. The fix is
   // `benchmarksCacheOnly: true` on the dashboard's `buildPerformanceView`
   // call (see dashboard.ts), threaded down as `HistoryOptions.cacheOnly`.
   //
@@ -1078,7 +1078,7 @@ describeDb("GET /dashboard — relative: cold benchmark does not block or fetch 
   // since the cost bound IS the blocking fix here.
   //
   // The fixture below seeds AAPL (the portfolio's own holding) but
-  // deliberately does NOT seed GSPC.INDX / ^GSPC / SPX -- that omission is
+  // deliberately does NOT seed SP500TR.INDX / ^SP500TR -- that omission is
   // the cold-store case. `hanging.gate` is a promise that
   // never resolves until the test releases it: if the cold branch ever
   // regresses to blocking (`cacheOnly` dropped, ignored, or the check
@@ -1104,7 +1104,7 @@ describeDb("GET /dashboard — relative: cold benchmark does not block or fetch 
     // AAPL fully covered so the portfolio's own price history never reaches
     // upstream either -- isolates this fixture to the benchmark path alone.
     await store.writeBars("AAPL", [priceBar(BUY, "90"), priceBar(TODAY, "121")], new Date());
-    // GSPC.INDX / ^GSPC / SPX intentionally NOT seeded: cold benchmark.
+    // SP500TR.INDX / ^SP500TR intentionally NOT seeded: cold benchmark.
 
     hanging = new CountingProvider(quote("AAPL", "121", "120"), []);
     hanging.gate = new Promise<void>((resolve) => {
@@ -1169,11 +1169,13 @@ describeDb("GET /dashboard — relative: cold benchmark does not block or fetch 
     // It's exactly 3, not 0: the cold branch kicks off a
     // fire-and-forget background refill (bounded by REFRESH_BUDGET) so a
     // benchmark that only ever arrives via `cacheOnly` isn't cold forever.
-    // `fetchBenchmarkSeries` tries all three sp500 variants sequentially
-    // (GSPC.INDX, ^GSPC, SPX) since every one of them is cold here, so each
-    // fires its own refill -- reaching `inner`, but never awaited by the
-    // response, which is the property this test exists to prove.
-    expect(hanging.historyCalls - before).toBe(3);
+    // `fetchBenchmarkSeries` tries every sp500 variant sequentially since
+    // both are cold here, so each fires its own refill -- reaching `inner`, but
+    // never awaited by the response, which is the property this test exists to
+    // prove. Counted off `BENCHMARKS` rather than hardcoded: the variant list
+    // went from three to two when the benchmark moved to a total-return series,
+    // and this assertion should track that rather than have to be found.
+    expect(hanging.historyCalls - before).toBe(BENCHMARKS.sp500!.symbols.length);
 
     // Let the (expected) background refills settle quickly rather than
     // leaving `afterEach`'s drain waiting on a gate nothing will release.

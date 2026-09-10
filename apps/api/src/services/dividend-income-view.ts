@@ -4,6 +4,7 @@ import {
   computeRetroactiveIncome,
   buildReceivedDividends,
   projectDividendSchedule,
+  projectionHorizonIso,
   computeDividendCAGR,
   classifyDividendTrend,
   dedupeDividends,
@@ -868,6 +869,14 @@ export async function buildDividendIncomeView(
     fxRatesAsOf,
     incomeRecordingOff,
     allowNegativeDividendGrowth,
+    /** The last date any projection here reaches. The clients need to be able
+     *  to *name* it: the dividends year picker offers next year in full, so its
+     *  months past this date render empty, and an empty December has to read as
+     *  "past the forecast" rather than "nothing expected". Sent from the server
+     *  because the server owns the rule — a `+ 1 year` reimplemented in the web
+     *  app would drift the moment the horizon moved, and `apps/web` deliberately
+     *  does not depend on `@sage/core`, where that rule lives. */
+    projectedThrough: projectionHorizonIso(now),
     summary: {
       // Empty when there is no currency to state the total in, which the
       // clients already render as "—". A figure needs a unit; `0` on its own is

@@ -12,6 +12,7 @@ import {
   excludeSpecialDividends,
   regularDividendAmount,
   projectDividendSchedule,
+  projectionHorizonIso,
   classifyDividendTrend,
   clampDividendGrowth,
   type DividendHistoryRow,
@@ -674,5 +675,47 @@ describe("clampDividendGrowth", () => {
   it("leaves zero unchanged either way", () => {
     expect(clampDividendGrowth(new Decimal("0"), false).toFixed(4)).toBe("0.0000");
     expect(clampDividendGrowth(new Decimal("0"), true).toFixed(4)).toBe("0.0000");
+  });
+});
+
+describe("projectionHorizonIso", () => {
+  it("is one year from the date given", () => {
+    expect(projectionHorizonIso(new Date("2026-09-10T00:00:00Z"))).toBe("2027-09-10");
+  });
+
+  it("rolls a leap day forward to Mar 1 rather than clamping to Feb 28", () => {
+    // Documented because it is the one input where "one year later" has no
+    // exact answer: `setUTCFullYear` rolls Feb 29 over rather than clamping, so
+    // the horizon is a day longer than a strict year. Left alone deliberately —
+    // it costs one extra forecast day once every four years, and changing it
+    // would move projection output for no benefit anyone can perceive.
+    expect(projectionHorizonIso(new Date("2024-02-29T00:00:00Z"))).toBe("2025-03-01");
+  });
+
+  it("is the bound projectDividendSchedule actually honours", () => {
+    const row = (exDate: string, paymentDate: string): DividendHistoryRow => ({
+      symbol: "THAMES.L",
+      exDate,
+      paymentDate,
+      amountPerShare: "1",
+      currency: "GBP",
+      period: "Quarterly",
+    });
+    // The whole point of exporting it: the UI names this date, so it must be
+    // the same date the projection stops at, not a second copy of the rule.
+    const asOf = new Date("2026-09-10T00:00:00Z");
+    const rows = projectDividendSchedule({
+      symbol: "THAMES.L",
+      quantity: new Decimal("100"),
+      history: [
+        row("2026-03-10", "2026-03-24"),
+        row("2026-06-10", "2026-06-24"),
+        row("2026-09-09", "2026-09-23"),
+      ],
+      announced: [],
+      asOf,
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) expect(r.exDate <= projectionHorizonIso(asOf)).toBe(true);
   });
 });
