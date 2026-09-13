@@ -14,8 +14,12 @@ function dto(overrides: Partial<PerformanceDTO> = {}): PerformanceDTO {
     simpleReturn: 0.05,
     twr: 0.1432,
     twrAnnualized: null,
-    mwr: 0.121,
-    mwrAnnualized: null,
+    lifetime: {
+      unrealised: { amount: "1200", currency: "DKK" },
+      realised: { amount: "800", currency: "DKK" },
+      income: { amount: "400", currency: "DKK" },
+      total: { amount: "2400", currency: "DKK" },
+    },
     volatility: 0.182,
     maxDrawdown: 0.093,
     bestDay: { date: "2026-04-09", value: 0.041 },
@@ -51,7 +55,7 @@ describe("PerfMetrics", () => {
     render(<PerfMetrics data={dto({ relative: relative() })} />);
     for (const title of [
       "Against the benchmarks",
-      "Money-weighted return",
+      "Made since you started",
       "Volatility",
       "Beta",
       "Max drawdown",
@@ -65,8 +69,8 @@ describe("PerfMetrics", () => {
     render(<PerfMetrics data={dto({ relative: relative() })} />);
     fireEvent.click(screen.getByRole("button", { name: /about: against the benchmarks/i }));
     expect(screen.getByText(/strips out when you added or sold/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /about: money-weighted return/i }));
-    expect(screen.getByText(/timing included/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /about: made since you started/i }));
+    expect(screen.getByText(/over its whole life rather than the window/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /about: max drawdown/i }));
     expect(screen.getByText(/deepest fall from a peak/i)).toBeInTheDocument();
   });
@@ -167,7 +171,7 @@ describe("PerfMetrics", () => {
   });
 
   it("renders an em dash rather than a fabricated figure when a value is missing", () => {
-    render(<PerfMetrics data={dto({ mwr: null, relative: relative() })} />);
+    render(<PerfMetrics data={dto({ lifetime: null, relative: relative() })} />);
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
   });
 });

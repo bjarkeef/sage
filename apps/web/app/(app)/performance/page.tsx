@@ -18,7 +18,7 @@ export default async function PerformancePage() {
     <PageShell>
       <AppPageHeader
         title="Performance"
-        description="Time-weighted and money-weighted returns, measured honestly."
+        description="How the book has done, and what it has made since you started."
       />
       {perf.insufficientData ? (
         <PerformanceEmptyState />

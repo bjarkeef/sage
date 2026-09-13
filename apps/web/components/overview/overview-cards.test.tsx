@@ -51,7 +51,7 @@ describe("PerformanceCard", () => {
     render(
       <PerformanceCard
         ytdPercent={16.15}
-        totalReturn={{ amount: { amount: "2192", currency: "USD" }, percent: 41.7 }}
+        totalReturn={{ amount: { amount: "2192", currency: "USD" } }}
         relative={null}
         benchmarkYtdTwr={null}
       />,

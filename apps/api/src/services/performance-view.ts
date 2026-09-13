@@ -4,7 +4,6 @@ import {
   chainedTWR,
   annualize,
   growthIndex,
-  xirr,
   volatility,
   maxDrawdown,
   bestWorstDay,
@@ -13,7 +12,6 @@ import {
   beta,
   MIN_PAIRED_DAYS_FOR_BETA,
   resolveSplitBasis,
-  type Cashflow,
 } from "@sage/core";
 import type { PortfolioViewDeps } from "./portfolio-view";
 import { findBasisMismatches, toBasisFindingBody } from "./basis-reconciliation";
@@ -69,14 +67,32 @@ function ratioBlock(mine: Decimal | null, theirs: Decimal | null): RatioBlock | 
 }
 
 /**
- * Time- and money-weighted return metrics for a user's portfolio over `range`.
+ * Return metrics for a user's portfolio over `range`, plus what the whole book
+ * has made in `lifetime`.
  *
  * Every flow is converted at the rate of its own trade date; when any of them
  * (or the underlying valuation series) had to fall back to a spot rate, the
  * response says so via `fxApproximated` rather than presenting an approximated
- * IRR or TWR as exact. A currency nothing can price drops its flows from the
- * IRR entirely and is reported as `fxIncomplete`; rates past the staleness
- * threshold are reported as `fxStale` with the day they came from.
+ * figure as exact. A currency nothing can price is dropped and reported as
+ * `fxIncomplete`; rates past the staleness threshold are reported as `fxStale`
+ * with the day they came from.
+ *
+ * There is deliberately no money-weighted return here any more.
+ *
+ * The arithmetic was never wrong — it reproduced to four decimal places — but
+ * the flows handed to it are not the flows that happened. Sage has no cash or
+ * settlement account: when the reporting book was restructured in one week of
+ * October 2025, 166,906 DKK of sales and 192,495 of purchases went through a
+ * portfolio worth 145,000, and every one of those round trips was read as a
+ * withdrawal followed by a deposit rather than as money moving between
+ * holdings. IRR prices that shape as brilliant timing and returned 35.9% for a
+ * year the time-weighted return puts at 14.6%.
+ *
+ * It is a question worth answering — did the timing help? is exactly what a
+ * time-weighted return refuses to tell you — and the price of answering it is
+ * a settlement model, either recorded by the holder or inferred by matching
+ * sales to nearby purchases. Until there is one, no number goes here. The same
+ * gap still shapes `simpleReturn` and the invested line, more quietly.
  */
 export async function buildPerformanceView(
   deps: PortfolioViewDeps,
@@ -145,8 +161,7 @@ export async function buildPerformanceView(
       insufficientData: true,
       twr: null,
       twrAnnualized: null,
-      mwr: null,
-      mwrAnnualized: null,
+      lifetime: null,
       volatility: null,
       maxDrawdown: null,
       bestDay: null,
@@ -216,8 +231,7 @@ export async function buildPerformanceView(
       insufficientData: true,
       twr: null,
       twrAnnualized: null,
-      mwr: null,
-      mwrAnnualized: null,
+      lifetime: null,
       volatility: null,
       maxDrawdown: null,
       bestDay: null,
@@ -245,31 +259,6 @@ export async function buildPerformanceView(
   const drawdown = maxDrawdown(index);
   const bw = bestWorstDay(returns);
 
-  // XIRR: opening position as a contribution, then flows strictly after the
-  // first valuation date (first-day trades are already inside MV_start). Each
-  // flow converts at the rate of its own trade date, so the money-weighted
-  // return sees what the cash was actually worth when it moved.
-  const flows: Cashflow[] = [{ date: first.date, amount: first.marketValue.negated() }];
-  for (const row of series.rows) {
-    if (row.tradeDate <= first.date || row.tradeDate > last.date) continue;
-    if (row.type === "split") continue;
-    const conversion = series.fxLookup.rateOn(row.tradeDate, row.currency);
-    if (!conversion) {
-      fxIncomplete = true;
-      continue;
-    }
-    if (conversion.approximated) fxApproximated = true;
-    const amount = new Decimal(row.quantity).times(row.price).dividedBy(conversion.divisor);
-    if (row.type === "buy") flows.push({ date: row.tradeDate, amount: amount.negated() });
-    else flows.push({ date: row.tradeDate, amount }); // sell or dividend
-  }
-  flows.push({ date: last.date, amount: last.marketValue });
-  const mwrAnnual = xirr(flows);
-  const mwrPeriod =
-    mwrAnnual === null
-      ? null
-      : mwrAnnual.plus(1).pow(new Decimal(windowDays).dividedBy(365)).minus(1);
-
   // What the book has made outside this window and outside its open positions.
   //
   // Kept as two named parts rather than one total because only a caller holding
@@ -283,12 +272,21 @@ export async function buildPerformanceView(
   // Its honesty flags are OR'd into this view's: the contract on
   // `fxApproximated` and `fxIncomplete` is that a consumer making further
   // `fxLookup` calls folds its own in before publishing.
-  const lifetimeParts = computeLifetimeReturn(series.rows, series.fxLookup, series.targetCurrency);
+  const lifetimeParts = computeLifetimeReturn(
+    series.rows,
+    series.fxLookup,
+    series.targetCurrency,
+    last.date,
+  );
   if (lifetimeParts.approximated) fxApproximated = true;
   if (lifetimeParts.incomplete) fxIncomplete = true;
+  const unrealised = last.marketValue.minus(lifetimeParts.openCost);
+  const money = (d: Decimal) => ({ amount: d.toFixed(2), currency: series.targetCurrency });
   const lifetime = {
-    realised: { amount: lifetimeParts.realised.toFixed(2), currency: series.targetCurrency },
-    income: { amount: lifetimeParts.income.toFixed(2), currency: series.targetCurrency },
+    unrealised: money(unrealised),
+    realised: money(lifetimeParts.realised),
+    income: money(lifetimeParts.income),
+    total: money(unrealised.plus(lifetimeParts.realised).plus(lifetimeParts.income)),
   };
 
   const benchmarkIds = opts.benchmarks ?? DEFAULT_BENCHMARKS;
@@ -392,8 +390,6 @@ export async function buildPerformanceView(
     insufficientData: false,
     twr: toNum(twr),
     twrAnnualized: annualizedGate ? toNum(annualize(twr, windowDays)) : null,
-    mwr: toNum(mwrPeriod),
-    mwrAnnualized: annualizedGate ? toNum(mwrAnnual) : null,
     volatility: toNum(vol),
     maxDrawdown: toNum(drawdown),
     bestDay: bw ? { date: bw.best.date, value: Number(bw.best.value.toFixed(6)) } : null,

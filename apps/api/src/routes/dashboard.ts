@@ -188,28 +188,23 @@ export function dashboardRoutes(
     // sequential upstream calls on a cold self-host, per fetchBenchmarkSeries'
     // symbol-variant fallback. `cacheOnly` skips straight to `relative: null`
     // instead; the page must not hang or fail because a benchmark is cold.
-    const [
-      { body: portfolio, todayChange, totalReturn },
-      income,
-      diversification,
-      history,
-      perfYtd,
-    ] = await Promise.all([
-      buildPortfolioView(deps, userId, { currency: targetCurrency, book }),
-      buildDividendIncomeView(deps, userId, { currency: targetCurrency, book }),
-      buildDiversificationView(deps, userId, { currency: targetCurrency, book }),
-      buildPortfolioHistoryView(deps, userId, { range: "1Y", currency: targetCurrency, book }),
-      buildPerformanceView(deps, userId, {
-        range: "YTD",
-        currency: targetCurrency,
-        // One benchmark, not all: the defaults track each other closely
-        // enough that a second pin would smudge, and the overview draws no
-        // chart to justify the extra series.
-        benchmarks: [PRIMARY_BENCHMARK_ID],
-        benchmarksCacheOnly: true,
-        book,
-      }),
-    ]);
+    const [{ body: portfolio, todayChange }, income, diversification, history, perfYtd] =
+      await Promise.all([
+        buildPortfolioView(deps, userId, { currency: targetCurrency, book }),
+        buildDividendIncomeView(deps, userId, { currency: targetCurrency, book }),
+        buildDiversificationView(deps, userId, { currency: targetCurrency, book }),
+        buildPortfolioHistoryView(deps, userId, { range: "1Y", currency: targetCurrency, book }),
+        buildPerformanceView(deps, userId, {
+          range: "YTD",
+          currency: targetCurrency,
+          // One benchmark, not all: the defaults track each other closely
+          // enough that a second pin would smudge, and the overview draws no
+          // chart to justify the extra series.
+          benchmarks: [PRIMARY_BENCHMARK_ID],
+          benchmarksCacheOnly: true,
+          book,
+        }),
+      ]);
 
     const todayIso = new Date().toISOString().slice(0, 10);
     const currentMonth = todayIso.slice(0, 7);
@@ -235,6 +230,35 @@ export function dashboardRoutes(
     // `points` array, which the front page has no chart to draw.
     const benchmarkYtdTwr = perfYtd.benchmarks[0]?.twr ?? null;
 
+    // "Total return" now means what this book has made over its whole life:
+    // today's unrealised gain, plus every sale it has ever made, plus the
+    // income that actually landed after the tax taken off it.
+    //
+    // It used to mean unrealised gain plus GROSS dividends on the holdings
+    // still open — which counted income from positions it held while ignoring
+    // every position it had sold, and treated withheld tax as money received.
+    // On the reporting book that printed 8,203.66 where the broker said
+    // 23,355.74, and matched no figure the holder could find anywhere else.
+    //
+    // No percentage travels with it. A lifetime gain has no denominator anyone
+    // agrees on — today's cost basis, every krone ever put in, and average
+    // capital employed differ by more than a factor of two on this book, and
+    // the broker's own headline divides by the first, which flatters it. The
+    // rate lives on /performance, where it is a time-weighted return over a
+    // window the reader chose.
+    //
+    // Falls back to today's unrealised gain when the valuation series is too
+    // short to build — a book bought into this week has no series yet, and it
+    // also has nothing sold and nothing paid out, so its whole life IS that
+    // gain. Without this the headline blanks on exactly the books whose owners
+    // are checking it hourly.
+    const unified = portfolio.subtotalsByCurrency.find((s) => s.currency === targetCurrency);
+    const lifetimeReturn = perfYtd.lifetime
+      ? { amount: perfYtd.lifetime.total }
+      : unified
+        ? { amount: unified.gainLoss }
+        : null;
+
     return c.json({
       displayCurrency: targetCurrency,
       positions: portfolio.positions,
@@ -243,7 +267,7 @@ export function dashboardRoutes(
       fxStale: portfolio.fxStale ?? false,
       fxRatesAsOf: portfolio.fxRatesAsOf ?? null,
       todayChange,
-      totalReturn,
+      totalReturn: lifetimeReturn,
       ytdTwr,
       ytdTwrIncomplete,
       relative: perfYtd.relative ?? null,

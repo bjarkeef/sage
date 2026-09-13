@@ -73,7 +73,7 @@ const FIXTURE_DASHBOARD: DashboardDTO = {
   ],
   subtotalsByCurrency: [],
   todayChange: { amount: { amount: "45", currency: "USD" }, percent: 1.2 },
-  totalReturn: { amount: { amount: "500", currency: "USD" }, percent: 50 },
+  totalReturn: { amount: { amount: "500", currency: "USD" } },
   ytdTwr: 0.08,
   ytdTwrIncomplete: false,
   relative: null,

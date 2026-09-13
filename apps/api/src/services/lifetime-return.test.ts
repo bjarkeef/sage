@@ -48,7 +48,12 @@ function row(
 
 describe("computeLifetimeReturn", () => {
   it("reports nothing for a book that has never sold or been paid", () => {
-    const r = computeLifetimeReturn([row({ type: "buy", tradeDate: "2024-01-05" })], fx, "DKK");
+    const r = computeLifetimeReturn(
+      [row({ type: "buy", tradeDate: "2024-01-05" })],
+      fx,
+      "DKK",
+      "2026-01-01",
+    );
     expect(r.realised.toString()).toBe("0");
     expect(r.income.toString()).toBe("0");
   });
@@ -64,6 +69,7 @@ describe("computeLifetimeReturn", () => {
       ],
       fx,
       "DKK",
+      "2026-01-01",
     );
 
     // 1000 USD in at 0.140 = 7142.857...; 1200 USD out at 0.155 = 7741.935...
@@ -78,6 +84,7 @@ describe("computeLifetimeReturn", () => {
       ],
       fx,
       "DKK",
+      "2026-01-01",
     );
 
     // Same price both ways at one rate: the whole loss is the two fees.
@@ -99,6 +106,7 @@ describe("computeLifetimeReturn", () => {
       ],
       fx,
       "DKK",
+      "2026-01-01",
     );
 
     // 1400 DKK in; 220 USD out at 0.155 = 1419.35.
@@ -119,6 +127,7 @@ describe("computeLifetimeReturn", () => {
       ],
       fx,
       "DKK",
+      "2026-01-01",
     );
 
     // 20 gross less 7 withheld = 13 USD at 0.145.
@@ -134,6 +143,7 @@ describe("computeLifetimeReturn", () => {
       ],
       fx,
       "DKK",
+      "2026-01-01",
     );
 
     expect(Number(r.income)).toBeCloseTo(10 / 0.145, 2);
@@ -149,6 +159,7 @@ describe("computeLifetimeReturn", () => {
       ],
       fx,
       "DKK",
+      "2026-01-01",
     );
 
     expect(r.incomplete).toBe(true);

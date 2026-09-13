@@ -401,8 +401,9 @@ describeDb("GET /dashboard — totalReturn", () => {
   beforeAll(async () => {
     tdb = await withTestDb();
 
-    // Bought at 100, current quote 150 -> gain = (150-100)*10 = 500 on a
-    // 1000 basis (no dividends seeded), so totalReturn should be 500 / 50%.
+    // Bought at 100, current quote 150 -> gain = (150-100)*10 = 500. Nothing
+    // sold and no dividends seeded, so the book's whole life is that 500 and
+    // nothing else. No percentage travels with it — see the route for why.
     const provider = new FakeMarketDataProvider({
       quotes: { AAPL: quote("AAPL", "150", "149") },
     });
@@ -431,13 +432,13 @@ describeDb("GET /dashboard — totalReturn", () => {
     const res = await app.request("/dashboard?currency=USD", { headers: { cookie } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      totalReturn: { amount: { amount: string; currency: string }; percent: number } | null;
+      totalReturn: { amount: { amount: string; currency: string } } | null;
     };
     expect(body.totalReturn).not.toBeNull();
     expect(body.totalReturn!.amount.currency).toBe("USD");
     // 500 / 1000 basis = 50% (no dividends seeded here).
     expect(Number(body.totalReturn!.amount.amount)).toBeCloseTo(500, 0);
-    expect(body.totalReturn!.percent).toBeCloseTo(50, 1);
+    expect(body.totalReturn).not.toHaveProperty("percent");
   });
 });
 

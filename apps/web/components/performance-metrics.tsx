@@ -181,10 +181,14 @@ export function PerfMetrics({ data }: { data: PerformanceDTO }) {
       />
 
       <MetricCard
-        title="Money-weighted return"
-        definition="What your money actually earned, timing included. It differs from time-weighted whenever you added or sold during the period."
-        figure={data.mwrAnnualized != null ? formatRate(data.mwrAnnualized) : formatRate(data.mwr)}
-        sub={data.mwrAnnualized != null ? "annualized" : undefined}
+        title="Made since you started"
+        definition="Everything this book has made, over its whole life rather than the window above: what today's holdings have gained, every sale it has ever made, and the dividends and interest that actually landed after the tax taken off them. There is no percentage because a lifetime gain has no denominator anyone agrees on — today's cost, every krone ever put in, and average capital employed differ here by more than double. The rate is the time-weighted return above, over a window you picked."
+        figure={data.lifetime ? formatMoney(data.lifetime.total) : "—"}
+        sub={
+          data.lifetime
+            ? `${formatMoney(data.lifetime.unrealised)} held · ${formatMoney(data.lifetime.realised)} sold · ${formatMoney(data.lifetime.income)} paid out`
+            : undefined
+        }
       />
 
       <MetricCard
