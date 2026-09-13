@@ -1,8 +1,10 @@
 export {
   computePositions,
+  computeDisposals,
   comparePositionTransactions,
   type PositionTransaction,
   type Position,
+  type Disposal,
 } from "./positions";
 export {
   replayHoldings,

@@ -17,6 +17,7 @@ import {
 } from "@sage/core";
 import type { PortfolioViewDeps } from "./portfolio-view";
 import { findBasisMismatches, toBasisFindingBody } from "./basis-reconciliation";
+import { computeLifetimeReturn } from "./lifetime-return";
 import {
   buildValuationSeries,
   fetchBenchmarkSeries,
@@ -269,6 +270,27 @@ export async function buildPerformanceView(
       ? null
       : mwrAnnual.plus(1).pow(new Decimal(windowDays).dividedBy(365)).minus(1);
 
+  // What the book has made outside this window and outside its open positions.
+  //
+  // Kept as two named parts rather than one total because only a caller holding
+  // today's positions can finish the sum, and because the parts answer
+  // different questions: `realised` is every sale ever made, `income` the cash
+  // that actually landed after the tax taken off it. Sage reported neither, and
+  // called unrealised-plus-gross-dividends "total return" — on the reporting
+  // book 8,203.66, against a broker's 2,904.68 for the open positions and
+  // 23,355.74 for the book's life. A third number, equal to neither.
+  //
+  // Its honesty flags are OR'd into this view's: the contract on
+  // `fxApproximated` and `fxIncomplete` is that a consumer making further
+  // `fxLookup` calls folds its own in before publishing.
+  const lifetimeParts = computeLifetimeReturn(series.rows, series.fxLookup, series.targetCurrency);
+  if (lifetimeParts.approximated) fxApproximated = true;
+  if (lifetimeParts.incomplete) fxIncomplete = true;
+  const lifetime = {
+    realised: { amount: lifetimeParts.realised.toFixed(2), currency: series.targetCurrency },
+    income: { amount: lifetimeParts.income.toFixed(2), currency: series.targetCurrency },
+  };
+
   const benchmarkIds = opts.benchmarks ?? DEFAULT_BENCHMARKS;
   const fetched = await fetchBenchmarkSeries(
     deps.provider,
@@ -365,6 +387,7 @@ export async function buildPerformanceView(
     range,
     window: { from: first.date, to: last.date, days: windowDays },
     gain: { amount: gainDelta.toFixed(2), currency: series.targetCurrency },
+    lifetime,
     simpleReturn,
     insufficientData: false,
     twr: toNum(twr),

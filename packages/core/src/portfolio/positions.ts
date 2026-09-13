@@ -99,6 +99,112 @@ export interface Position {
 interface Lot {
   qty: Decimal;
   price: Money;
+  /** When these shares were acquired, so a disposal can price its cost at the
+   *  rate of the day it was actually paid rather than the day it was sold. */
+  acquiredOn: Date;
+}
+
+/**
+ * One sale matched against one lot it consumed.
+ *
+ * A single sell can span several lots bought on different days and, on a book
+ * that has changed broker or currency, in different currencies — the reporting
+ * book has three symbols bought in DKK and sold in USD. So cost and proceeds
+ * are kept apart, each with the date it belongs to, and subtracting them is
+ * left to a caller that holds exchange rates. Doing it here would either be
+ * wrong across currencies or silently drop the currency effect, which for a
+ * Danish holder of American shares is a real part of what was made.
+ */
+export interface Disposal {
+  symbol: string;
+  /** Shares sold out of this lot. */
+  quantity: Decimal;
+  /** Date of the sale. */
+  soldOn: Date;
+  /** Date the consumed shares were bought. */
+  acquiredOn: Date;
+  /** Sale price x quantity, less this lot's share of the sale's fee. */
+  proceeds: Money;
+  /** What those same shares cost to acquire, fee included. */
+  cost: Money;
+}
+
+/** Walk one symbol's history FIFO, returning both what survives and what was
+ *  sold along the way. One walk, so positions and disposals cannot disagree
+ *  about which lots a sale consumed. */
+function walkLots(
+  symbol: string,
+  txs: PositionTransaction[],
+): { lots: Lot[]; disposals: Disposal[] } {
+  const ordered = [...txs].sort(comparePositionTransactions);
+  const lots: Lot[] = [];
+  const disposals: Disposal[] = [];
+
+  for (const tx of ordered) {
+    if (tx.type === "dividend") continue;
+
+    if (tx.type === "split") {
+      for (const lot of lots) {
+        lot.qty = lot.qty.times(tx.quantity);
+        lot.price = lot.price.dividedBy(tx.quantity);
+      }
+      continue;
+    }
+
+    if (tx.type === "buy") {
+      lots.push({ qty: tx.quantity, price: lotCostPerShare(tx), acquiredOn: tx.tradeDate });
+      continue;
+    }
+
+    // A sale's own fee comes out of its proceeds, spread over the shares sold
+    // so a sale spanning two lots charges each its share.
+    const feePerShare =
+      tx.fee && !tx.fee.isZero() && !tx.quantity.isZero() && tx.fee.currency === tx.price.currency
+        ? tx.fee.dividedBy(tx.quantity)
+        : null;
+    const netPrice = feePerShare ? tx.price.minus(feePerShare) : tx.price;
+
+    let remaining = tx.quantity;
+    while (remaining.greaterThan(0)) {
+      const lot = lots[0];
+      if (!lot) throw new OversellError(symbol);
+      const taken = lot.qty.lessThanOrEqualTo(remaining) ? lot.qty : remaining;
+      disposals.push({
+        symbol,
+        quantity: taken,
+        soldOn: tx.tradeDate,
+        acquiredOn: lot.acquiredOn,
+        proceeds: netPrice.times(taken),
+        cost: lot.price.times(taken),
+      });
+      remaining = remaining.minus(taken);
+      if (lot.qty.lessThanOrEqualTo(taken)) lots.shift();
+      else lot.qty = lot.qty.minus(taken);
+    }
+  }
+
+  return { lots, disposals };
+}
+
+/**
+ * Every sale in the history, matched FIFO against the lots it consumed.
+ *
+ * Sage computed this nowhere. On the reporting book the sales it never looked
+ * at are the largest single component of what that book has actually made, so
+ * a "total return" built only from open positions was answering a much smaller
+ * question than the one being asked of it.
+ */
+export function computeDisposals(transactions: PositionTransaction[]): Disposal[] {
+  const bySymbol = new Map<string, PositionTransaction[]>();
+  for (const tx of transactions) {
+    const list = bySymbol.get(tx.symbol) ?? [];
+    list.push(tx);
+    bySymbol.set(tx.symbol, list);
+  }
+  const out: Disposal[] = [];
+  for (const [symbol, txs] of bySymbol) out.push(...walkLots(symbol, txs).disposals);
+  out.sort((a, b) => a.soldOn.getTime() - b.soldOn.getTime());
+  return out;
 }
 
 /**
@@ -123,38 +229,7 @@ export function computePositions(transactions: PositionTransaction[]): Position[
 
   const positions: Position[] = [];
   for (const [symbol, txs] of bySymbol) {
-    const ordered = [...txs].sort(comparePositionTransactions);
-    const lots: Lot[] = [];
-
-    for (const tx of ordered) {
-      if (tx.type === "dividend") continue;
-
-      if (tx.type === "split") {
-        for (const lot of lots) {
-          lot.qty = lot.qty.times(tx.quantity);
-          lot.price = lot.price.dividedBy(tx.quantity);
-        }
-        continue;
-      }
-
-      if (tx.type === "buy") {
-        lots.push({ qty: tx.quantity, price: lotCostPerShare(tx) });
-        continue;
-      }
-
-      let remaining = tx.quantity;
-      while (remaining.greaterThan(0)) {
-        const lot = lots[0];
-        if (!lot) throw new OversellError(symbol);
-        if (lot.qty.lessThanOrEqualTo(remaining)) {
-          remaining = remaining.minus(lot.qty);
-          lots.shift();
-        } else {
-          lot.qty = lot.qty.minus(remaining);
-          remaining = new Decimal(0);
-        }
-      }
-    }
+    const { lots } = walkLots(symbol, txs);
 
     const quantity = lots.reduce((sum, lot) => sum.plus(lot.qty), new Decimal(0));
     // Drop residual dust left when buy/sell quantities don't cancel to exact

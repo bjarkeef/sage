@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Decimal } from "../money/decimal";
 import { Money } from "../money/money";
-import { computePositions, type PositionTransaction } from "./positions";
+import { computePositions, computeDisposals, type PositionTransaction } from "./positions";
 import { OversellError } from "./errors";
 
 function buy(
@@ -333,5 +333,107 @@ describe("computePositions — acquisition fees", () => {
 
     expect(p!.quantity.toString()).toBe("5");
     expect(p!.costBasis.amount.toString()).toBe("0");
+  });
+});
+
+describe("computeDisposals", () => {
+  const withFee = (tx: PositionTransaction, amount: string, ccy = "USD"): PositionTransaction => ({
+    ...tx,
+    fee: Money.of(amount, ccy),
+  });
+
+  it("matches a sale against the oldest lot first", () => {
+    const d = computeDisposals([
+      buy("AAPL", "10", "100", "2024-01-01"),
+      buy("AAPL", "10", "150", "2024-02-01"),
+      sell("AAPL", "10", "200", "2024-06-01"),
+    ]);
+
+    expect(d).toHaveLength(1);
+    expect(d[0]!.quantity.toString()).toBe("10");
+    expect(d[0]!.cost.amount.toString()).toBe("1000");
+    expect(d[0]!.proceeds.amount.toString()).toBe("2000");
+    expect(d[0]!.acquiredOn).toEqual(new Date("2024-01-01"));
+    expect(d[0]!.soldOn).toEqual(new Date("2024-06-01"));
+  });
+
+  // One sale, two acquisition dates. Kept as two records because their costs
+  // were paid on different days, and a book reporting in another currency has
+  // to convert each at its own rate.
+  it("splits a sale that spans two lots, keeping each lot's own dates", () => {
+    const d = computeDisposals([
+      buy("AAPL", "10", "100", "2024-01-01"),
+      buy("AAPL", "10", "150", "2024-02-01"),
+      sell("AAPL", "15", "200", "2024-06-01"),
+    ]);
+
+    expect(d).toHaveLength(2);
+    expect(d.map((x) => x.quantity.toString())).toEqual(["10", "5"]);
+    expect(d.map((x) => x.cost.amount.toString())).toEqual(["1000", "750"]);
+    expect(d.map((x) => x.proceeds.amount.toString())).toEqual(["2000", "1000"]);
+    expect(d.map((x) => x.acquiredOn.toISOString().slice(0, 10))).toEqual([
+      "2024-01-01",
+      "2024-02-01",
+    ]);
+  });
+
+  it("takes the sale's fee out of its proceeds, shared across the lots it spans", () => {
+    const d = computeDisposals([
+      buy("AAPL", "10", "100", "2024-01-01"),
+      buy("AAPL", "10", "100", "2024-02-01"),
+      withFee(sell("AAPL", "15", "200", "2024-06-01"), "30"),
+    ]);
+
+    // 2 per share of fee: 10 shares carry 20 of it, the other 5 carry 10.
+    expect(d.map((x) => x.proceeds.amount.toString())).toEqual(["1980", "990"]);
+  });
+
+  it("counts the buy's fee in the cost it reports", () => {
+    const d = computeDisposals([
+      withFee(buy("AAPL", "10", "100", "2024-01-01"), "25"),
+      sell("AAPL", "10", "200", "2024-06-01"),
+    ]);
+
+    expect(d[0]!.cost.amount.toString()).toBe("1025");
+  });
+
+  it("carries a split through to the cost of shares sold afterwards", () => {
+    const d = computeDisposals([
+      buy("AAPL", "10", "100", "2024-01-01"),
+      { ...buy("AAPL", "2", "0", "2024-03-01"), type: "split" },
+      sell("AAPL", "20", "60", "2024-06-01"),
+    ]);
+
+    expect(d[0]!.quantity.toString()).toBe("20");
+    expect(d[0]!.cost.amount.toString()).toBe("1000");
+    expect(d[0]!.proceeds.amount.toString()).toBe("1200");
+  });
+
+  it("reports nothing for a book that has never sold", () => {
+    expect(computeDisposals([buy("AAPL", "10", "100", "2024-01-01")])).toEqual([]);
+  });
+
+  // Three of the reporting book's symbols were bought in DKK and sold in USD.
+  // Cost and proceeds stay in their own currencies precisely so this does not
+  // silently subtract one from the other.
+  it("keeps cost and proceeds in the currencies they were paid in", () => {
+    const d = computeDisposals([
+      buy("AAPL", "2", "1311.21", "2023-08-03", "DKK"),
+      sell("AAPL", "2", "203.8", "2024-08-05", "USD"),
+    ]);
+
+    expect(d[0]!.cost.currency).toBe("DKK");
+    expect(d[0]!.proceeds.currency).toBe("USD");
+  });
+
+  it("orders disposals by sale date across symbols", () => {
+    const d = computeDisposals([
+      buy("AAPL", "1", "10", "2024-01-01"),
+      sell("AAPL", "1", "12", "2024-09-01"),
+      buy("MSFT", "1", "20", "2024-01-01"),
+      sell("MSFT", "1", "25", "2024-03-01"),
+    ]);
+
+    expect(d.map((x) => x.symbol)).toEqual(["MSFT", "AAPL"]);
   });
 });
