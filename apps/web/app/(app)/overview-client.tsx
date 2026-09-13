@@ -92,16 +92,23 @@ export function OverviewClient() {
       </header>
 
       <section className="mb-8">
-        <OverviewHero value={lastValue} todayChange={dashboard.todayChange} scrubbed={scrubbed} />
-        <div className="mt-4">
-          <PortfolioChart
-            variant="ambient"
-            initialHistory={dashboard.history}
-            displayCurrency={dashboard.displayCurrency}
-            todayChange={dashboard.todayChange}
-            onScrub={setScrubbed}
-          />
-        </div>
+        {/* The numeral is handed to the chart rather than stacked above it, so
+            the figure, the range pills and the plot occupy one block. Apart,
+            with a gap between them, they read as three things. */}
+        <PortfolioChart
+          variant="ambient"
+          initialHistory={dashboard.history}
+          displayCurrency={dashboard.displayCurrency}
+          todayChange={dashboard.todayChange}
+          onScrub={setScrubbed}
+          header={
+            <OverviewHero
+              value={lastValue}
+              todayChange={dashboard.todayChange}
+              scrubbed={scrubbed}
+            />
+          }
+        />
         {prefs.statStrip && (
           <OverviewStatStrip
             ytdPercent={ytdPercent}

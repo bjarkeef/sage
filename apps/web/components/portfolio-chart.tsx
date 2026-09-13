@@ -11,6 +11,7 @@ import {
   type MouseEventParams,
 } from "lightweight-charts";
 import { createGainBand, type GainBandPoint } from "./charts/gain-band";
+import { createCurtain } from "./charts/curtain";
 import { useTheme } from "next-themes";
 import { SegmentedControl, Delta, Stat, StatStrip } from "@sage/ui";
 import { getPortfolioHistory } from "../lib/api";
@@ -20,7 +21,12 @@ import { AmbientChartSkeleton, HeroSkeleton } from "./skeletons";
 import { FxApproximatedCallout } from "./fx-approximated-callout";
 import { FxStaleCallout } from "./fx-stale-callout";
 import { FxUnavailableCallout } from "./fx-unavailable-callout";
-import { readChartTheme, baseChartOptions, areaSeriesOptions } from "../lib/chart-config";
+import {
+  readChartTheme,
+  baseChartOptions,
+  areaSeriesOptions,
+  withChartAlpha,
+} from "../lib/chart-config";
 import type { DashboardDTO, PortfolioHistoryDTO, PortfolioHistoryPoint } from "../lib/types";
 
 const RANGES = [
@@ -97,6 +103,12 @@ export interface PortfolioChartProps {
    *  the portfolio's value, which is not a trade this app makes for a flourish.
    *  The mockup could do it because it had no server render. */
   onScrub?: (point: PortfolioHistoryPoint | null) => void;
+  /** Rendered on the same row as the range control. The overview passes its
+   *  hero numeral here so the figure, the range pills and the plot read as one
+   *  object — apart, with a gap between them, they read as three stacked
+   *  blocks, which is what made this feel like a number sitting above a
+   *  picture rather than one instrument. */
+  header?: React.ReactNode;
   initialHistory: PortfolioHistoryDTO;
   displayCurrency: string | null;
   todayChange: DashboardDTO["todayChange"];
@@ -111,6 +123,7 @@ export function PortfolioChart({
   todayChange,
   variant = "default",
   onScrub,
+  header,
 }: PortfolioChartProps) {
   const ambient = variant === "ambient";
   const [range, setRange] = React.useState(INITIAL_RANGE);
@@ -171,7 +184,12 @@ export function PortfolioChart({
   // and rebuilds the chart, and replaying the draw every time would be a
   // stutter rather than a welcome. See DESIGN.md, Motion.
   const hasEnteredRef = React.useRef(false);
+  /** 0-1 sweep for the entrance curtain; 1 means fully revealed. */
   const revealRef = React.useRef(1);
+  /** Where the hover veil starts, as a fraction of pane width; null when the
+   *  pointer is off the plot. */
+  const veilRef = React.useRef<number | null>(null);
+  const requestChartUpdateRef = React.useRef<(() => void) | null>(null);
 
   React.useEffect(() => {
     if (!containerRef.current || chartData.length === 0) return;
@@ -224,7 +242,12 @@ export function PortfolioChart({
             lineStyle: LineStyle.Dashed,
             lastValueVisible: false,
             priceLineVisible: false,
-            crosshairMarkerVisible: false,
+            // A dot on this line as well as on the value line: the readout
+            // below shows both figures, so both should be pinned on the chart.
+            crosshairMarkerVisible: true,
+            crosshairMarkerRadius: 3,
+            crosshairMarkerBorderColor: theme.background,
+            crosshairMarkerBackgroundColor: withAlpha(theme.text, 0.85),
           })
         : null;
     investedSeries?.setData(investedData);
@@ -235,7 +258,25 @@ export function PortfolioChart({
           points: () => bandRef.current,
           gainFill: () => withAlpha(theme.gain, 0.15),
           lossFill: () => withAlpha(theme.loss, 0.14),
-          progress: () => revealRef.current,
+        }),
+      );
+
+      // The entrance sweep, and the hover veil. Same rectangle, different jobs:
+      // one hides what has not been drawn yet, the other dims what comes after
+      // the pointer.
+      series.attachPrimitive(
+        createCurtain({
+          from: () => (revealRef.current >= 1 ? null : revealRef.current),
+          fill: () => theme.background,
+          onAttach: (requestUpdate) => {
+            requestChartUpdateRef.current = requestUpdate;
+          },
+        }),
+      );
+      series.attachPrimitive(
+        createCurtain({
+          from: () => veilRef.current,
+          fill: () => withChartAlpha(theme.background, 0.62),
         }),
       );
     }
@@ -262,47 +303,28 @@ export function PortfolioChart({
 
     const finish = () => {
       entranceCompleted = true;
-      series.setData(chartData);
-      investedSeries?.setData(investedData);
-      series.priceScale().setAutoScale(true);
       revealRef.current = 1;
+      requestChartUpdateRef.current?.();
     };
 
     if (!hasEnteredRef.current && !prefersReduced && chartData.length > 8) {
       hasEnteredRef.current = true;
-      // Every day the chart will ever show is present from the first frame;
-      // the ones that have not been reached yet are WHITESPACE — a time with no
-      // value, which holds its slot on the axis and draws nothing.
-      //
-      // The obvious implementation, feeding a growing slice, does not work: the
-      // time scale re-fits to whatever it has, so a chart two days in spans two
-      // days, and the whole drawing slides and rescales under the reader as it
-      // fills. Pinning the logical range each frame does not hold it either.
-      // Whitespace fixes the axis at its final extent from the start, so the
-      // only thing that moves is the line, which is the point.
-      series.priceScale().setAutoScale(false);
+      // The series already hold ALL their data and never change during the
+      // entrance — only the curtain moves. That is the whole fix: feeding a
+      // growing slice made lightweight-charts re-anchor the visible range to
+      // the newest bars every frame, so the drawing appeared crammed at the
+      // right edge at the wrong bar spacing and expanded leftwards. It read as
+      // the chart flying in from the right and snapping into place.
       revealRef.current = 0;
       const start = performance.now();
       const DURATION_MS = 900;
       const step = (now: number) => {
         const t = Math.min(1, (now - start) / DURATION_MS);
-        // Ease IN and out, not just out. `1 - (1-t)^3` puts 58% of the line on
-        // screen in the first quarter of the time and spends the last half
-        // covering 12% — it reads as a snap followed by a crawl, which is what
-        // made this feel cheap rather than considered. Symmetric easing draws
-        // like a hand moving across the page: slow to start, quickest in the
-        // middle, settling at the end.
-        const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-        const k = Math.max(2, Math.ceil(eased * chartData.length));
-        series.setData([
-          ...chartData.slice(0, k),
-          ...chartData.slice(k).map((p) => ({ time: p.time })),
-        ]);
-        investedSeries?.setData([
-          ...investedData.slice(0, k),
-          ...investedData.slice(k).map((p) => ({ time: p.time })),
-        ]);
-        revealRef.current = eased;
+        // Ease in AND out. `1 - (1-t)^3` put 58% of the drawing on screen in
+        // the first quarter of the time and spent the second half covering the
+        // last 12% — a snap followed by a crawl.
+        revealRef.current = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        requestChartUpdateRef.current?.();
         if (t < 1) {
           raf = requestAnimationFrame(step);
         } else {
@@ -321,15 +343,6 @@ export function PortfolioChart({
       revealRef.current = 1;
     }
 
-    // No hover bubble on this chart, deliberately. The readout above follows the
-    // crosshair now — bigger, in a fixed place the eye already knows, and it
-    // carries money in and the gain as well as the value. A bubble under the
-    // pointer would repeat the value and the date a few hundred pixels below
-    // where they are already being shown.
-    //
-    // The asset and performance charts keep theirs: neither has a headline that
-    // tracks the crosshair, so there the bubble is the only readout.
-
     // Drive the readout from the crosshair. `param.time` is the series time —
     // the ISO date these points are keyed by — so the lookup is exact rather
     // than a nearest-x search.
@@ -337,6 +350,9 @@ export function PortfolioChart({
     const onCrosshair = (param: MouseEventParams) => {
       const t = param.time;
       const hit = typeof t === "string" ? (pointByDate.get(t) ?? null) : null;
+      const width = containerRef.current?.clientWidth ?? 0;
+      veilRef.current = hit && param.point && width > 0 ? param.point.x / width : null;
+      requestChartUpdateRef.current?.();
       setScrubbed((prev) => {
         if (prev?.date === hit?.date) return prev;
         onScrubRef.current?.(hit);
@@ -360,6 +376,8 @@ export function PortfolioChart({
       if (!entranceCompleted) hasEnteredRef.current = false;
       resizeObserver.disconnect();
       chart.unsubscribeCrosshairMove(onCrosshair);
+      veilRef.current = null;
+      requestChartUpdateRef.current = null;
       setScrubbed(null);
       onScrubRef.current?.(null);
       chart.remove();
@@ -370,9 +388,26 @@ export function PortfolioChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartData, investedData, resolvedTheme, ambient]);
 
-  if (isLoading) return ambient ? <AmbientChartSkeleton /> : <HeroSkeleton />;
+  // The header outlives the chart. It carries the owner's hero numeral, and a
+  // book with no price history yet — a first day, or a first import — still has
+  // a value to show. Returning early without it made the largest figure on the
+  // page disappear on exactly the accounts least able to spare it; there are
+  // tests for this in `overview-client.test.tsx` because it has happened before.
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {header}
+        {ambient ? <AmbientChartSkeleton /> : <HeroSkeleton />}
+      </div>
+    );
+  }
   if (!data || data.points.length === 0) {
-    return <p className="text-muted-foreground text-sm">Not enough data for a chart yet.</p>;
+    return (
+      <div className="space-y-4">
+        {header}
+        <p className="text-muted-foreground text-sm">Not enough data for a chart yet.</p>
+      </div>
+    );
   }
 
   const lastPoint = data.points[data.points.length - 1]!;
@@ -389,7 +424,12 @@ export function PortfolioChart({
 
   return (
     <div className="space-y-4">
-      <div className={`flex items-center gap-4 ${ambient ? "justify-end" : "justify-between"}`}>
+      <div
+        className={`flex flex-wrap items-end gap-x-4 gap-y-2 ${
+          ambient && !header ? "justify-end" : "justify-between"
+        }`}
+      >
+        {header}
         {!ambient && <span className="label-caps text-muted-foreground">Net worth</span>}
         <SegmentedControl
           options={RANGES}
