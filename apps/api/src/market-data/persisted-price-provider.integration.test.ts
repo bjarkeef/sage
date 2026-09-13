@@ -269,11 +269,27 @@ describeDb("PersistedPriceProvider", () => {
   it("serves partial stored history immediately rather than blocking", async () => {
     // Stored range does not reach back to the requested `from`.
     await store.writeBars("HIST3", [bar(dayOffset(-2), "9")], new Date(NOW));
+
+    // The refill is HELD open for the duration of the call. Without this the
+    // test is a race between two round trips — the read that serves the
+    // response, and the background write behind it — and whichever wins
+    // decides the assertion. It went green on a laptop and red on CI, where
+    // the write landed first and the response carried a bar the refill had
+    // only just fetched. Holding the gate states the actual claim: the
+    // response does not wait for upstream, so it cannot contain upstream's
+    // answer.
+    let release!: () => void;
+    upstream.barGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     upstream.bars = [bar(dayOffset(-30), "1")];
 
     const bars = await provider.getHistoricalPrices("HIST3", dayOffset(-60), dayOffset(0));
 
     expect(bars.map((b) => b.close.amount.toString())).toEqual(["9"]);
+
+    release();
+    await drainPriceRefreshesForTests();
   });
 
   it("serves stored history when upstream fails", async () => {
