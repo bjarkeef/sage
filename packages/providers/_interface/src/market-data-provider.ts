@@ -33,6 +33,19 @@ export interface HistoryOptions {
    *  against there. Without the cold-path refill, a symbol that only ever
    *  arrives via `cacheOnly` requests could never warm at all. */
   cacheOnly?: boolean;
+  /** Also return bars back to this date when the store already holds them, but
+   *  judge coverage — and therefore whether to reach upstream — by `from`
+   *  alone. Absence before `from` is not a gap; it is history that may simply
+   *  not exist.
+   *
+   *  For a caller that needs a bar from BEFORE its window in order to
+   *  forward-fill the first day inside it. Window starts are calendar dates
+   *  and bars fall on trading days, so a range opening on a weekend or a
+   *  holiday has no bar of its own to start from. Widening `from` instead
+   *  would work, and would also tell the store it is missing two weeks it was
+   *  never meant to have — every chart load would then fire a background
+   *  refresh per symbol. */
+  seedFrom?: Date;
 }
 
 /**
