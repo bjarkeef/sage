@@ -84,7 +84,18 @@ function withAlpha(color: string, alpha: number): string {
 export interface PortfolioChartProps {
   /** The day under the pointer, or null on the way out. Lets an owner render
    *  the hero numeral from the chart, so the two are one instrument rather than
-   *  a figure stacked above a picture. */
+   *  a figure stacked above a picture.
+   *
+   *  Deliberately NOT fired during the entrance. The numeral was briefly made
+   *  to travel from the range's opening value to today's, as the mockup did —
+   *  but the overview is server-rendered, so today's figure is in the HTML and
+   *  on screen before React is alive. Measured: 343,029 painted at 209ms, then
+   *  the chart mounted and pulled it back to 279,435. The number was right,
+   *  then snapped backwards and re-earned itself, which reads as a fault.
+   *
+   *  Starting it lower would mean shipping a figure in the SSR HTML that is not
+   *  the portfolio's value, which is not a trade this app makes for a flourish.
+   *  The mockup could do it because it had no server render. */
   onScrub?: (point: PortfolioHistoryPoint | null) => void;
   initialHistory: PortfolioHistoryDTO;
   displayCurrency: string | null;
@@ -204,8 +215,12 @@ export function PortfolioChart({
     const investedSeries =
       investedData.length > 0
         ? chart.addSeries(LineSeries, {
-            color: withAlpha(theme.text, 0.55),
-            lineWidth: 1,
+            // Brighter and thicker than the 0.55/1px it was. At the old weight
+            // the line read as dotted noise along the floor of the pane rather
+            // than as the series the whole gain band is measured from — and a
+            // band whose floor you cannot see is just a fill.
+            color: withAlpha(theme.text, 0.85),
+            lineWidth: 2,
             lineStyle: LineStyle.Dashed,
             lastValueVisible: false,
             priceLineVisible: false,
@@ -271,7 +286,13 @@ export function PortfolioChart({
       const DURATION_MS = 900;
       const step = (now: number) => {
         const t = Math.min(1, (now - start) / DURATION_MS);
-        const eased = 1 - Math.pow(1 - t, 3);
+        // Ease IN and out, not just out. `1 - (1-t)^3` puts 58% of the line on
+        // screen in the first quarter of the time and spends the last half
+        // covering 12% — it reads as a snap followed by a crawl, which is what
+        // made this feel cheap rather than considered. Symmetric easing draws
+        // like a hand moving across the page: slow to start, quickest in the
+        // middle, settling at the end.
+        const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
         const k = Math.max(2, Math.ceil(eased * chartData.length));
         series.setData([
           ...chartData.slice(0, k),
