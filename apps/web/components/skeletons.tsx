@@ -111,17 +111,26 @@ export function HorizonSkeleton() {
   return (
     <div role="status" aria-label="Loading portfolio" className="space-y-5">
       <div className="flex flex-col gap-5">
-        <Skeleton className="h-[clamp(48px,8vw,108px)] w-[min(560px,80%)]" />
-        <Skeleton className="h-6 w-[min(420px,70%)]" />
+        {/* `horizon-num`'s own clamp times its 0.94 line-height — the figure
+            measures 102px at 1440, not the 108px the clamp alone suggests. */}
+        <Skeleton className="h-[calc(clamp(48px,8vw,108px)*0.94)] w-[min(560px,80%)]" />
+        {/* text-lg/relaxed: 18px x 1.625. */}
+        <Skeleton className="h-[29px] w-[min(420px,70%)]" />
       </div>
-      {/* Out through the column's gutters, exactly as the plot is. */}
-      <Skeleton className="-mx-4 h-65 w-auto rounded-none sm:-mx-8" />
+      {/* Out through the column's gutters, exactly as the plot is — and rounded
+          like every other placeholder on the page, because a square-cornered
+          slab among rounded ones reads as the one thing that failed to load. */}
+      <Skeleton className="-mx-4 h-65 w-auto rounded-card sm:-mx-8" />
       <div className="grid grid-flow-row gap-6 pt-1 sm:grid-flow-col sm:auto-cols-fr sm:gap-0">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="space-y-2 sm:px-6 sm:first:pl-0">
-            <Skeleton className="h-3 w-20" />
+          // 85px + the strip's own pt-1 is the 89px a `size="md"` Stat with a
+          // context line actually occupies. Measured, not estimated: the drift
+          // between guessed proportions and real ones was 12px, which is a
+          // visible jump on the one path this component exists to smooth.
+          <div key={i} className="space-y-2 sm:min-h-[85px] sm:px-6 sm:first:pl-0">
+            <Skeleton className="h-4 w-20" />
             <Skeleton className="h-8 w-36" />
-            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-4 w-28" />
           </div>
         ))}
       </div>

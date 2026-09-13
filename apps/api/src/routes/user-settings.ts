@@ -44,6 +44,12 @@ const overviewPrefsSchema = z
 
 const updateSchema = z
   .object({
+    // The display name, which is what the overview greets you by. better-auth
+    // owns the column but gates its own `update-user` endpoint (403 even for a
+    // valid, authenticated no-op write), and this route already authenticates
+    // and already writes this table — so the name lives with every other
+    // setting rather than behind a second mechanism.
+    name: z.string().trim().min(1).max(80),
     displayCurrency: z.string().length(3).nullable(),
     overviewPrefs: overviewPrefsSchema,
     dividendTaxRate: z.number().min(0).max(100).nullable(),
@@ -74,6 +80,7 @@ export function userSettingsRoutes(db: Database) {
     const userId = c.get("user").id;
     const [row] = await db
       .select({
+        name: user.name,
         displayCurrency: user.displayCurrency,
         overviewPrefs: user.overviewPrefs,
         dividendTaxRate: user.dividendTaxRate,
@@ -90,6 +97,7 @@ export function userSettingsRoutes(db: Database) {
       .where(eq(portfolio.id, portfolioId));
 
     return c.json({
+      name: row?.name ?? "",
       displayCurrency: row?.displayCurrency ?? null,
       overviewPrefs: fillDefaults(row?.overviewPrefs),
       dividendTaxRate: toNullableNumber(row?.dividendTaxRate),
@@ -109,6 +117,7 @@ export function userSettingsRoutes(db: Database) {
 
     const [existing] = await db
       .select({
+        name: user.name,
         displayCurrency: user.displayCurrency,
         overviewPrefs: user.overviewPrefs,
         dividendTaxRate: user.dividendTaxRate,
@@ -117,6 +126,8 @@ export function userSettingsRoutes(db: Database) {
       .from(user)
       .where(eq(user.id, userId))
       .limit(1);
+
+    const name = body.name !== undefined ? body.name : (existing?.name ?? "");
 
     const mergedPrefs: Partial<OverviewPrefs> | null | undefined = body.overviewPrefs
       ? { ...(existing?.overviewPrefs ?? {}), ...body.overviewPrefs }
@@ -140,6 +151,7 @@ export function userSettingsRoutes(db: Database) {
     await db
       .update(user)
       .set({
+        name,
         displayCurrency,
         overviewPrefs: mergedPrefs ?? null,
         dividendTaxRate: dividendTaxRate == null ? null : dividendTaxRate.toFixed(2),
@@ -168,6 +180,7 @@ export function userSettingsRoutes(db: Database) {
     }
 
     return c.json({
+      name,
       displayCurrency,
       overviewPrefs: fillDefaults(mergedPrefs),
       dividendTaxRate,

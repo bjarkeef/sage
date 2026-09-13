@@ -440,6 +440,8 @@ export interface OverviewPrefs {
 }
 
 export interface UserSettingsDTO {
+  /** Display name — what the overview greets you by. */
+  name: string;
   displayCurrency: string | null;
   overviewPrefs: OverviewPrefs;
   dividendTaxRate: number | null;

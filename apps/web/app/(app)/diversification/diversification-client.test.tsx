@@ -14,6 +14,7 @@ import { DiversificationClient } from "./diversification-client";
 import * as api from "../../../lib/api";
 
 const FIXTURE_SETTINGS: UserSettingsDTO = {
+  name: "Test User",
   displayCurrency: "EUR",
   overviewPrefs: {
     brief: true,

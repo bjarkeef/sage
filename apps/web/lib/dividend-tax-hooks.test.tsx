@@ -14,6 +14,7 @@ vi.mock("./api", () => ({
 }));
 
 const SETTINGS: UserSettingsDTO = {
+  name: "Test User",
   displayCurrency: "DKK",
   overviewPrefs: {
     brief: true,

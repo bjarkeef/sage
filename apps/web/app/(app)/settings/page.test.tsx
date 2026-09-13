@@ -59,6 +59,7 @@ function settings(
   dividendTaxRate: number | null = null,
 ): UserSettingsDTO {
   return {
+    name: "Test User",
     displayCurrency: null,
     overviewPrefs: {
       brief: true,

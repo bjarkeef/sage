@@ -13,6 +13,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     settings = await getUserSettings();
   } catch {
     settings = {
+      name: "Test User",
       displayCurrency: null,
       overviewPrefs: {
         brief: true,

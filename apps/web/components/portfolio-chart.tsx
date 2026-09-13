@@ -629,7 +629,11 @@ export function PortfolioChart({
           // Over the plot, not above it, and faded until wanted. The window is
           // the only control this page has; it should be reachable without
           // being the second thing you read.
-          <div className="pointer-events-none absolute inset-x-4 bottom-3 flex sm:inset-x-8">
+          // `z-10` is load-bearing, not decoration. lightweight-charts gives its
+          // two canvases their own stacking, so a later sibling still painted
+          // UNDER them: `elementFromPoint` on a pill returned CANVAS and the
+          // range control could not be clicked at all. Shipped broken once.
+          <div className="pointer-events-none absolute inset-x-4 bottom-3 z-10 flex sm:inset-x-8">
             <SegmentedControl
               options={RANGES}
               value={range}
