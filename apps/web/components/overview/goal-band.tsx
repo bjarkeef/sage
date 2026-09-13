@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getGoal } from "../../lib/api";
 import { qk } from "../../lib/query/keys";
 import { formatMoney } from "../../lib/format";
+import { Skeleton } from "@sage/ui";
 
 /**
  * What the book is actually for, on the page you land on.
@@ -18,10 +19,34 @@ import { formatMoney } from "../../lib/format";
  * because it finishes the same sentence.
  */
 export function GoalBand() {
-  const { data } = useQuery({ queryKey: qk.goal(), queryFn: getGoal, staleTime: 300_000 });
+  const { data, isPending } = useQuery({
+    queryKey: qk.goal(),
+    queryFn: getGoal,
+    staleTime: 300_000,
+  });
 
   const goal = data?.goal ?? null;
   const result = data?.result ?? null;
+
+  // In flight. Two things go wrong without this branch, and the second is the
+  // worse one: the band occupies no height until the query lands and then
+  // pushes the whole page down, AND `!goal` is indistinguishable from "no goal
+  // set", so a reader who HAS a goal was told to go and set one for as long as
+  // the request took.
+  //
+  // Same height as both real states, so nothing moves whichever one arrives.
+  if (isPending) {
+    return (
+      <div
+        role="status"
+        aria-label="Loading goal progress"
+        className="flex flex-col gap-3 border-t border-hairline-faint pt-5"
+      >
+        <Skeleton className="h-5 w-[min(440px,70%)]" />
+        <Skeleton className="h-[3px] w-full rounded-full" />
+      </div>
+    );
+  }
 
   // No goal set, or not enough history to project one. An empty track reads as
   // a failure state; an invitation reads as the next thing to do. This is the
@@ -29,7 +54,7 @@ export function GoalBand() {
   // render a zeroed bar.
   if (!goal || !result) {
     return (
-      <div className="border-t border-hairline-faint pt-5">
+      <div className="flex min-h-[42px] flex-col justify-center border-t border-hairline-faint pt-5">
         <p className="text-sm text-muted-foreground">
           <Link href="/goal" className="text-foreground hover:underline">
             Set a goal

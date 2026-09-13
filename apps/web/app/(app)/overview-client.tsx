@@ -78,7 +78,7 @@ export function OverviewClient() {
           used to live here — a greeting, a ticker comment and a market-hours
           note stacked in a 60px band — now sits under the figure as one
           sentence, which is the order a person actually reads them in. */}
-      <header className="mb-10 flex flex-wrap items-center justify-between gap-4 sm:mb-14">
+      <header className="mb-12 flex flex-wrap items-center justify-between gap-4 pt-6 sm:mb-16 sm:pt-12">
         <MarketEyebrow />
         <div className="flex flex-wrap items-center gap-3 opacity-45 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 sm:shrink-0">
           <CurrencyPicker initialCurrency={currency} />

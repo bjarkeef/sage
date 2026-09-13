@@ -98,6 +98,37 @@ export function AmbientChartSkeleton() {
   );
 }
 
+/**
+ * The overview's own shape: eyebrow, figure, the line under it, a full-bleed
+ * plot and the three-figure ledger.
+ *
+ * Every measurement here is the real one — `horizon-num`'s clamp resolves to a
+ * 108px line at desktop width, the plot is `h-65`, the ledger's rows are what
+ * `Stat` at `size="md"` occupies — because a skeleton whose proportions are
+ * approximate is a layout shift with extra steps.
+ */
+export function HorizonSkeleton() {
+  return (
+    <div role="status" aria-label="Loading portfolio" className="space-y-5">
+      <div className="flex flex-col gap-5">
+        <Skeleton className="h-[clamp(48px,8vw,108px)] w-[min(560px,80%)]" />
+        <Skeleton className="h-6 w-[min(420px,70%)]" />
+      </div>
+      {/* Out through the column's gutters, exactly as the plot is. */}
+      <Skeleton className="-mx-4 h-65 w-auto rounded-none sm:-mx-8" />
+      <div className="grid grid-flow-row gap-6 pt-1 sm:grid-flow-col sm:auto-cols-fr sm:gap-0">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="space-y-2 sm:px-6 sm:first:pl-0">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-8 w-36" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Mirrors the overview hero layout so loading causes no layout shift. */
 export function HeroSkeleton() {
   return (
@@ -169,16 +200,20 @@ export function StatStripSkeleton() {
 export function OverviewPageSkeleton() {
   return (
     <div data-skeleton-shape="overview">
-      <header className="mb-8 space-y-2">
-        <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-6 w-80" />
-        <Skeleton className="mt-2 h-4 w-44" />
+      {/* One eyebrow and the two quiet controls — the greeting is no longer up
+          here, so neither is its placeholder. */}
+      <header className="mb-12 flex items-center justify-between pt-6 sm:mb-16 sm:pt-12">
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-4 w-32" />
       </header>
 
-      <section className="mb-8">
-        <Skeleton className="h-11 w-52" />
-        <div className="mt-4">
-          <AmbientChartSkeleton />
+      <section className="mb-14 sm:mb-20">
+        <HorizonSkeleton />
+        {/* The goal band's own reserved height, so the shape below it does not
+            move when the goal query lands. */}
+        <div className="mt-5 space-y-3 border-t border-hairline-faint pt-5">
+          <Skeleton className="h-5 w-[min(440px,70%)]" />
+          <Skeleton className="h-[3px] w-full rounded-full" />
         </div>
       </section>
 
