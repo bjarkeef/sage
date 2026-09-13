@@ -24,6 +24,9 @@ export interface ChartTheme {
   line: string;
   text: string;
   card: string;
+  /** The page ground behind the chart. The entrance curtain paints with it,
+   *  so it has to be the real background rather than the card wash. */
+  background: string;
   comparison1: string;
   comparison2: string;
   hairline: string;
@@ -43,6 +46,7 @@ export function readChartTheme(): ChartTheme {
     line: resolve("--chart-line"),
     text: resolve("--muted-foreground"),
     card: resolve("--card"),
+    background: resolve("--background"),
     comparison1: resolve("--chart-comparison-1"),
     comparison2: resolve("--chart-comparison-2"),
     hairline: resolve("--hairline"),
@@ -53,6 +57,20 @@ export function readChartTheme(): ChartTheme {
     marker: resolve("--chart-marker"),
     markerHalo: resolve("--chart-marker-halo"),
   };
+}
+
+/** Apply an alpha to a resolved CSS colour. Theme tokens resolve to hex or to
+ *  rgb()/rgba(), so both are handled — a bare hex suffix on an rgba string is
+ *  invalid CSS and is silently ignored by canvas. */
+export function withChartAlpha(color: string, alpha: number): string {
+  if (color.startsWith("#")) {
+    return `${color}${Math.round(alpha * 255)
+      .toString(16)
+      .padStart(2, "0")}`;
+  }
+  const nums = color.match(/[\d.]+/g);
+  if (!nums || nums.length < 3) return color;
+  return `rgba(${nums[0]}, ${nums[1]}, ${nums[2]}, ${alpha})`;
 }
 
 export function baseChartOptions(
@@ -80,7 +98,15 @@ export function baseChartOptions(
       horzLines: { visible: true, color: theme.hairline },
     },
     crosshair: {
-      vertLine: { color: theme.hairline, labelVisible: false },
+      // `--hairline` is alpha .07 — a card border, invisible as a crosshair.
+      // The line was configured and drawn all along and still read as "there is
+      // no crosshair", which is the same thing as not having one.
+      vertLine: {
+        color: withChartAlpha(theme.text, 0.45),
+        width: 1,
+        style: LineStyle.Dashed,
+        labelVisible: false,
+      },
       horzLine: { visible: false, labelVisible: false },
     },
     timeScale: {

@@ -7,12 +7,14 @@ import {
   attachHoverTooltip,
   baseChartOptions,
   comparisonSeriesOptions,
+  withChartAlpha,
 } from "./chart-config";
 
 const theme = {
   line: "#3d6a4d",
   border: "#333333",
   text: "#888888",
+  background: "#0d0d0c",
   card: "#ffffff",
   comparison1: "#918c80",
   comparison2: "#93b0a0",
@@ -61,7 +63,12 @@ describe("chart-config", () => {
     expect(opts.timeScale?.borderVisible).toBe(false);
     expect(opts.rightPriceScale?.visible).toBe(false);
     expect(opts.rightPriceScale?.scaleMargins).toEqual({ top: 0.12, bottom: 0.12 });
-    expect(opts.crosshair?.vertLine?.color).toBe(theme.hairline);
+    // NOT the hairline. `--hairline` is alpha .07 — correct for a card border,
+    // and as a crosshair it is drawn and invisible, which is the same thing as
+    // having none. It has to be legibly stronger than the grid it crosses.
+    expect(opts.crosshair?.vertLine?.color).not.toBe(theme.hairline);
+    expect(opts.crosshair?.vertLine?.color).toBe(withChartAlpha(theme.text, 0.45));
+    expect(opts.crosshair?.vertLine?.style).toBe(LineStyle.Dashed);
     expect(opts.crosshair?.vertLine?.labelVisible).toBe(false);
     expect(opts.crosshair?.horzLine?.visible).toBe(false);
     expect(opts.handleScroll).toEqual({ vertTouchDrag: false });
