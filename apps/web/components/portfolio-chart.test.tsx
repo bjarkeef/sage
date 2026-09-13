@@ -274,4 +274,26 @@ describe("PortfolioChart", () => {
     expect(screen.queryByRole("button", { name: /S&P 500/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /MSCI World/ })).not.toBeInTheDocument();
   });
+
+  // Reported by the maintainer: "gain is just the same always, even when
+  // changing to YTD". It was — every figure in this block was a lifetime one
+  // read off the last day, so the range control redrew the picture and moved
+  // no number at all.
+  //
+  // The fixture is chosen so the two candidate answers differ. Value rises
+  // 10,000 -> 11,000 across the range, but money in rises 9,000 -> 9,500, so
+  // 500 of that 1,000 was paid in, not earned. A figure built from the value
+  // delta — which is what `changeAmount` in this fixture is — would read
+  // +$1,000.00 and credit the owner for making a deposit. That is the exact
+  // error benchmarks were removed from this chart over.
+  it("credits the range with what was earned in it, not with what was paid in", async () => {
+    renderWithClient(
+      <PortfolioChart initialHistory={history} displayCurrency={null} todayChange={null} />,
+      makeTestQueryClient(),
+    );
+    const cell = await screen.findByTitle(/how much of the gain was made/i);
+    expect(cell).toHaveTextContent("Past year");
+    expect(cell).toHaveTextContent("+$500.00");
+    expect(cell).not.toHaveTextContent("+$1,000.00");
+  });
 });

@@ -48,6 +48,17 @@ const RANGE_LABEL: Record<string, string> = {
   ALL: "since inception",
 };
 
+/** Caps label for the range-scoped cell in the strip. Separate from
+ *  `RANGE_LABEL` because "Past year to date" does not read. */
+const RANGE_STAT_LABEL: Record<string, string> = {
+  "1W": "Past week",
+  "1M": "Past month",
+  "3M": "Past 3 months",
+  YTD: "Year to date",
+  "1Y": "Past year",
+  ALL: "Since inception",
+};
+
 const INITIAL_RANGE = "1Y";
 
 /* Benchmark overlays were removed from this chart on 2026-09-10, deliberately.
@@ -502,6 +513,23 @@ export function PortfolioChart({
   const gainPercent = investedShown > 0 ? (gainAmount / investedShown) * 100 : null;
   const rangeLabel = RANGE_LABEL[range] ?? range;
 
+  // How much of that gain was made inside the selected range. Every other
+  // figure in this block is a lifetime one measured on the shown day, so
+  // switching range redrew the picture and moved none of the numbers — a range
+  // control that changes nothing you can read is a broken control.
+  //
+  // It is the change in the GAIN, not in the value. Value change over a window
+  // includes whatever was paid in during it, which is the exact error that got
+  // the benchmark overlay removed from this chart: a book with steady inflows
+  // reads as growing because its owner deposited. Subtracting money in at both
+  // ends leaves the part the market did.
+  //
+  // Hidden on ALL, where the range starts at the book's first day: the gain
+  // made since inception is the gain, and the cell beside it already says so.
+  const firstPoint = data.points[0]!;
+  const gainAtRangeStart = Number(firstPoint.value.amount) - Number(firstPoint.invested.amount);
+  const rangeGain = gainAmount - gainAtRangeStart;
+
   return (
     <div className="space-y-4">
       <div
@@ -625,6 +653,20 @@ export function PortfolioChart({
             />
           }
         />
+        {range !== "ALL" && data.points.length >= 2 && (
+          <Stat
+            size="sm"
+            label={RANGE_STAT_LABEL[range] ?? range}
+            value={<Delta value={rangeGain} currency={shown.value.currency} />}
+            // No percentage: the honest denominator for a windowed figure is a
+            // time-weighted one, and that lives on /performance. A ratio
+            // invented here to fill the slot would be the wrong number printed
+            // confidently.
+            title={`How much of the gain was made ${
+              range === "YTD" ? "this year to date" : `in the past ${rangeLabel}`
+            }. Money paid in during the window is subtracted, so a deposit cannot inflate it.`}
+          />
+        )}
       </StatStrip>
 
       {data.fxIncomplete && (
