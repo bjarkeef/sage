@@ -27,6 +27,7 @@ export async function buildPortfolioHistoryView(
       fxIncomplete: false,
       fxStale: false,
       fxRatesAsOf: null,
+      stalePrices: [],
     };
   }
 
@@ -81,6 +82,11 @@ export async function buildPortfolioHistoryView(
     points,
     changePercent,
     changeAmount,
+    // Holdings valued from a close older than STALE_PRICE_DAYS. They are in the
+    // total at that price, so the chart is drawn but the figure is older than
+    // it looks — the client says so rather than letting a flat line pass for a
+    // quiet market.
+    stalePrices: series.stalePrices,
     benchmarks: benchmarkData,
     // At least one date could not be priced from the stored ECB series and fell
     // back to today's rate; the client labels the chart rather than passing an

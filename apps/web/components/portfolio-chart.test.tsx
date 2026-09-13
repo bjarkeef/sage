@@ -36,6 +36,7 @@ const history: PortfolioHistoryDTO = {
   ],
   changePercent: 10,
   changeAmount: { amount: "1000", currency: "USD" },
+  stalePrices: [],
 };
 
 const todayChange: DashboardDTO["todayChange"] = {

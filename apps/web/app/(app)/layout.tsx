@@ -41,10 +41,17 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           indicator, so the last row of a page is never trapped underneath it. */}
       <main className="relative flex-1 overflow-y-auto py-7 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-7">
         <DisplayCurrencyProvider value={settings.displayCurrency}>
-          <PageShell>
-            <ProvidersDegradedCallout />
-          </PageShell>
-          {children}
+          {/* A container, so a single element can measure the full content
+              width and escape the centred column — see the overview's plot.
+              A container query rather than `100vw`: the sidebar is part of the
+              viewport and not part of this, so vw units would push the plot
+              under it and put a horizontal scrollbar on every page. */}
+          <div className="@container/main">
+            <PageShell>
+              <ProvidersDegradedCallout />
+            </PageShell>
+            {children}
+          </div>
         </DisplayCurrencyProvider>
       </main>
       <MobileNav />

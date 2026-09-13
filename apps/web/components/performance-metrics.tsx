@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Card, InfoTooltip, RelativeScale, cn } from "@sage/ui";
 import type { PerformanceDTO, PerformanceRelativeDTO, RelativeFigureDTO } from "../lib/types";
+import { formatMoney } from "../lib/format";
 import { formatRate } from "./performance-stats";
 
 /** Short "Apr 9" style date, matching the chart tooltip's date formatting. */
@@ -184,6 +185,13 @@ export function PerfMetrics({ data }: { data: PerformanceDTO }) {
         definition="What your money actually earned, timing included. It differs from time-weighted whenever you added or sold during the period."
         figure={data.mwrAnnualized != null ? formatRate(data.mwrAnnualized) : formatRate(data.mwr)}
         sub={data.mwrAnnualized != null ? "annualized" : undefined}
+      />
+
+      <MetricCard
+        title="Return on money in"
+        definition="The same gain, over what you had paid in when the window opened. This is the figure the overview shows, and it will not match the time-weighted return above: that one removes your deposits so it can be compared with an index, this one does not. Neither is wrong — they answer different questions about the same kroner."
+        figure={data.simpleReturn != null ? formatRate(data.simpleReturn) : "—"}
+        sub={data.gain ? `${formatMoney(data.gain)} earned` : undefined}
       />
 
       <MetricCard
