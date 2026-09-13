@@ -28,6 +28,11 @@ interface BriefHeaderProps {
   segments: BriefSegment[];
   marketStateEnabled: boolean;
   todayChangePercent: number | null;
+  /** "inline" is the overview's: one paragraph, greeting first at full strength
+   *  and the day's line after it in muted — set beneath the figure rather than
+   *  above it, with no market subline, because the market state has moved to the
+   *  eyebrow over the figure where it is one glance rather than a third line. */
+  layout?: "stacked" | "inline";
 }
 
 /** The overview header: a time-of-day greeting (same hydration-safe pattern
@@ -46,6 +51,7 @@ export function BriefHeader({
   segments,
   marketStateEnabled,
   todayChangePercent,
+  layout = "stacked",
 }: BriefHeaderProps) {
   const { data: session } = authClient.useSession();
   const first = session?.user?.name?.trim().split(/\s+/)[0];
@@ -53,6 +59,17 @@ export function BriefHeader({
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  if (layout === "inline") {
+    return (
+      <p className="max-w-[46ch] text-lg/relaxed font-light text-muted-foreground text-balance">
+        <span className="text-foreground" suppressHydrationWarning>
+          {`${greeting}${first ? `, ${first}` : ""}.`}
+        </span>{" "}
+        {segments.length > 0 && renderSegments(segments)}
+      </p>
+    );
+  }
 
   return (
     <div>

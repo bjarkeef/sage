@@ -136,6 +136,7 @@ const FIXTURE_SETTINGS: UserSettingsDTO = {
     incomeRoom: true,
     portfolioRoom: true,
     statStrip: false,
+    goalBand: true,
     performanceCard: true,
     incomeCard: true,
     portfolioCard: true,

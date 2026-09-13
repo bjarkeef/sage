@@ -16,6 +16,7 @@ const ALL_ON: OverviewPrefs = {
   incomeRoom: true,
   portfolioRoom: true,
   statStrip: false,
+  goalBand: true,
   performanceCard: true,
   incomeCard: true,
   portfolioCard: true,

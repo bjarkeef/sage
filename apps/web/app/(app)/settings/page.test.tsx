@@ -67,6 +67,7 @@ function settings(
       incomeRoom: true,
       portfolioRoom: true,
       statStrip: false,
+      goalBand: true,
       performanceCard: true,
       incomeCard: true,
       portfolioCard: true,
@@ -103,11 +104,11 @@ describe("SettingsPage — Overview section", () => {
 
     // 8 overview rows + "Add dividends automatically" + "Allow negative dividend growth", both in the Dividends section.
     const switches = screen.getAllByRole("switch");
-    expect(switches).toHaveLength(10);
+    expect(switches).toHaveLength(11);
     // The settings query resolves a tick after the static labels render — wait
     // for the load-driven enable before asserting on disabled/checked state.
     await waitFor(() => expect(switches[0]).not.toBeDisabled());
-    // brief, paydayGreeting, marketState, statStrip, performanceCard, incomeCard, portfolioCard, upcomingCard, autoAdd, allowNegativeGrowth
+    // brief, paydayGreeting, marketState, statStrip, goalBand, performanceCard, incomeCard, portfolioCard, upcomingCard, autoAdd, allowNegativeGrowth
     const statStripSwitch = switches[3]!; // defaults off
     expect(statStripSwitch).toHaveAttribute("data-state", "unchecked");
     for (const s of switches) {
@@ -197,7 +198,7 @@ describe("SettingsPage — Overview section", () => {
 
     const switches = screen.getAllByRole("switch");
     const marketSwitch = switches[2]!; // key A
-    const performanceSwitch = switches[4]!; // key B
+    const performanceSwitch = switches[5]!; // key B — index shifts when a row is added above
     await waitFor(() => expect(marketSwitch).not.toBeDisabled());
 
     // Both flipped off before either request settles.

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { PageShell, EmptyState, Card } from "@sage/ui";
+import { PageShell, EmptyState } from "@sage/ui";
 import { getDashboard, getUserSettings } from "../../lib/api";
 import { qk } from "../../lib/query/keys";
 import type { PortfolioHistoryPoint } from "../../lib/types";
@@ -16,6 +16,8 @@ import { PortfolioChart } from "../../components/portfolio-chart-lazy";
 import { TransactionDialog } from "../../components/transaction-dialog";
 import { OverviewHero } from "../../components/overview/hero";
 import { OverviewStatStrip } from "../../components/overview/stat-strip";
+import { GoalBand } from "../../components/overview/goal-band";
+import { MarketEyebrow } from "../../components/overview/market-eyebrow";
 import { PerformanceCard } from "../../components/overview/performance-card";
 import { IncomeCard } from "../../components/overview/income-card";
 import { PortfolioCard } from "../../components/overview/portfolio-card";
@@ -71,16 +73,14 @@ export function OverviewClient() {
   const colorSegments = prefs.brief ? composeColorLine(toBriefInput(dashboard, prefs, now)) : [];
   return (
     <PageShell>
-      {/* Wraps at both levels, same reasoning as PageHeader's actions row
-          (packages/ui/src/components/ui/page-header.tsx): a rigid group next
-          to a flexible title runs the page sideways on a phone. */}
-      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <BriefHeader
-          segments={colorSegments}
-          marketStateEnabled={prefs.marketState}
-          todayChangePercent={dashboard.todayChange?.percent ?? null}
-        />
-        <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
+      {/* The page opens with the day and the two settings, both quiet: the
+          eyebrow is one glance and the controls fade until pointed at. What
+          used to live here — a greeting, a ticker comment and a market-hours
+          note stacked in a 60px band — now sits under the figure as one
+          sentence, which is the order a person actually reads them in. */}
+      <header className="mb-10 flex flex-wrap items-center justify-between gap-4 sm:mb-14">
+        <MarketEyebrow />
+        <div className="flex flex-wrap items-center gap-3 opacity-45 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 sm:shrink-0">
           <CurrencyPicker initialCurrency={currency} />
           <Link
             href="/settings#overview"
@@ -91,35 +91,37 @@ export function OverviewClient() {
         </div>
       </header>
 
-      <section className="mb-8">
-        {/* On its own surface, like every other block on this page. The numeral
-            is handed to the chart rather than stacked above it, so the figure,
-            the range pills, the plot and the figures under it are one object —
-            and the card is what says so. Bare on the page, with cards below it,
-            the most important block on the overview was the only one that did
-            not look like a thing.
-
-            The chart paints its entrance curtain with `--background` while
-            sitting on `--surface-card`, which is a 1.5% wash over exactly that
-            colour — close enough to be the same paint, so no backdrop has to be
-            plumbed through. If the card surface ever stops being a near-nothing
-            wash, the curtain needs the real one. */}
-        <Card>
-          <PortfolioChart
-            variant="ambient"
-            initialHistory={dashboard.history}
-            displayCurrency={dashboard.displayCurrency}
-            todayChange={dashboard.todayChange}
-            onScrub={setScrubbed}
-            header={
-              <OverviewHero
-                value={lastValue}
-                todayChange={dashboard.todayChange}
-                scrubbed={scrubbed}
-              />
-            }
-          />
-        </Card>
+      <section className="mb-14 sm:mb-20">
+        {/* No card. The figure, the line it stands on and the three numbers
+            under it are one object, and at this size a surface around them only
+            says they are separate from a page that has nothing else on it. The
+            plot runs out through the column's gutters — see the `horizon`
+            variant — so the chart is the ground rather than a picture. */}
+        <PortfolioChart
+          variant="horizon"
+          initialHistory={dashboard.history}
+          displayCurrency={dashboard.displayCurrency}
+          todayChange={dashboard.todayChange}
+          onScrub={setScrubbed}
+          header={
+            <OverviewHero
+              value={lastValue}
+              todayChange={dashboard.todayChange}
+              scrubbed={scrubbed}
+              brief={
+                prefs.brief ? (
+                  <BriefHeader
+                    layout="inline"
+                    segments={colorSegments}
+                    marketStateEnabled={false}
+                    todayChangePercent={dashboard.todayChange?.percent ?? null}
+                  />
+                ) : null
+              }
+            />
+          }
+        />
+        {prefs.goalBand && <GoalBand />}
         {prefs.statStrip && (
           <OverviewStatStrip
             ytdPercent={ytdPercent}

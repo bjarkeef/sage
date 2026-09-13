@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { getByMoney } from "../../lib/test/by-money";
 import { describe, expect, it } from "vitest";
 import { OverviewHero } from "./hero";
 import { OverviewStatStrip } from "./stat-strip";
@@ -11,7 +12,7 @@ describe("OverviewHero", () => {
         todayChange={{ amount: { amount: "-65.18", currency: "USD" }, percent: -0.87 }}
       />,
     );
-    expect(screen.getByText("$7,451.39")).toBeInTheDocument();
+    expect(getByMoney("$7,451.39")).toBeInTheDocument();
     expect(screen.getByText(/-0\.87%|−0\.87%/)).toBeInTheDocument();
   });
   it("omits the delta when todayChange is null", () => {

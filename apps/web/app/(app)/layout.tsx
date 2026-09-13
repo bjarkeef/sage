@@ -21,6 +21,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         incomeRoom: true,
         portfolioRoom: true,
         statStrip: false,
+        goalBand: true,
         performanceCard: true,
         incomeCard: true,
         portfolioCard: true,

@@ -118,7 +118,7 @@ describe("composeBrief", () => {
       { kind: "text", text: " — " },
       { kind: "value", text: "+10 kr (+1.00%)", tone: "gain" },
       { kind: "text", text: " today." },
-      { kind: "text", text: " Quiet day — nothing needs your attention." },
+      { kind: "text", text: " No holding moved much today." },
     ]);
   });
 
@@ -139,7 +139,7 @@ describe("composeBrief", () => {
       { kind: "text", text: " — " },
       { kind: "value", text: "+10 kr (+1.00%)", tone: "gain" },
       { kind: "text", text: " today." },
-      { kind: "text", text: " Quiet day — nothing needs your attention." },
+      { kind: "text", text: " No holding moved much today." },
     ]);
   });
 
@@ -182,7 +182,7 @@ describe("composeBrief", () => {
       { kind: "text", text: " — " },
       { kind: "value", text: "+10 kr (+1.00%)", tone: "gain" },
       { kind: "text", text: " today." },
-      { kind: "text", text: " Quiet day — nothing needs your attention." },
+      { kind: "text", text: " No holding moved much today." },
       { kind: "text", text: " MPAY pays out this week, around " },
       { kind: "value", text: "312 kr", tone: "income" },
       { kind: "text", text: "." },
@@ -244,7 +244,7 @@ describe("composeBrief", () => {
       { kind: "text", text: " — " },
       { kind: "value", text: "+4.120 kr (+0.32%)", tone: "gain" },
       { kind: "text", text: " today." },
-      { kind: "text", text: " Quiet day — nothing needs your attention." },
+      { kind: "text", text: " No holding moved much today." },
     ]);
 
     // With negative change -> loss tone
@@ -263,7 +263,7 @@ describe("composeBrief", () => {
       { kind: "text", text: " — " },
       { kind: "value", text: "−4.120 kr (−0.32%)", tone: "loss" },
       { kind: "text", text: " today." },
-      { kind: "text", text: " Quiet day — nothing needs your attention." },
+      { kind: "text", text: " No holding moved much today." },
     ]);
 
     // With null change -> opening is just the value and a period
@@ -280,7 +280,7 @@ describe("composeBrief", () => {
       { kind: "text", text: "Your portfolio stands at " },
       { kind: "value", text: "1.284.502 kr", tone: "neutral" },
       { kind: "text", text: "." },
-      { kind: "text", text: " Quiet day — nothing needs your attention." },
+      { kind: "text", text: " No holding moved much today." },
     ]);
   });
 

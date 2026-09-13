@@ -88,6 +88,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The overview's figure. Not a bigger `hero-num`: at this size 300 reads heavy
+   and -0.02em reads loose, so the weight drops to 100 and the tracking tightens
+   — the display face already goes this light and the app had never asked it to.
+   Fluid rather than a breakpoint step, because the number is the composition
+   and it should own the same share of the column at every width. */
+@utility horizon-num {
+  font-family: var(--ff-display);
+  font-size: clamp(48px, 8vw, 108px);
+  line-height: 0.94;
+  font-weight: 100;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+}
+
 @utility stat-num {
   font-family: var(--ff-display);
   font-size: 32px;

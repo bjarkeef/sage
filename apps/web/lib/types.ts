@@ -431,6 +431,8 @@ export interface OverviewPrefs {
   /** @deprecated superseded by portfolioCard; still honored via fillDefaults. */
   portfolioRoom: boolean;
   statStrip: boolean;
+  /** The "living on it by <year>" progress band on the overview. */
+  goalBand: boolean;
   performanceCard: boolean;
   incomeCard: boolean;
   portfolioCard: boolean;

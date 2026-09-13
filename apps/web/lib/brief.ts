@@ -42,7 +42,12 @@ function variantClauses(input: BriefInput): BriefSegment[] {
       ),
     );
   } else {
-    out.push(t("Quiet day — nothing needs your attention."));
+    // Not "nothing needs your attention": the app cannot know that, and a mood
+    // is the one thing this slot must never carry. Rejected by the maintainer
+    // 2026-09-13 in the front-page proposal, where the same phrasing had been
+    // written into a mockup — and found already shipping here. The grammar is
+    // what moved, then what is coming; when nothing moved, say only that.
+    out.push(t("No holding moved much today."));
   }
   if (input.nextPayout) {
     const when = input.nextPayout.when === "today" ? "today" : "this week";
