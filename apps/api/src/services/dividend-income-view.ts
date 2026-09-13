@@ -1,6 +1,7 @@
 import { eq, and, desc, inArray } from "drizzle-orm";
 import {
   Decimal,
+  Money,
   computeRetroactiveIncome,
   buildReceivedDividends,
   projectDividendSchedule,
@@ -702,8 +703,11 @@ export async function buildDividendIncomeView(
     (bookCurrencies.size === 1 ? [...bookCurrencies][0]! : null);
   const inDisplay = (ccy: string) => ccy === displayCcy;
   /** A portfolio-level total, or nothing when we cannot name its currency. */
+  // `toFixed()` with no argument published full precision, which is how
+  // `trailingTwelveMonthIncome` came to read 3807.612310089597436539277003283177
+  // in a payload where every other amount is minor units.
   const money = (total: Decimal) =>
-    displayCcy === null ? [] : [{ amount: total.toFixed(), currency: displayCcy }];
+    displayCcy === null ? [] : [Money.of(total, displayCcy).round().toJSON()];
 
   // A received row we could not convert is excluded from every total by
   // `inDisplay`. That exclusion is correct — mixing currencies in one sum is
