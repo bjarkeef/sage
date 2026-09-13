@@ -6,6 +6,7 @@ import { createChart, AreaSeries, LineSeries, type IChartApi } from "lightweight
 import { useTheme } from "next-themes";
 import { SegmentedControl } from "@sage/ui";
 import { getPerformance } from "../lib/api";
+import { formatMoney } from "../lib/format";
 import { qk } from "../lib/query/keys";
 import { HeroSkeleton } from "./skeletons";
 import {
@@ -132,7 +133,20 @@ export function PerformanceStudio() {
           <SegmentedControl options={RANGES} value={range} onChange={setRange} size="sm" />
         </div>
         <div>
-          <div className={`hero-num ${twrTone}`}>{formatRate(data.twr)}</div>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <div className={`hero-num ${twrTone}`}>{formatRate(data.twr)}</div>
+            {/* The money beside the rate, because this page reported only a
+                percentage and the overview reported only an amount, and there
+                was nowhere to see both. NOT inside the percentage's own
+                parentheses: a time-weighted return removes your deposits, so no
+                amount corresponds to it. This is what the book made over the
+                same window with deposits netted out — the figure the overview's
+                range cell prints, so the two pages agree on the pair and differ
+                only in which half they lead with. */}
+            {data.gain && (
+              <span className="text-sm text-muted-foreground">{formatMoney(data.gain)} earned</span>
+            )}
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {range === "ALL" ? "since inception" : `past ${rangeLabel}`}
             {data.twrAnnualized != null && `, ${formatRate(data.twrAnnualized)} annualized`}

@@ -139,6 +139,7 @@ export async function buildPerformanceView(
       displayCurrency: series.targetCurrency,
       range,
       window: null,
+      gain: null,
       insufficientData: true,
       twr: null,
       twrAnnualized: null,
@@ -207,6 +208,7 @@ export async function buildPerformanceView(
       displayCurrency: series.targetCurrency,
       range,
       window: { from: first.date, to: last.date, days: windowDays },
+      gain: null,
       insufficientData: true,
       twr: null,
       twrAnnualized: null,
@@ -334,10 +336,22 @@ export async function buildPerformanceView(
   }
 
   const annualizedGate = windowDays > 365;
+  // What the book actually MADE over this window, in money. Not a kroner
+  // reading of the time-weighted return — a TWR strips out deposits and so
+  // corresponds to no amount at all; putting one in its parentheses would be a
+  // fabricated figure. This is the change in (value − money in) across the
+  // window, so a deposit lifts both ends and cancels, and it is the same
+  // quantity the overview's range cell prints. The two pages then report one
+  // pair with different emphasis instead of a percentage on one and an amount
+  // on the other with no way to see both.
+  const gainDelta = last.marketValue
+    .minus(last.invested)
+    .minus(first.marketValue.minus(first.invested));
   return {
     displayCurrency: series.targetCurrency,
     range,
     window: { from: first.date, to: last.date, days: windowDays },
+    gain: { amount: gainDelta.toFixed(2), currency: series.targetCurrency },
     insufficientData: false,
     twr: toNum(twr),
     twrAnnualized: annualizedGate ? toNum(annualize(twr, windowDays)) : null,
