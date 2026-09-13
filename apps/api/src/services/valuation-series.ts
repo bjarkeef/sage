@@ -565,7 +565,23 @@ export async function buildValuationSeries(
         }
       }
       let invested = new Decimal(0);
-      for (const symbol of priceable) {
+      for (const symbol of timeline.symbols) {
+        // A symbol still HELD contributes its cost only once it can be priced,
+        // so cost never appears without a matching market value. A symbol no
+        // longer held has no market value to match — only the residue
+        // cumulative net-invested leaves behind when a position is closed at a
+        // profit or a loss — and gating that on priceability made the cost line
+        // depend on whether the store happened to hold the symbol's old bars
+        // inside the window.
+        //
+        // Found on a real book: one closed position, sold at a profit, whose
+        // last stored bar predated a 1M window but not a 3M one. Every longer
+        // range counted its negative residue and 1M did not, so 1M reported a
+        // cost line a few hundred kroner higher than every other range for the
+        // same day, with market value identical to the cent. The residue is a
+        // ledger fact and does not change with the range.
+        const held = snap.quantities.get(symbol);
+        if (held !== undefined && !held.isZero() && !priceable.has(symbol)) continue;
         const amount = investedSeries.investedOn(symbol, date);
         if (amount === null) continue; // no transactions yet, or no rate for them
         invested = invested.plus(amount);
@@ -588,6 +604,47 @@ export async function buildValuationSeries(
         flowBasis: invested.plus(entryAdjustment),
       });
     }
+  }
+
+  // ---- the newest point is priced the way the portfolio is -----------------
+  //
+  // The rule the series already follows for every other date is "value it at
+  // the most recent price known FOR that date", which for a past date is its
+  // close. For the newest date the most recent price known is the quote — and
+  // `portfolio-view` values every holding from exactly that. Leaving this point
+  // on closes put two totals for "what this is worth" on one screen: 169,459.28
+  // under the hero, 168,864.01 in the card below it, 595 DKK apart on the
+  // reporting book. Same day, same holdings, two price fields.
+  //
+  // Per symbol, and only forward: a quote older than the point's own date is a
+  // staler answer than the close already in hand, so that symbol keeps its
+  // close. Custom holdings land there by construction — their quote is the last
+  // manual mark, which is the same number the series forward-filled — so they
+  // are untouched rather than mixed.
+  const newest = points[points.length - 1];
+  if (newest !== undefined) {
+    const snap = timeline.asOf(newest.date);
+    let total = newest.marketValue;
+    for (const symbol of timeline.symbols) {
+      const rawQty = snap.quantities.get(symbol);
+      if (rawQty === undefined || !rawQty.greaterThan(0)) continue;
+      const close = lastClose.get(symbol);
+      if (!close) continue; // unpriced on this date; nothing to replace
+      try {
+        const quote = await provider.getQuote(symbol);
+        if (quote.asOf.toISOString().slice(0, 10) < newest.date) continue;
+        const conversion = fxLookup.rateOn(newest.date, quote.price.currency);
+        const closeConversion = fxLookup.rateOn(newest.date, close.currency);
+        if (!conversion || !closeConversion) continue;
+        const qty = rawQty.times(splitBasis.factorAt(symbol, newest.date));
+        const was = close.close.dividedBy(closeConversion.divisor).times(qty);
+        const now = quote.price.toDecimal().dividedBy(conversion.divisor).times(qty);
+        total = total.minus(was).plus(now);
+      } catch {
+        // No quote for this symbol: it keeps the close, exactly as before.
+      }
+    }
+    newest.marketValue = total;
   }
 
   // "FX conversion contributed" — true when any contributing symbol was quoted

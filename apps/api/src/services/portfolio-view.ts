@@ -185,11 +185,20 @@ export async function buildPortfolioView(
     if (!targetCurrency || fromCurrency === targetCurrency || !fxRates.has(fromCurrency)) {
       // Keep the native currency label when conversion is not possible — never
       // advertise targetCurrency on an unconverted amount.
-      return m.toJSON();
+      //
+      // Rounded even though nothing was converted. `Money` holds full precision
+      // internally and this branch used to publish it raw, so a holding that
+      // never needed a rate shipped its whole tail: a custom holding in the
+      // book's own currency reported a market value of
+      // 50193.88157472854998123287671232877. Every other amount in the payload
+      // is minor units, and a consumer that sums these inherits the tail.
+      return m.round().toJSON();
     }
     const rate = fxRates.get(fromCurrency)!;
     const converted = m.toDecimal().dividedBy(rate);
-    return { amount: converted.toFixed(2), currency: targetCurrency };
+    // `round()` rather than `toFixed(2)`: the minor units belong to the
+    // currency, and two is only right for most of them.
+    return Money.of(converted, targetCurrency).round().toJSON();
   }
 
   /** Position-level display currency: target only when this position converted. */

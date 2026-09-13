@@ -805,6 +805,85 @@ describeDb("portfolio history — a window opening on a day nothing traded", () 
 });
 
 /**
+ * The chart's last point and the portfolio's own total are the same holdings on
+ * the same day. They were priced from two different fields — the daily close
+ * and the quote — and on the reporting book that put 169,459.28 under the
+ * overview hero and 168,864.01 in the card directly below it.
+ */
+describeDb("portfolio history — the newest point is priced like the portfolio", () => {
+  let tdb: TestDb;
+  let app: ReturnType<typeof createApp>;
+  let provider: FakeMarketDataProvider;
+  let userId: string;
+
+  const BUY = daysAgo(40);
+  const LAST_BAR = daysAgo(1);
+
+  beforeAll(async () => {
+    tdb = await withTestDb();
+    provider = new FakeMarketDataProvider({
+      // Close of 100 on the last bar, but the quote for the same day says 110.
+      history: { AAPL: [bar(BUY, "90"), bar(LAST_BAR, "100")] },
+      quotes: {
+        AAPL: {
+          symbol: "AAPL",
+          price: Money.of("110", "USD"),
+          asOf: new Date(`${LAST_BAR}T00:00:00Z`),
+          previousClose: Money.of("100", "USD"),
+        },
+      },
+    });
+    const auth = createAuth(tdb.db, testEnv);
+    app = createApp(tdb.db, provider, auth);
+    const cookie = await signUpTestUser(app, "newest-point@test.com");
+    const [row] = await tdb.db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.email, "newest-point@test.com"))
+      .limit(1);
+    if (!row) throw new Error("test user not found after sign-up");
+    userId = row.id;
+    await app.request("/transactions", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({
+        instrument: {
+          symbol: "AAPL",
+          name: "AAPL",
+          exchange: "NMS",
+          currency: "USD",
+          assetType: "stock",
+        },
+        type: "buy",
+        quantity: "10",
+        price: "90",
+        tradeDate: BUY,
+      }),
+    });
+  }, 30_000);
+
+  afterAll(async () => {
+    await tdb?.stop();
+  });
+
+  it("values the last point at the quote, and every earlier point at its close", async () => {
+    const series = await buildValuationSeries({ db: tdb.db, provider }, userId, { range: "ALL" });
+    if ("empty" in series) throw new Error("expected a non-empty series");
+
+    const last = series.points[series.points.length - 1]!;
+    expect(last.date).toBe(LAST_BAR);
+    // 10 x 110 (quote), not 10 x 100 (close) — which is what `/portfolio`
+    // reports for the same holdings on the same day.
+    expect(last.marketValue.toFixed(2)).toBe("1100.00");
+
+    const first = series.points[0]!;
+    expect(first.date).toBe(BUY);
+    // Untouched: only the newest point has a quote that is not older than it.
+    expect(first.marketValue.toFixed(2)).toBe("900.00");
+  });
+});
+
+/**
  * Task 4: `repairHistory` turns detection (Task 3) into a repair, but ONLY
  * when the caller asks and ONLY for a symbol actually short — the guard
  * against this slowing down every ordinary page load. Exercised against a
