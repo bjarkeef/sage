@@ -128,6 +128,7 @@ const FIXTURE_CUSTOM_ASSET: AssetDetailDTO = {
 };
 
 const FIXTURE_SETTINGS: UserSettingsDTO = {
+  name: "Test User",
   displayCurrency: null,
   overviewPrefs: {
     brief: true,

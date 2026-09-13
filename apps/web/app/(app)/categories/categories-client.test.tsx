@@ -29,6 +29,7 @@ vi.mock("../../../components/categories/allocation-donut", () => ({
 import { CategoriesClient } from "./categories-client";
 
 const FIXTURE_SETTINGS: UserSettingsDTO = {
+  name: "Test User",
   displayCurrency: "DKK",
   overviewPrefs: {
     brief: true,

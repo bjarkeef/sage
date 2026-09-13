@@ -10,10 +10,12 @@ import {
   updateAutoAddDividends,
   updateDividendTaxRate,
   updateAllowNegativeDividendGrowth,
+  updateDisplayName,
 } from "@/lib/api";
 import { invalidateFor } from "@/lib/query/invalidation";
 import { qk } from "@/lib/query/keys";
 import type { OverviewPrefs } from "@/lib/types";
+import { authClient } from "@/lib/auth-client";
 import { ExportSection } from "@/components/export-section";
 import { SystemSection } from "./system-section";
 
@@ -84,6 +86,9 @@ export default function SettingsPage() {
 
   const [autoAdd, setAutoAdd] = useState<boolean | null>(null);
   const [allowNegativeGrowth, setAllowNegativeGrowth] = useState<boolean | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameSaved, setNameSaved] = useState(false);
 
   const { data: settings } = useQuery({
     queryKey: qk.userSettings(),
@@ -104,6 +109,7 @@ export default function SettingsPage() {
       setTaxRateInput(settings.dividendTaxRate != null ? String(settings.dividendTaxRate) : "");
       setAutoAdd(settings.autoAddDividends);
       setAllowNegativeGrowth(settings.allowNegativeDividendGrowth);
+      setNameDraft(settings.name);
     }
   }, [settings]);
 
@@ -183,6 +189,27 @@ export default function SettingsPage() {
     }
   }
 
+  const nameDirty = nameDraft.trim().length > 0 && nameDraft.trim() !== (settings?.name ?? "");
+
+  async function handleSaveName() {
+    const next = nameDraft.trim();
+    if (!next || next === settings?.name) return;
+    setNameSaving(true);
+    try {
+      await updateDisplayName(next);
+      // The greeting reads the SESSION, not this query, so invalidating
+      // user-settings alone would leave the overview greeting the old name
+      // until the next full load.
+      await queryClient.invalidateQueries({ queryKey: qk.userSettings() });
+      await authClient.getSession({ query: { disableCookieCache: true } });
+      setNameSaved(true);
+    } catch {
+      alert("Could not save your name.");
+    } finally {
+      setNameSaving(false);
+    }
+  }
+
   async function handleDelete() {
     setLoading(true);
     try {
@@ -200,6 +227,36 @@ export default function SettingsPage() {
   return (
     <PageShell width="narrow" className="py-10">
       <PageHeader title="Settings" />
+
+      <div id="you" className="mt-8 scroll-mt-8">
+        <SectionHeader title="You" className="mb-0" />
+        <p className="mt-1 text-xs text-muted-foreground">
+          What the overview greets you by. A first name is enough.
+        </p>
+        <form
+          className="mt-3 flex flex-wrap items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSaveName();
+          }}
+        >
+          <Input
+            aria-label="Display name"
+            value={nameDraft}
+            disabled={settings === undefined}
+            maxLength={80}
+            onChange={(e) => {
+              setNameDraft(e.target.value);
+              setNameSaved(false);
+            }}
+            className="w-56"
+          />
+          <Button type="submit" variant="secondary" disabled={!nameDirty || nameSaving}>
+            {nameSaving ? "Saving…" : "Save"}
+          </Button>
+          {nameSaved && <span className="text-xs text-muted-foreground">Saved</span>}
+        </form>
+      </div>
 
       <div id="overview" className="mt-8 scroll-mt-8">
         <SectionHeader title="Overview" meta={saved ? "Saved" : undefined} className="mb-0" />

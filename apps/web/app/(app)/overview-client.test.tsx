@@ -121,6 +121,7 @@ const FIXTURE_DASHBOARD: DashboardDTO = {
 const EMPTY_CHANGE = { amount: "0", currency: "USD" };
 
 const FIXTURE_SETTINGS: UserSettingsDTO = {
+  name: "Test User",
   displayCurrency: "USD",
   overviewPrefs: {
     brief: true,
