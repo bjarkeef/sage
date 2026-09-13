@@ -39,6 +39,11 @@ const OVERVIEW_ROWS: { key: keyof OverviewPrefs; label: string; description: str
     description: "A compact top row: YTD return, income, and return vs cost.",
   },
   {
+    key: "goalBand",
+    label: "Goal progress",
+    description: "How close the income is to the goal, and the year you set for it.",
+  },
+  {
     key: "performanceCard",
     label: "Performance card",
     description: "Year-to-date and total return.",

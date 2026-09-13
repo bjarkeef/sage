@@ -20,6 +20,7 @@ vi.mock("next-themes", () => ({
 
 // Import after the mocks above so OverviewClient's transitive deps pick them up.
 import { OverviewClient } from "./overview-client";
+import { allByMoney } from "../../lib/test/by-money";
 import * as api from "../../lib/api";
 
 const FIXTURE_DASHBOARD: DashboardDTO = {
@@ -128,6 +129,7 @@ const FIXTURE_SETTINGS: UserSettingsDTO = {
     incomeRoom: true,
     portfolioRoom: true,
     statStrip: false,
+    goalBand: true,
     performanceCard: true,
     incomeCard: true,
     portfolioCard: true,
@@ -170,7 +172,7 @@ describe("OverviewClient", () => {
     // cache, not just fast enough to race a refetch.
     renderOverview();
 
-    await waitFor(() => expect(screen.getByText("$4,550.00")).toBeInTheDocument());
+    await waitFor(() => expect(allByMoney("$4,550.00")).toHaveLength(1));
     expect(dashSpy).not.toHaveBeenCalled();
     expect(settingsSpy).not.toHaveBeenCalled();
   });
@@ -243,7 +245,7 @@ describe("OverviewClient", () => {
         ],
       });
 
-      expect(await screen.findByText("$3,197.00")).toBeInTheDocument();
+      await waitFor(() => expect(allByMoney("$3,197.00")).toHaveLength(1));
     });
 
     /** Summing across currencies is the one thing this app refuses to do, so
@@ -284,7 +286,7 @@ describe("OverviewClient", () => {
         ],
       });
 
-      expect(await screen.findByText("$4,550.00")).toBeInTheDocument();
+      await waitFor(() => expect(allByMoney("$4,550.00")).toHaveLength(1));
       expect(screen.queryByText("$1.00")).not.toBeInTheDocument();
     });
 
@@ -307,7 +309,7 @@ describe("OverviewClient", () => {
       });
 
       await screen.findByText(/Money in/);
-      expect(screen.getAllByText("$4,550.00")).toHaveLength(1);
+      expect(allByMoney("$4,550.00")).toHaveLength(1);
     });
   });
 });

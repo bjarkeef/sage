@@ -125,8 +125,14 @@ export interface PortfolioChartProps {
   displayCurrency: string | null;
   todayChange: DashboardDTO["todayChange"];
   /** "ambient" drops the chart's own hero header and price axis: the Wealth
-   *  room already shows the net-worth number, so the chart is just atmosphere. */
-  variant?: "default" | "ambient";
+   *  room already shows the net-worth number, so the chart is just atmosphere.
+   *
+   *  "horizon" is the overview's: the plot runs edge to edge with no axis of
+   *  any kind, the range control sits over it and recedes until pointed at, and
+   *  the figures beneath it are set on bare ground rather than in a strip. The
+   *  chart stops being a picture on the page and becomes the ground the page
+   *  stands on. */
+  variant?: "default" | "ambient" | "horizon";
 }
 
 export function PortfolioChart({
@@ -137,7 +143,10 @@ export function PortfolioChart({
   onScrub,
   header,
 }: PortfolioChartProps) {
-  const ambient = variant === "ambient";
+  const horizon = variant === "horizon";
+  // Horizon inherits ambient's suppressions (no hero numeral of its own, no
+  // price scale) and adds its own.
+  const ambient = variant === "ambient" || horizon;
   const [range, setRange] = React.useState(INITIAL_RANGE);
   // The server-rendered initialHistory was fetched with whatever displayCurrency
   // this component first mounted with; capture it once so a later currency
@@ -225,13 +234,17 @@ export function PortfolioChart({
     const base = baseChartOptions(
       theme,
       containerRef.current.clientWidth,
-      ambient ? 200 : 240,
+      horizon ? 260 : ambient ? 200 : 240,
       range === "1W",
     );
     const chart = createChart(containerRef.current, {
       ...base,
       timeScale: {
         ...base.timeScale,
+        // No axis at all on the overview. The range control names the window,
+        // and a row of month ticks under a full-bleed plot reads as a chart
+        // sitting in a frame — which is the thing this variant exists to stop.
+        ...(horizon ? { visible: false } : {}),
         // Room at the right for the mark on today. `fixRightEdge` pins the
         // newest bar to the last pixel of the pane, which cut that mark — and
         // the halo around it — in half; it is the one option that makes a
@@ -477,7 +490,7 @@ export function PortfolioChart({
     // data?.points is already captured via chartData (derived from it); adding it
     // would rebuild the chart on every refetch that produced identical points.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartData, investedData, resolvedTheme, ambient]);
+  }, [chartData, investedData, resolvedTheme, ambient, horizon]);
 
   // The header outlives the chart. It carries the owner's hero numeral, and a
   // book with no price history yet — a first day, or a first import — still has
@@ -541,21 +554,25 @@ export function PortfolioChart({
 
   return (
     <div className="space-y-4">
-      <div
-        className={`flex flex-wrap items-end gap-x-4 gap-y-2 ${
-          ambient && !header ? "justify-end" : "justify-between"
-        }`}
-      >
-        {header}
-        {!ambient && <span className="label-caps text-muted-foreground">Net worth</span>}
-        <SegmentedControl
-          options={RANGES}
-          value={range}
-          onChange={setRange}
-          size="sm"
-          className={ambient ? "opacity-60 transition-opacity hover:opacity-100" : undefined}
-        />
-      </div>
+      {horizon ? (
+        header
+      ) : (
+        <div
+          className={`flex flex-wrap items-end gap-x-4 gap-y-2 ${
+            ambient && !header ? "justify-end" : "justify-between"
+          }`}
+        >
+          {header}
+          {!ambient && <span className="label-caps text-muted-foreground">Net worth</span>}
+          <SegmentedControl
+            options={RANGES}
+            value={range}
+            onChange={setRange}
+            size="sm"
+            className={ambient ? "opacity-60 transition-opacity hover:opacity-100" : undefined}
+          />
+        </div>
+      )}
 
       {!ambient && (
         <div>
@@ -586,13 +603,38 @@ export function PortfolioChart({
 
       {/* Fixed-height wrapper so the placeholder-data dim (a compositor-only
           opacity change) signals "loading a new range" without any layout shift. */}
-      <div className={`relative ${ambient ? "h-50" : "h-60"}`}>
+      <div
+        className={`relative ${
+          horizon
+            ? // Out through the page column's own gutters, so the plot reaches
+              // the window on the right and the sidebar on the left. Anything
+              // narrower is a picture with a margin around it.
+              "-mx-4 h-65 sm:-mx-8"
+            : ambient
+              ? "h-50"
+              : "h-60"
+        }`}
+      >
         <div
           ref={containerRef}
           className={`relative h-full w-full transition-opacity duration-200 ${
             isPlaceholderData ? "opacity-40" : ""
           }`}
         />
+        {horizon && (
+          // Over the plot, not above it, and faded until wanted. The window is
+          // the only control this page has; it should be reachable without
+          // being the second thing you read.
+          <div className="pointer-events-none absolute inset-x-4 bottom-3 flex sm:inset-x-8">
+            <SegmentedControl
+              options={RANGES}
+              value={range}
+              onChange={setRange}
+              size="sm"
+              className="pointer-events-auto opacity-35 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100"
+            />
+          </div>
+        )}
         {isPlaceholderData && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <span className="label-caps text-muted-foreground">Updating…</span>
@@ -617,9 +659,22 @@ export function PortfolioChart({
           midpoint of a thousand pixels, marooned from the label group it
           belongs with; read together they are one sentence. Equal columns stay
           on phones, where max-content would overflow rather than wrap. */}
-      <StatStrip className="sm:auto-cols-max sm:justify-start">
+      <StatStrip
+        className={
+          horizon
+            ? // Three equal columns on bare ground, hairline-divided. Packing
+              // them left is right when there are two short figures; at this
+              // size it leaves a third of the page empty beside them.
+              //
+              // Stacked below `sm`, because three columns of a 390px screen is
+              // 120px each and these figures are set at 27px: they drew on top
+              // of one another rather than wrapping. The dividers turn with the
+              // flow so the rule always separates, never underlines.
+              "grid-flow-row divide-x-0 divide-y pt-1 [&>*]:px-0 [&>*]:py-3 sm:grid-flow-col sm:divide-x sm:divide-y-0 sm:[&>*]:px-6 sm:[&>*]:py-1 sm:[&>*:first-child]:pl-0"
+            : "sm:auto-cols-max sm:justify-start"
+        }
+      >
         <Stat
-          size="sm"
           label={
             <span className="flex items-center gap-2">
               <span
@@ -633,13 +688,14 @@ export function PortfolioChart({
               Money in
             </span>
           }
+          size={horizon ? "md" : "sm"}
           value={formatMoney(shown.invested)}
+          context={horizon ? "contributions minus withdrawals" : undefined}
           // Kept from the toggle this replaced: the distinction is easy to get
           // wrong and the label alone cannot carry it.
           title="Contributions minus withdrawals. Sits below the cost of your current holdings once you have sold at a profit, because those gains were reinvested."
         />
         <Stat
-          size="sm"
           label={
             <span className="flex items-center gap-2">
               <span
@@ -654,24 +710,39 @@ export function PortfolioChart({
               Gain
             </span>
           }
+          size={horizon ? "md" : "sm"}
           value={
             <Delta
               value={gainAmount}
-              percent={gainPercent ?? undefined}
+              percent={horizon ? undefined : (gainPercent ?? undefined)}
               currency={shown.value.currency}
             />
+          }
+          // On horizon the percent moves to its own line WITH ITS BASIS NAMED.
+          // A bare percent beside an amount reads as the amount's rate; this
+          // one is measured on money in, and /performance reports a
+          // time-weighted figure for the same window that does not match it.
+          context={
+            horizon && gainPercent != null
+              ? `${gainPercent >= 0 ? "+" : "−"}${Math.abs(gainPercent).toFixed(2)}% on money in`
+              : undefined
           }
         />
         {range !== "ALL" && data.points.length >= 2 && (
           <Stat
-            size="sm"
             label={RANGE_STAT_LABEL[range] ?? range}
+            size={horizon ? "md" : "sm"}
             value={
               <Delta
                 value={rangeGain}
-                percent={rangeGainPercent ?? undefined}
+                percent={horizon ? undefined : (rangeGainPercent ?? undefined)}
                 currency={shown.value.currency}
               />
+            }
+            context={
+              horizon && rangeGainPercent != null
+                ? `${rangeGainPercent >= 0 ? "+" : "−"}${Math.abs(rangeGainPercent).toFixed(2)}% on money in at the start`
+                : undefined
             }
             title={`How much of the gain was made ${
               range === "YTD" ? "this year to date" : `in the past ${rangeLabel}`

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { OverviewHero } from "./hero";
+import { allByMoney, getByMoney } from "../../lib/test/by-money";
 
 const value = { amount: "343029.27", currency: "USD" };
 const todayChange = { amount: { amount: "150", currency: "USD" }, percent: 1.5 };
@@ -8,7 +9,7 @@ const todayChange = { amount: { amount: "150", currency: "USD" }, percent: 1.5 }
 describe("OverviewHero", () => {
   it("shows today's change when nothing is under the pointer", () => {
     render(<OverviewHero value={value} todayChange={todayChange} />);
-    expect(screen.getByText("$343,029.27")).toBeInTheDocument();
+    expect(getByMoney("$343,029.27")).toBeInTheDocument();
     expect(screen.getByText("today")).toBeInTheDocument();
   });
 
@@ -24,8 +25,8 @@ describe("OverviewHero", () => {
         }}
       />,
     );
-    expect(screen.getByText("$298,400.10")).toBeInTheDocument();
-    expect(screen.queryByText("$343,029.27")).not.toBeInTheDocument();
+    expect(getByMoney("$298,400.10")).toBeInTheDocument();
+    expect(allByMoney("$343,029.27")).toHaveLength(0);
   });
 
   it("drops 'today' while scrubbing, because the pointer is not on today", () => {
