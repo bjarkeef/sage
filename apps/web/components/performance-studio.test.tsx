@@ -41,6 +41,7 @@ const FIXTURE_1Y: PerformanceDTO = {
   range: "1Y",
   window: { from: "2025-07-13", to: "2026-07-13", days: 365 },
   insufficientData: false,
+  gain: { amount: "1200.00", currency: "USD" },
   twr: 0.12,
   twrAnnualized: 0.12,
   mwr: 0.1,

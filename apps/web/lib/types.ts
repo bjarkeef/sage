@@ -596,6 +596,10 @@ export interface PerformanceDTO {
   range: string;
   window: { from: string; to: string; days: number } | null;
   insufficientData: boolean;
+  /** Money the book made inside the window, deposits removed. Deliberately not
+   *  a kroner reading of `twr`: a time-weighted return strips out cash flows
+   *  and corresponds to no amount at all. */
+  gain: MoneyDTO | null;
   twr: number | null;
   twrAnnualized: number | null;
   mwr: number | null;

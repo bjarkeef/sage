@@ -529,6 +529,15 @@ export function PortfolioChart({
   const firstPoint = data.points[0]!;
   const gainAtRangeStart = Number(firstPoint.value.amount) - Number(firstPoint.invested.amount);
   const rangeGain = gainAmount - gainAtRangeStart;
+  // Same grammar as the Gain cell beside it — money made over money in — so the
+  // two read as one sentence rather than two conventions. Measured against what
+  // had been paid in when the window OPENED, which is what the gain in this
+  // window was earned on. Deliberately not the time-weighted return: that is a
+  // different measure, it lives on /performance, and printing it in an amount's
+  // parentheses would claim the amount is its numerator.
+  const investedAtRangeStart = Number(firstPoint.invested.amount);
+  const rangeGainPercent =
+    investedAtRangeStart > 0 ? (rangeGain / investedAtRangeStart) * 100 : null;
 
   return (
     <div className="space-y-4">
@@ -657,11 +666,13 @@ export function PortfolioChart({
           <Stat
             size="sm"
             label={RANGE_STAT_LABEL[range] ?? range}
-            value={<Delta value={rangeGain} currency={shown.value.currency} />}
-            // No percentage: the honest denominator for a windowed figure is a
-            // time-weighted one, and that lives on /performance. A ratio
-            // invented here to fill the slot would be the wrong number printed
-            // confidently.
+            value={
+              <Delta
+                value={rangeGain}
+                percent={rangeGainPercent ?? undefined}
+                currency={shown.value.currency}
+              />
+            }
             title={`How much of the gain was made ${
               range === "YTD" ? "this year to date" : `in the past ${rangeLabel}`
             }. Money paid in during the window is subtracted, so a deposit cannot inflate it.`}
