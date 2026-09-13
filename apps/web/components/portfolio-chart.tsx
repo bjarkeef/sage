@@ -5,6 +5,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   createChart,
   AreaSeries,
+  LastPriceAnimationMode,
   LineSeries,
   LineStyle,
   type IChartApi,
@@ -187,28 +188,58 @@ export function PortfolioChart({
   /** 0-1 sweep for the entrance curtain; 1 means fully revealed. */
   const revealRef = React.useRef(1);
   /** Where the hover veil starts, as a fraction of pane width; null when the
-   *  pointer is off the plot. */
+   *  pointer has never been on the plot. It is deliberately NOT cleared on the
+   *  way out — the veil fades out from where it stood, and clearing it would
+   *  make it jump to the left edge for the length of the fade. */
   const veilRef = React.useRef<number | null>(null);
+  /** 0-1 presence of the hover veil, so it fades in and out rather than
+   *  blinking on at full strength under the hand. */
+  const veilAlphaRef = React.useRef(0);
+  /** The day last reported, so a pointer moving within one day is not a change. */
+  const lastScrubRef = React.useRef<string | null>(null);
   const requestChartUpdateRef = React.useRef<(() => void) | null>(null);
 
   React.useEffect(() => {
     if (!containerRef.current || chartData.length === 0) return;
 
     const theme = readChartTheme();
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (chartRef.current) {
       chartRef.current.remove();
     }
 
-    const chart = createChart(
-      containerRef.current,
-      baseChartOptions(
-        theme,
-        containerRef.current.clientWidth,
-        ambient ? 200 : 240,
-        range === "1W",
-      ),
+    const base = baseChartOptions(
+      theme,
+      containerRef.current.clientWidth,
+      ambient ? 200 : 240,
+      range === "1W",
     );
+    const chart = createChart(containerRef.current, {
+      ...base,
+      timeScale: {
+        ...base.timeScale,
+        // Room at the right for the mark on today. `fixRightEdge` pins the
+        // newest bar to the last pixel of the pane, which cut that mark — and
+        // the halo around it — in half; it is the one option that makes a
+        // right-hand gutter impossible, since it clamps the offset to zero by
+        // definition. Trailing whitespace bars do not work around it: they are
+        // clamped away by the same rule.
+        fixRightEdge: false,
+        rightOffsetPixels: 18,
+      },
+      // With the edge unpinned, a wheel or a drag could push the drawing into
+      // that gutter and leave it there. Neither belongs on this chart anyway:
+      // its control is the range pills, it holds daily closes with nothing to
+      // find between them, and while the wheel panned it, a page scroll that
+      // happened to pass over the hero was swallowed instead of scrolling the
+      // page. Dragging across it now means reading it, which is what the
+      // pointer was already doing.
+      handleScroll: false,
+      handleScale: false,
+    });
     if (ambient) {
       chart.priceScale("right").applyOptions({ visible: false });
     }
@@ -223,6 +254,15 @@ export function PortfolioChart({
     const series = chart.addSeries(AreaSeries, {
       ...areaSeriesOptions(theme),
       ...(investedData.length > 0 ? { topColor: "transparent", bottomColor: "transparent" } : {}),
+      // The "now" dot, with lightweight-charts' own 2.6s halo around it. The
+      // chart had no mark for today at all: the value line simply stopped, and
+      // the end of a line is not the same statement as "this is where you are".
+      // Under reduced motion the dot stays and only the halo goes — OnDataUpdate
+      // keeps the centre point drawn (the pane view is visible for anything but
+      // Disabled) without a loop, where Disabled would remove the mark itself.
+      lastPriceAnimation: prefersReduced
+        ? LastPriceAnimationMode.OnDataUpdate
+        : LastPriceAnimationMode.Continuous,
     });
     series.setData(chartData);
 
@@ -273,10 +313,18 @@ export function PortfolioChart({
           },
         }),
       );
-      series.attachPrimitive(
+      // Attached to the LAST series added, at "normal", and both of those
+      // matter. "normal" puts it under the crosshair layer, so the hover dots
+      // and the vertical rule are no longer painted over — at "top" the veil
+      // began at the pointer's own x and sliced the dot centred there in half.
+      // The last series, because sources draw in the order they were added:
+      // hung off the value series it would dim that line and leave money in
+      // drawn brightly over the top of it.
+      investedSeries.attachPrimitive(
         createCurtain({
-          from: () => veilRef.current,
-          fill: () => withChartAlpha(theme.background, 0.62),
+          zOrder: "normal",
+          from: () => (veilAlphaRef.current <= 0.005 ? null : veilRef.current),
+          fill: () => withChartAlpha(theme.background, 0.55 * veilAlphaRef.current),
         }),
       );
     }
@@ -289,9 +337,6 @@ export function PortfolioChart({
     // bound it. The price scale is frozen for the duration: without that, a
     // chart holding two days of data autoscales to those two days and the whole
     // drawing lurches as more arrives.
-    const prefersReduced =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let raf = 0;
     // The flag has to mean "an entrance FINISHED", not "one was started".
     // React StrictMode invokes this effect twice on mount in development: the
@@ -343,6 +388,28 @@ export function PortfolioChart({
       revealRef.current = 1;
     }
 
+    // The veil fades rather than blinking: 160ms in and out, the same figure
+    // the mockup specified, short enough that it never lags the hand.
+    let veilRaf = 0;
+    const rampVeil = (to: number) => {
+      if (veilAlphaRef.current === to) return;
+      if (veilRaf) cancelAnimationFrame(veilRaf);
+      if (prefersReduced) {
+        veilAlphaRef.current = to;
+        return;
+      }
+      const from = veilAlphaRef.current;
+      const start = performance.now();
+      const VEIL_MS = 160;
+      const stepVeil = (now: number) => {
+        const t = Math.min(1, (now - start) / VEIL_MS);
+        veilAlphaRef.current = from + (to - from) * (1 - Math.pow(1 - t, 3));
+        requestChartUpdateRef.current?.();
+        veilRaf = t < 1 ? requestAnimationFrame(stepVeil) : 0;
+      };
+      veilRaf = requestAnimationFrame(stepVeil);
+    };
+
     // Drive the readout from the crosshair. `param.time` is the series time —
     // the ISO date these points are keyed by — so the lookup is exact rather
     // than a nearest-x search.
@@ -351,13 +418,23 @@ export function PortfolioChart({
       const t = param.time;
       const hit = typeof t === "string" ? (pointByDate.get(t) ?? null) : null;
       const width = containerRef.current?.clientWidth ?? 0;
-      veilRef.current = hit && param.point && width > 0 ? param.point.x / width : null;
+      if (hit && param.point && width > 0) {
+        veilRef.current = param.point.x / width;
+        rampVeil(1);
+      } else {
+        rampVeil(0);
+      }
       requestChartUpdateRef.current?.();
-      setScrubbed((prev) => {
-        if (prev?.date === hit?.date) return prev;
+      // Notified outside a state updater. React may replay an updater during
+      // render, and calling the owner's setter from in there warned — and
+      // deserved to: "Cannot update a component while rendering a different
+      // component" is React telling you the write can be lost or doubled.
+      const hitDate = hit?.date ?? null;
+      if (lastScrubRef.current !== hitDate) {
+        lastScrubRef.current = hitDate;
+        setScrubbed(hit);
         onScrubRef.current?.(hit);
-        return hit;
-      });
+      }
     };
     chart.subscribeCrosshairMove(onCrosshair);
 
@@ -371,12 +448,15 @@ export function PortfolioChart({
 
     return () => {
       if (raf) cancelAnimationFrame(raf);
+      if (veilRaf) cancelAnimationFrame(veilRaf);
       // Torn down before it finished (StrictMode's first pass, or a fast
       // unmount): give the entrance back, so the mount that survives plays it.
       if (!entranceCompleted) hasEnteredRef.current = false;
       resizeObserver.disconnect();
       chart.unsubscribeCrosshairMove(onCrosshair);
       veilRef.current = null;
+      veilAlphaRef.current = 0;
+      lastScrubRef.current = null;
       requestChartUpdateRef.current = null;
       setScrubbed(null);
       onScrubRef.current?.(null);
@@ -495,7 +575,12 @@ export function PortfolioChart({
 
           The swatch sits on the label so a figure and the line it names are one
           object rather than a colour match across a gap. */}
-      <StatStrip>
+      {/* Packed to the left from `sm` up, rather than divided evenly across the
+          full width. Two cells in equal columns put the gain figure at the
+          midpoint of a thousand pixels, marooned from the label group it
+          belongs with; read together they are one sentence. Equal columns stay
+          on phones, where max-content would overflow rather than wrap. */}
+      <StatStrip className="sm:auto-cols-max sm:justify-start">
         <Stat
           size="sm"
           label={

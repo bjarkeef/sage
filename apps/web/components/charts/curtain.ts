@@ -17,6 +17,10 @@ export interface CurtainOptions {
    *  able to ask for frames: nothing else changes, so without this the chart
    *  would never repaint and the curtain would sit wherever it was first drawn. */
   onAttach?: (requestUpdate: () => void) => void;
+  /** Which layer to draw on. See the note on layering below — this is the
+   *  difference between hiding the crosshair and sitting beneath it.
+   *  Defaults to "top". */
+  zOrder?: "bottom" | "normal" | "top";
 }
 
 /**
@@ -40,6 +44,16 @@ export interface CurtainOptions {
  *  - **The hover.** The same rectangle at low alpha dims everything after the
  *    pointer, so the eye reads "up to here" rather than inferring it from a
  *    vertical rule alone.
+ *
+ * **Layering is not a detail here.** lightweight-charts paints in two passes:
+ * the main canvas takes `bottom`, the grid, then `normal`; the top canvas is
+ * cleared and takes the crosshair — its line AND every series' hover dot —
+ * and only then `top`. So a `top` curtain starting at the pointer's own x
+ * covers the right half of the dot centred on that x, and half the crosshair
+ * line with it. That is exactly what shipped, and it read as a dot sliced down
+ * the middle. The entrance wants `top` (it must hide everything, and no
+ * crosshair exists yet); the hover veil wants `normal`, on the last series
+ * added, so it dims the drawing and the crosshair rides above it.
  */
 export function createCurtain(opts: CurtainOptions): ISeriesPrimitive<Time> {
   let attached: SeriesAttachedParameter<Time, SeriesType> | null = null;
@@ -66,7 +80,7 @@ export function createCurtain(opts: CurtainOptions): ISeriesPrimitive<Time> {
   const paneView: IPrimitivePaneView = {
     // Above the series: this hides or dims the lines themselves, which is the
     // whole point. The gain band draws at "bottom" and is covered too.
-    zOrder: () => "top",
+    zOrder: () => opts.zOrder ?? "top",
     renderer: () => renderer,
   };
 

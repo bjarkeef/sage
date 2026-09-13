@@ -42,6 +42,7 @@ export function lightweightChartsStub() {
     AreaSeries: "Area",
     LineSeries: "Line",
     LineStyle: { Solid: 0, Dotted: 1, Dashed: 2, LargeDashed: 3, SparseDotted: 4 },
+    LastPriceAnimationMode: { Disabled: 0, Continuous: 1, OnDataUpdate: 2 },
     ColorType: { Solid: "solid", VerticalGradient: "gradient" },
   };
 }
