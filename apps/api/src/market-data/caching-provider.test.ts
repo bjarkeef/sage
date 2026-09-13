@@ -325,6 +325,43 @@ describe("CachingMarketDataProvider", () => {
     expect(spy).toHaveBeenCalledWith("AAPL", from, to, opts);
   });
 
+  it("forwards seedFrom on the PLAIN cached path, which cacheOnly never exercises", async () => {
+    // `cacheOnly` and `requireFrom` both return before the memo, so the test
+    // above passes through an early branch and says nothing about the path
+    // every ordinary chart request takes. That path built its key and called
+    // `this.inner.getHistoricalPrices(symbol, from, to)` with no `opts` at
+    // all, so `seedFrom` was silently dropped and the valuation series got a
+    // bar list that stopped at the window start — the fix for the first-day
+    // hole worked in every integration test, against a provider chain that
+    // did not include this class, and did nothing on the real endpoint.
+    const inner = new CountingProvider();
+    const spy = vi.spyOn(inner, "getHistoricalPrices");
+    const cache = new CachingMarketDataProvider(inner, 1000);
+    const from = new Date("2024-01-01");
+    const to = new Date("2024-06-01");
+    const opts = { seedFrom: new Date("2023-12-18") };
+
+    await cache.getHistoricalPrices("AAPL", from, to, opts);
+
+    expect(spy).toHaveBeenCalledWith("AAPL", from, to, opts);
+  });
+
+  it("keys the bar cache by seedFrom, so a wider read is not served a narrower one", async () => {
+    // `seedFrom` changes the LENGTH of the returned array, so two callers
+    // asking for the same window with different seeds must not share an entry
+    // — an asset page would otherwise be handed the series' extra fortnight,
+    // or the series handed the asset page's truncated list.
+    const inner = new CountingProvider();
+    const cache = new CachingMarketDataProvider(inner, 1000);
+    const from = new Date("2024-01-01");
+    const to = new Date("2024-06-01");
+
+    await cache.getHistoricalPrices("AAPL", from, to);
+    await cache.getHistoricalPrices("AAPL", from, to, { seedFrom: new Date("2023-12-18") });
+
+    expect(inner.historyCalls).toBe(2);
+  });
+
   it("does not poison the shared cache with a cacheOnly result", async () => {
     // The cache key is `symbol|from|to` and does not encode `opts`. If a
     // cacheOnly call's `[]` were written into the shared map under that key,

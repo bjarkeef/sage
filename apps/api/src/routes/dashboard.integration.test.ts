@@ -733,7 +733,14 @@ describeDb("GET /dashboard — ytdTwrIncomplete: does not fetch extra upstream h
   // exactly the condition that also makes a repair moot, hence the separate
   // fixture above for the property that actually matters.
   const { buyDaysAgo, buy: BUY } = boughtEarlyThisYear();
-  const PRE_BAR = daysAgo(buyDaysAgo + 1);
+  // Well outside the valuation series' warm-up look-back (WARMUP_DAYS, 14), not
+  // one day before the buy. The series reads a fortnight of bars from before a
+  // window start so the first day inside it can forward-fill like any other —
+  // a close from the day before 1 January is history it is entitled to use, and
+  // with it AAPL is priced from day one and the gap is no gap. For this fixture
+  // to describe a book whose stored history genuinely starts after it was
+  // bought, the anchor has to sit further back than that read reaches.
+  const PRE_BAR = daysAgo(buyDaysAgo + 30);
   const resumeDaysAgo = Math.max(1, Math.min(buyDaysAgo - 1, Math.floor(buyDaysAgo / 2)));
   const RESUME = daysAgo(resumeDaysAgo);
   // Strictly BETWEEN the buy and the resume, so the anchor prices a date on

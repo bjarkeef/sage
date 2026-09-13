@@ -105,7 +105,10 @@ export class CachingMarketDataProvider implements IMarketDataProvider {
       this.requiredInFlight.set(symbol, pending);
       return pending;
     }
-    const key = `${symbol}|${dayOf(from)}|${dayOf(to)}`;
+    // `seedFrom` widens the RESULT, so it belongs in the key: without it an
+    // asset page and the valuation series, asking for the same window, would
+    // serve each other a bar list of the wrong length.
+    const key = `${symbol}|${dayOf(from)}|${dayOf(to)}|${opts?.seedFrom ? dayOf(opts.seedFrom) : ""}`;
     // An empty bar list is PROVISIONAL, not an answer. PersistedPriceProvider
     // resolves with `[]` — it does not reject — whenever it is cold and its
     // attempt budget says not to fetch upstream yet, so without this a single
@@ -125,7 +128,11 @@ export class CachingMarketDataProvider implements IMarketDataProvider {
     return this.shared(
       this.history,
       key,
-      () => this.inner.getHistoricalPrices(symbol, from, to),
+      // `opts` forwarded, not dropped. The two options that change what the
+      // inner provider DOES — `cacheOnly` and `requireFrom` — both return
+      // above, so nothing needed it until `seedFrom`, which changes what the
+      // inner provider RETURNS and is keyed on above.
+      () => this.inner.getHistoricalPrices(symbol, from, to, opts),
       this.historyTtlMs,
       (bars) => bars.length === 0,
     );

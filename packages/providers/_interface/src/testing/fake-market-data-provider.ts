@@ -1,4 +1,4 @@
-import type { IMarketDataProvider } from "../market-data-provider";
+import type { IMarketDataProvider, HistoryOptions } from "../market-data-provider";
 import type { Quote, PriceBar, Dividend, SearchResult, AssetProfile } from "../types";
 import { SymbolNotFoundError } from "../errors";
 
@@ -26,9 +26,19 @@ export class FakeMarketDataProvider implements IMarketDataProvider {
     return Promise.resolve(quote);
   }
 
-  getHistoricalPrices(symbol: string, from: Date, to: Date): Promise<PriceBar[]> {
+  getHistoricalPrices(
+    symbol: string,
+    from: Date,
+    to: Date,
+    opts?: HistoryOptions,
+  ): Promise<PriceBar[]> {
     const bars = this.config.history?.[symbol] ?? [];
-    return Promise.resolve(bars.filter((bar) => bar.date >= from && bar.date <= to));
+    // `seedFrom` widens the read. Honoured here because a double that ignores
+    // it silently turns every test of the behaviour into a test of nothing —
+    // the caller asks for a bar from before its window and gets the same array
+    // it would have got anyway.
+    const start = opts?.seedFrom !== undefined && opts.seedFrom < from ? opts.seedFrom : from;
+    return Promise.resolve(bars.filter((bar) => bar.date >= start && bar.date <= to));
   }
 
   getDividendHistory(symbol: string): Promise<Dividend[]> {

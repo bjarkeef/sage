@@ -130,6 +130,32 @@ export interface ValuationSeries {
 
 export type ValuationSeriesResult = ValuationSeries | { empty: true; targetCurrency: string };
 
+/**
+ * Calendar days of price history read BEFORE the window start, used only to
+ * seed the forward-fill. No point is ever emitted for them.
+ *
+ * Without it the first day of a window could only value symbols holding a bar
+ * on that exact calendar date, because `lastClose` had nothing to carry in
+ * yet. Window starts are calendar dates and bars fall on trading days, so
+ * "that exact date" is routinely a day nothing traded — YTD opens on 1 January
+ * every year, 1W opens on whatever weekday today is, 3M lands on a weekend one
+ * time in three. The point emitted then contained only the symbols that
+ * happened to trade, and custom holdings, whose provider re-dates their last
+ * mark to the window start so they never vanish from a chart.
+ *
+ * On a real book that produced a first point of 12,779 against a true 38,029 —
+ * a GBP savings account and nothing else — which the money-weighted return
+ * then took as the opening balance and reported 52% for the year against a
+ * time-weighted 8.7%. The cost line disagreed with itself between ranges for
+ * the same date for the same reason.
+ *
+ * 14 days clears the longest ordinary closure (Christmas into New Year,
+ * Easter) with room to spare. The FX series has always been fetched from
+ * inception on exactly this reasoning — see `fromKey` below, and the comment
+ * there about the invested line disagreeing between ranges. Prices never were.
+ */
+const WARMUP_DAYS = 14;
+
 /** Range start in UTC calendar days — trade/bar dates are UTC keys throughout. */
 function rangeToDate(range: z.infer<typeof rangeSchema>): Date {
   const now = new Date();
@@ -242,13 +268,18 @@ export async function buildValuationSeries(
   // this path has no other timeout, so a slow upstream would otherwise hang the
   // page instead of leaving the symbol in `historyIncomplete`.
   const windowStartKey = clampedFrom.toISOString().slice(0, 10);
+  // Read from here, emit from `windowStartKey`. Passed as `seedFrom`, NOT as a
+  // wider `from`: the store is not missing these two weeks, so widening `from`
+  // would report every symbol short and fire a background refresh per symbol on
+  // every chart load. See WARMUP_DAYS and `HistoryOptions.seedFrom`.
+  const warmupFrom = new Date(clampedFrom.getTime() - WARMUP_DAYS * 86_400_000);
   const deadline = Date.now() + REPAIR_BUDGET_MS;
   const pricesBySymbol = new Map<string, PriceBar[]>();
   await mapBounded(timeline.symbols, REPAIR_CONCURRENCY, async (symbol) => {
     // Only a symbol whose ledger predates its bars can be repaired, and only a
     // caller that asked for it pays. Everything else takes the store-first path
     // exactly as before, which is why a complete book makes no upstream call.
-    let historyOpts: HistoryOptions | undefined;
+    let historyOpts: HistoryOptions = { seedFrom: warmupFrom };
     if (opts.repairHistory) {
       const firstTrade = firstTradeBySymbol.get(symbol);
       if (firstTrade !== undefined) {
@@ -260,7 +291,11 @@ export async function buildValuationSeries(
         // clear.
         const heldQty = timeline.asOf(requiredKey).quantities.get(symbol);
         if (heldQty !== undefined && heldQty.greaterThan(0)) {
-          historyOpts = { requireFrom: new Date(`${requiredKey}T00:00:00Z`), deadline };
+          historyOpts = {
+            ...historyOpts,
+            requireFrom: new Date(`${requiredKey}T00:00:00Z`),
+            deadline,
+          };
         }
       }
     }
@@ -426,13 +461,24 @@ export async function buildValuationSeries(
     splitBasis = resolveSplitBasis(txs, findings, checkedBySymbol);
   }
 
+  // Warm-up bars are for seeding only: a date before the window start must not
+  // become a point, or every range would begin two weeks early.
   const allDates = new Set<string>();
   for (const byDate of closesBySymbol.values()) {
-    for (const date of byDate.keys()) allDates.add(date);
+    for (const date of byDate.keys()) if (date >= windowStartKey) allDates.add(date);
   }
   const sortedDates = [...allDates].sort();
 
   const lastClose = new Map<string, { close: Decimal; currency: string }>();
+  // Carry the last bar from before the window in, so day one forward-fills
+  // like every other day instead of valuing only whatever traded that morning.
+  for (const [symbol, byDate] of closesBySymbol) {
+    let latest: string | null = null;
+    for (const date of byDate.keys()) {
+      if (date < windowStartKey && (latest === null || date > latest)) latest = date;
+    }
+    if (latest !== null) lastClose.set(symbol, byDate.get(latest)!);
+  }
   const contributing = new Set<string>();
   // Symbols already represented in an EMITTED point. A symbol joining the
   // series later brings its market value and its whole original cost on the

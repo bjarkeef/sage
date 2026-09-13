@@ -174,6 +174,10 @@ export class PersistedPriceProvider implements IMarketDataProvider {
     opts?: HistoryOptions,
   ): Promise<PriceBar[]> {
     const coverage = await this.store.coverage(symbol);
+    // Every stored read below is widened by `seedFrom`; every COVERAGE decision
+    // still uses `from`. That split is the whole point of the option — see
+    // `HistoryOptions.seedFrom`.
+    const readFrom = opts?.seedFrom !== undefined && opts.seedFrom < from ? opts.seedFrom : from;
 
     if (coverage === null) {
       // Nothing stored at all: block, as with a cold quote — unless the
@@ -246,13 +250,13 @@ export class PersistedPriceProvider implements IMarketDataProvider {
         // definitive answer is recorded, matching the cold path's reasoning.
         if (error instanceof SymbolNotFoundError) this.recordAttempt(symbol, from);
       }
-      return this.store.readBars(symbol, from, to);
+      return this.store.readBars(symbol, readFrom, to);
     }
 
     if (!covered || !fresh) {
       this.refreshBarsInBackground(symbol, from, to);
     }
-    return this.store.readBars(symbol, from, to);
+    return this.store.readBars(symbol, readFrom, to);
   }
 
   getDividendHistory(symbol: string): Promise<Dividend[]> {

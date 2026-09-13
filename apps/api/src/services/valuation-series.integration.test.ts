@@ -695,6 +695,116 @@ describeDb("portfolio history — short history detection", () => {
 });
 
 /**
+ * A window opens on a CALENDAR date; bars fall on TRADING days. The first day
+ * inside a range is therefore routinely a day nothing traded — YTD opens on
+ * 1 January every year, 1W opens on whatever weekday today is, 3M lands on a
+ * weekend one time in three.
+ *
+ * Reported against a real book: the YTD chart's first point read 12,779 where
+ * the day before and the day after both read ~38,000, because the only thing
+ * priceable on 1 January was a custom holding, whose provider re-dates its last
+ * mark to the window start so it never vanishes from a chart. The
+ * money-weighted return takes that first point as the opening balance and
+ * reported 52% for the year against a time-weighted 8.7%.
+ */
+describeDb("portfolio history — a window opening on a day nothing traded", () => {
+  let tdb: TestDb;
+  let app: ReturnType<typeof createApp>;
+  let provider: FakeMarketDataProvider;
+  let userId: string;
+
+  /** The 1Y window start, computed the way `rangeToDate` computes it rather
+   *  than as "365 days ago" — one of the two is wrong in a leap year. */
+  function utcKey(d: Date): string {
+    return d.toISOString().slice(0, 10);
+  }
+  const now = new Date();
+  const WINDOW_START = utcKey(
+    new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate())),
+  );
+  const DAY_BEFORE_WINDOW = utcKey(new Date(Date.parse(`${WINDOW_START}T00:00:00Z`) - 86_400_000));
+  const DAY_AFTER_WINDOW = utcKey(new Date(Date.parse(`${WINDOW_START}T00:00:00Z`) + 86_400_000));
+  const BUY = utcKey(new Date(Date.parse(`${WINDOW_START}T00:00:00Z`) - 30 * 86_400_000));
+  const TODAY = utcKey(now);
+
+  beforeAll(async () => {
+    tdb = await withTestDb();
+    provider = new FakeMarketDataProvider({
+      history: {
+        // Stands in for the custom holding: a mark ON the window start, so a
+        // point is emitted for a date no exchange traded.
+        MARKED: [bar(BUY, "50"), bar(WINDOW_START, "50"), bar(TODAY, "50")],
+        // An ordinary listing: it has a close from the day before the window
+        // opened, and nothing on the window start itself, because that day was
+        // shut. It is held throughout.
+        LISTED: [bar(BUY, "100"), bar(DAY_BEFORE_WINDOW, "100"), bar(DAY_AFTER_WINDOW, "100")],
+      },
+    });
+    const auth = createAuth(tdb.db, testEnv);
+    app = createApp(tdb.db, provider, auth);
+    const cookie = await signUpTestUser(app, "history-shut-open@test.com");
+    const [row] = await tdb.db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.email, "history-shut-open@test.com"))
+      .limit(1);
+    if (!row) throw new Error("test user not found after sign-up");
+    userId = row.id;
+
+    for (const symbol of ["MARKED", "LISTED"]) {
+      await app.request("/transactions", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({
+          instrument: {
+            symbol,
+            name: symbol,
+            exchange: "NMS",
+            currency: "USD",
+            assetType: "stock",
+          },
+          type: "buy",
+          quantity: "10",
+          price: symbol === "MARKED" ? "50" : "100",
+          tradeDate: BUY,
+        }),
+      });
+    }
+  }, 30_000);
+
+  afterAll(async () => {
+    await tdb?.stop();
+  });
+
+  it("values the whole book on the first day, not only what happened to trade", async () => {
+    const series = await buildValuationSeries({ db: tdb.db, provider }, userId, { range: "1Y" });
+    if ("empty" in series) throw new Error("expected a non-empty series");
+
+    const first = series.points[0];
+    expect(first?.date).toBe(WINDOW_START);
+    // MARKED 10 x 50 = 500, LISTED 10 x 100 = 1,000. Before the warm-up read,
+    // LISTED had no bar at or after the window start and contributed nothing,
+    // so this point was 500 — a third of the book, on the date every
+    // money-weighted return takes as its opening balance.
+    expect(first?.marketValue.toFixed(2)).toBe("1500.00");
+  });
+
+  it("does not disagree with itself about the same day across ranges", async () => {
+    const short = await buildValuationSeries({ db: tdb.db, provider }, userId, { range: "1Y" });
+    const long = await buildValuationSeries({ db: tdb.db, provider }, userId, { range: "ALL" });
+    if ("empty" in short || "empty" in long) throw new Error("expected non-empty series");
+
+    const fromLong = long.points.find((p) => p.date === WINDOW_START);
+    expect(fromLong).toBeDefined();
+    // The cost line drifted between ranges for exactly this reason: a symbol's
+    // cost enters the series on the day its VALUE does, so a symbol missing
+    // from day one of a short range was missing its cost there too.
+    expect(short.points[0]?.marketValue.toFixed(2)).toBe(fromLong!.marketValue.toFixed(2));
+    expect(short.points[0]?.invested.toFixed(2)).toBe(fromLong!.invested.toFixed(2));
+  });
+});
+
+/**
  * Task 4: `repairHistory` turns detection (Task 3) into a repair, but ONLY
  * when the caller asks and ONLY for a symbol actually short — the guard
  * against this slowing down every ordinary page load. Exercised against a
