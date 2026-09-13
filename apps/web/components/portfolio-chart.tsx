@@ -18,7 +18,7 @@ import { SegmentedControl, Delta, Stat, StatStrip } from "@sage/ui";
 import { getPortfolioHistory } from "../lib/api";
 import { qk } from "../lib/query/keys";
 import { moneyToNumber, formatMoney } from "../lib/format";
-import { AmbientChartSkeleton, HeroSkeleton } from "./skeletons";
+import { AmbientChartSkeleton, HeroSkeleton, HorizonSkeleton } from "./skeletons";
 import { FxApproximatedCallout } from "./fx-approximated-callout";
 import { FxStaleCallout } from "./fx-stale-callout";
 import { FxUnavailableCallout } from "./fx-unavailable-callout";
@@ -498,6 +498,10 @@ export function PortfolioChart({
   // page disappear on exactly the accounts least able to spare it; there are
   // tests for this in `overview-client.test.tsx` because it has happened before.
   if (isLoading) {
+    // Horizon renders its own shape rather than the header plus a chart
+    // placeholder: its header IS the figure, so showing a real numeral above a
+    // grey plot puts a finished element on an unfinished page.
+    if (horizon) return <HorizonSkeleton />;
     return (
       <div className="space-y-4">
         {header}
