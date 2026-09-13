@@ -253,3 +253,85 @@ describe("splits", () => {
     expect(p.quantity.toFixed()).toBe("15");
   });
 });
+
+describe("computePositions — acquisition fees", () => {
+  const withFee = (tx: PositionTransaction, amount: string, ccy = "USD"): PositionTransaction => ({
+    ...tx,
+    fee: Money.of(amount, ccy),
+  });
+
+  // Fees were recorded from the first import and read by nothing: every figure
+  // built on cost basis assumed the shares had been free to buy. On the
+  // reporting book that overstated the unrealised gain by 104.56 DKK, 3% of the
+  // gain being reported.
+  it("counts a buy's fee as part of what the shares cost", () => {
+    const [p] = computePositions([withFee(buy("AAPL", "10", "100", "2024-01-01"), "25")]);
+
+    expect(p!.costBasis.amount.toString()).toBe("1025");
+    expect(p!.averageCost.amount.toString()).toBe("102.5");
+  });
+
+  it("leaves a position without fees exactly where it was", () => {
+    const [p] = computePositions([buy("AAPL", "10", "100", "2024-01-01")]);
+    expect(p!.costBasis.amount.toString()).toBe("1000");
+  });
+
+  it("carries the fee through a partial sell in proportion to the shares left", () => {
+    const [p] = computePositions([
+      withFee(buy("AAPL", "10", "100", "2024-01-01"), "25"),
+      sell("AAPL", "4", "150", "2024-06-01"),
+    ]);
+
+    // 6 of 10 shares survive, each costing 102.5 to acquire.
+    expect(p!.quantity.toString()).toBe("6");
+    expect(p!.costBasis.amount.toString()).toBe("615");
+  });
+
+  it("keeps fee-inclusive basis whole across a split", () => {
+    const [p] = computePositions([
+      withFee(buy("AAPL", "10", "100", "2024-01-01"), "25"),
+      { ...buy("AAPL", "2", "0", "2024-06-01"), type: "split" },
+    ]);
+
+    expect(p!.quantity.toString()).toBe("20");
+    expect(p!.costBasis.amount.toString()).toBe("1025");
+    expect(p!.averageCost.amount.toString()).toBe("51.25");
+  });
+
+  // A sell's fee reduces the proceeds, which is a realised figure. The lots
+  // that survive were bought at the same cost either way.
+  it("ignores a sell's own fee", () => {
+    const [p] = computePositions([
+      buy("AAPL", "10", "100", "2024-01-01"),
+      withFee(sell("AAPL", "4", "150", "2024-06-01"), "30"),
+    ]);
+
+    expect(p!.costBasis.amount.toString()).toBe("600");
+  });
+
+  // Core holds no exchange rates, so the alternative to dropping it is adding
+  // a DKK figure to a USD one. The loader converts at the trade date before
+  // this point; see `feeInTradeCurrency`.
+  it("drops a fee it cannot convert rather than adding it wrong", () => {
+    const [p] = computePositions([withFee(buy("AAPL", "10", "100", "2024-01-01"), "90", "DKK")]);
+
+    expect(p!.costBasis.amount.toString()).toBe("1000");
+    expect(p!.costBasis.currency).toBe("USD");
+  });
+
+  it("treats a zero fee as no fee", () => {
+    const [p] = computePositions([withFee(buy("AAPL", "10", "100", "2024-01-01"), "0")]);
+    expect(p!.costBasis.amount.toString()).toBe("1000");
+  });
+
+  // A reinvestment credits shares rather than buying them, and the fee on one
+  // is tax withheld from the income that paid for them. The reporting book's
+  // savings account has three such rows; counting their withholding as cost
+  // would have added 255.51 DKK the holder never spent.
+  it("ignores a fee on shares credited at a price of zero", () => {
+    const [p] = computePositions([withFee(buy("AAPL", "5", "0", "2024-01-01"), "40")]);
+
+    expect(p!.quantity.toString()).toBe("5");
+    expect(p!.costBasis.amount.toString()).toBe("0");
+  });
+});

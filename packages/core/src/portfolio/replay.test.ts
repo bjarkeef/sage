@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Decimal } from "../money/decimal";
 import { Money } from "../money/money";
-import { replayHoldings, replayConvertedInvested } from "./replay";
+import { replayHoldings, replayConvertedInvested, investedDelta } from "./replay";
 import type { PositionTransaction } from "./positions";
 
 function buy(
@@ -316,5 +316,51 @@ describe("replayConvertedInvested", () => {
     // The January buy must not pick up April's rate just by arriving second.
     expect(invested.investedOn("AAPL", "2026-01-15")?.toFixed(2)).toBe("970.87");
     expect(invested.investedOn("AAPL", "2026-04-15")?.toFixed(2)).toBe("1840.44");
+  });
+});
+
+describe("investedDelta — fees", () => {
+  const fee = (tx: PositionTransaction, amount: string, ccy = "USD"): PositionTransaction => ({
+    ...tx,
+    fee: Money.of(amount, ccy),
+  });
+
+  // Money in is money that left the holder, and a commission leaves on the way
+  // out just as the shares' price does. Cost basis counts it (see
+  // `computePositions`), so the invested line has to count it too or the two
+  // report different amounts for the same purchase.
+  it("adds a buy's fee to money in", () => {
+    expect(investedDelta(fee(buy("AAPL", "10", "100", "2024-01-01"), "25"))!.toString()).toBe(
+      "1025",
+    );
+  });
+
+  // A sale hands back its proceeds LESS the fee, so the fee is added on this
+  // side too — it is not signed with the quantity.
+  it("subtracts a sell's proceeds net of its fee", () => {
+    expect(investedDelta(fee(sell("AAPL", "4", "150", "2024-06-01"), "30"))!.toString()).toBe(
+      "-570",
+    );
+  });
+
+  it("moves no cost basis for a dividend, whatever its fee", () => {
+    // The fee on a dividend is tax withheld — income that never arrived, not
+    // money put in.
+    expect(investedDelta(fee(dividend("AAPL", "10", "0.5", "2024-03-01"), "1.75"))).toBeNull();
+  });
+
+  it("moves none for a split", () => {
+    expect(investedDelta(split("AAPL", "2", "2024-06-01"))).toBeNull();
+  });
+
+  it("drops a fee in another currency rather than adding it wrong", () => {
+    expect(
+      investedDelta(fee(buy("AAPL", "10", "100", "2024-01-01"), "90", "DKK"))!.toString(),
+    ).toBe("1000");
+  });
+
+  it("records no money in for shares credited at a price of zero", () => {
+    // Reinvested income: the tax came out of the dividend, not out of pocket.
+    expect(investedDelta(fee(buy("AAPL", "5", "0", "2024-01-01"), "40"))!.toString()).toBe("0");
   });
 });

@@ -35,7 +35,25 @@ export interface HoldingsSnapshot {
  */
 export function investedDelta(tx: PositionTransaction): Decimal | null {
   const signed = signedQuantity(tx);
-  return signed === null ? null : tx.price.toDecimal().times(signed);
+  if (signed === null) return null;
+  // Fees go the same way on both sides, because both are money that left the
+  // holder: a buy costs its fee on top of the shares, and a sell hands back its
+  // proceeds less the fee. So the term is added either way, never signed with
+  // the quantity.
+  //
+  // A dividend's fee is withholding — income that never arrived — and never
+  // reaches here, because `signedQuantity` returns null for it.
+  //
+  // A fee in a currency other than the trade's is dropped rather than added
+  // wrong; core holds no rates. The loader converts at the trade date first.
+  // A price of zero means shares were credited rather than bought — a
+  // reinvestment or a DRIP — and a fee there is tax withheld from the income
+  // that paid for them. No money went in, so none is recorded as going in.
+  const fee =
+    tx.fee && !tx.fee.isZero() && !tx.price.isZero() && tx.fee.currency === tx.price.currency
+      ? tx.fee.toDecimal()
+      : new Decimal(0);
+  return tx.price.toDecimal().times(signed).plus(fee);
 }
 
 /**

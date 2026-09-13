@@ -16,6 +16,45 @@ export interface PositionTransaction {
    * from a DB should always pass this so FIFO is deterministic.
    */
   sequence?: string;
+  /**
+   * What the trade cost to place, in the trade's own currency.
+   *
+   * A buy's fee is part of what the shares cost, so it belongs in cost basis;
+   * a sell's reduces the proceeds. On a dividend it is the tax withheld, which
+   * is income the holder never received and never cost-basis — see
+   * {@link investedDelta}, which is where the distinction is made.
+   *
+   * **Must already be in `price.currency`.** Core has no exchange rates, so a
+   * fee in another currency is dropped rather than added wrong; the loader
+   * converts at the trade date before it gets here.
+   */
+  fee?: Money;
+}
+
+/**
+ * A buy's acquisition cost per share, fee included.
+ *
+ * Fees were recorded from the first import and read by nothing: the column was
+ * written, exported and shown on the transaction row, while every figure built
+ * on cost basis quietly assumed the shares had been free to buy. On the
+ * reporting book that overstated the unrealised gain by 104.56 DKK, 3% of the
+ * gain it was reporting, spread across 22 of its 27 holdings.
+ *
+ * Folding the fee into the lot's per-share cost rather than carrying it beside
+ * the lot means splits, partial sells and `averageCost` all keep working
+ * unchanged: each is already expressed in terms of this one number.
+ */
+function lotCostPerShare(tx: PositionTransaction): Money {
+  if (!tx.fee || tx.fee.isZero() || tx.quantity.isZero()) return tx.price;
+  if (tx.fee.currency !== tx.price.currency) return tx.price; // unconvertible here
+  // Shares credited rather than bought — a reinvestment, a DRIP, a bonus issue
+  // — carry a price of zero, and a fee on one of those is tax withheld from the
+  // income that paid for them, not a cost of acquiring them. Counting it would
+  // say the holder spent money they never spent: on the reporting book the
+  // savings account's three reinvest rows would have added 255.51 DKK of
+  // withholding to its cost.
+  if (tx.price.isZero()) return tx.price;
+  return tx.price.plus(tx.fee.dividedBy(tx.quantity));
 }
 
 /**
@@ -64,7 +103,11 @@ interface Lot {
 
 /**
  * Compute open positions from a flat list of transactions, applying FIFO lot
- * accounting per symbol. Buys add lots; sells consume the oldest lots first.
+ * accounting per symbol. Buys add lots at what the shares cost to acquire —
+ * price plus the buy's fee, see {@link lotCostPerShare} — and sells consume the
+ * oldest lots first. A sell's own fee reduces its proceeds, which is a realised
+ * figure and none of this function's business: it leaves the surviving lots
+ * exactly as it found them.
  * Dividends are skipped (income-only). Splits multiply lot quantities and divide
  * lot prices, preserving total cost basis.
  * Returns only positions with a positive remaining quantity. Throws
@@ -95,7 +138,7 @@ export function computePositions(transactions: PositionTransaction[]): Position[
       }
 
       if (tx.type === "buy") {
-        lots.push({ qty: tx.quantity, price: tx.price });
+        lots.push({ qty: tx.quantity, price: lotCostPerShare(tx) });
         continue;
       }
 

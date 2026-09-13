@@ -252,7 +252,7 @@ export function transactionsRoutes(db: Database, provider?: IMarketDataProvider)
               ),
             );
           const replay: PositionTransaction[] = [
-            ...existing.map(toPositionTransaction),
+            ...existing.map((r) => toPositionTransaction(r)),
             {
               symbol: body.instrument.symbol,
               type: body.type,
@@ -484,7 +484,7 @@ export function transactionsRoutes(db: Database, provider?: IMarketDataProvider)
           eq(transaction.instrumentSymbol, existing.instrumentSymbol),
         ),
       );
-    const remaining = symbolTxs.filter((row) => row.id !== id).map(toPositionTransaction);
+    const remaining = symbolTxs.filter((row) => row.id !== id).map((r) => toPositionTransaction(r));
     try {
       assertSymbolLedger(remaining);
     } catch (err) {
