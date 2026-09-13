@@ -140,6 +140,7 @@ export async function buildPerformanceView(
       range,
       window: null,
       gain: null,
+      simpleReturn: null,
       insufficientData: true,
       twr: null,
       twrAnnualized: null,
@@ -155,6 +156,7 @@ export async function buildPerformanceView(
       basisMismatches,
       unverifiedSplits,
       historyIncomplete,
+      stalePrices: "empty" in series ? [] : series.stalePrices,
       splitSymbols,
       multiCurrency: "empty" in series ? false : series.multiCurrency,
       anomalousDays: 0,
@@ -209,6 +211,7 @@ export async function buildPerformanceView(
       range,
       window: { from: first.date, to: last.date, days: windowDays },
       gain: null,
+      simpleReturn: null,
       insufficientData: true,
       twr: null,
       twrAnnualized: null,
@@ -224,6 +227,7 @@ export async function buildPerformanceView(
       basisMismatches,
       unverifiedSplits,
       historyIncomplete,
+      stalePrices: series.stalePrices,
       splitSymbols,
       multiCurrency: series.multiCurrency,
       anomalousDays: anomalies,
@@ -347,11 +351,21 @@ export async function buildPerformanceView(
   const gainDelta = last.marketValue
     .minus(last.invested)
     .minus(first.marketValue.minus(first.invested));
+  // The same money over what had been paid in when the window opened. This is
+  // the rate the OVERVIEW prints, and publishing it here is the point: the two
+  // pages were reporting different percentages for one window — 9.46% against
+  // 14.57% on the reporting book — and a reader could only discover they are
+  // different measures by noticing the discrepancy. Now they sit side by side
+  // on the page whose job is defining measures.
+  const simpleReturn = first.invested.isZero()
+    ? null
+    : Number(gainDelta.dividedBy(first.invested).toFixed(6));
   return {
     displayCurrency: series.targetCurrency,
     range,
     window: { from: first.date, to: last.date, days: windowDays },
     gain: { amount: gainDelta.toFixed(2), currency: series.targetCurrency },
+    simpleReturn,
     insufficientData: false,
     twr: toNum(twr),
     twrAnnualized: annualizedGate ? toNum(annualize(twr, windowDays)) : null,
@@ -367,6 +381,7 @@ export async function buildPerformanceView(
     basisMismatches,
     unverifiedSplits,
     historyIncomplete,
+    stalePrices: series.stalePrices,
     splitSymbols,
     multiCurrency: series.multiCurrency,
     anomalousDays: anomalies,

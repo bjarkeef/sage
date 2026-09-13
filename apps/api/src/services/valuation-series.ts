@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { and, eq, inArray } from "drizzle-orm";
+import { instrument } from "../db/schema";
 import {
   Decimal,
   replayHoldings,
@@ -51,6 +53,26 @@ export type { TransactionRow };
  *  Shared with the benchmark comparison in `performance-view`, which needs the
  *  same allowance when lining an index up against the portfolio's own window. */
 export const CLOSED_MARKET_TOLERANCE_DAYS = 4;
+
+/**
+ * How long a close may be carried forward before the series says so.
+ *
+ * Forward-fill is how a holding survives a weekend, a holiday, or a day its
+ * exchange simply did not print. It was unbounded: a symbol whose bars stopped
+ * in August was still "priceable" in September at August's price, and nothing
+ * anywhere said so. On the reporting book 18 of 27 holdings had no bar for three
+ * weeks and the chart drew a confident line through all of it.
+ *
+ * The fix is to DISCLOSE, not to drop. Dropping the holding would take its value
+ * out of the total and draw a cliff — the book would appear to have lost money
+ * it still has, which is a worse lie than a stale price. A stale price is the
+ * best estimate available; the defect was only ever the silence.
+ *
+ * 10 days clears a long weekend plus a public holiday either side of it with
+ * room to spare, and is short enough that a stalled refresher is caught within
+ * a fortnight.
+ */
+export const STALE_PRICE_DAYS = 10;
 
 /** One date's conversion factor, and whether it had to be approximated. */
 export interface FxConversion {
@@ -125,6 +147,10 @@ export interface ValuationSeries {
    *  window on which they were held, so part of the period cannot be valued.
    *  Empty on a complete book. Sorted, for a stable response. */
   historyIncomplete: string[];
+  /** Holdings carried on a close older than {@link STALE_PRICE_DAYS}, with the
+   *  date of the oldest such close. They ARE in the totals — at a price that may
+   *  be weeks old — which is exactly why it has to be said out loud. Sorted. */
+  stalePrices: { symbol: string; asOf: string }[];
   rows: TransactionRow[];
 }
 
@@ -267,6 +293,23 @@ export async function buildValuationSeries(
   // must not open fifty connections at once. Deadlined for the same reason —
   // this path has no other timeout, so a slow upstream would otherwise hang the
   // page instead of leaving the symbol in `historyIncomplete`.
+  // Custom holdings price from manual marks that are MEANT to stand until
+  // changed, so they can never be "stale" in the sense STALE_PRICE_DAYS means.
+  // One indexed read over symbols already in hand.
+  const customRows =
+    timeline.symbols.length > 0
+      ? await db
+          .select({ symbol: instrument.symbol })
+          .from(instrument)
+          .where(
+            and(
+              inArray(instrument.symbol, [...timeline.symbols]),
+              eq(instrument.assetType, "custom"),
+            ),
+          )
+      : [];
+  const customSymbols = new Set(customRows.map((r) => r.symbol));
+
   const windowStartKey = clampedFrom.toISOString().slice(0, 10);
   // Read from here, emit from `windowStartKey`. Passed as `seedFrom`, NOT as a
   // wider `from`: the store is not missing these two weeks, so widening `from`
@@ -469,7 +512,7 @@ export async function buildValuationSeries(
   }
   const sortedDates = [...allDates].sort();
 
-  const lastClose = new Map<string, { close: Decimal; currency: string }>();
+  const lastClose = new Map<string, { close: Decimal; currency: string; date: string }>();
   // Carry the last bar from before the window in, so day one forward-fills
   // like every other day instead of valuing only whatever traded that morning.
   for (const [symbol, byDate] of closesBySymbol) {
@@ -477,7 +520,7 @@ export async function buildValuationSeries(
     for (const date of byDate.keys()) {
       if (date < windowStartKey && (latest === null || date > latest)) latest = date;
     }
-    if (latest !== null) lastClose.set(symbol, byDate.get(latest)!);
+    if (latest !== null) lastClose.set(symbol, { ...byDate.get(latest)!, date: latest });
   }
   const contributing = new Set<string>();
   // Symbols already represented in an EMITTED point. A symbol joining the
@@ -491,6 +534,10 @@ export async function buildValuationSeries(
   // Symbols found held-but-unpriceable on at least one emitted point. Filled
   // inside the loop below and published as `historyIncomplete`.
   const heldUnpriced = new Set<string>();
+  // Symbols valued from a close carried further than a closed market explains,
+  // against the oldest such close. Distinct from `heldUnpriced`: these ARE in
+  // the total, at a price that may be weeks old.
+  const stalePricedAsOf = new Map<string, string>();
   let entryAdjustment = new Decimal(0);
   const points: {
     date: string;
@@ -512,9 +559,21 @@ export async function buildValuationSeries(
     // below, which must not claim these have no stored prices.
     const fxBlocked = new Set<string>();
     for (const symbol of timeline.symbols) {
-      const native = closesBySymbol.get(symbol)?.get(date) ?? lastClose.get(symbol);
+      const own = closesBySymbol.get(symbol)?.get(date);
+      const native = own ? { ...own, date } : lastClose.get(symbol);
       if (!native) continue; // before the symbol's first bar — no known price yet
       lastClose.set(symbol, native);
+      // Carried further than a closed market explains. Recorded, never dropped:
+      // see STALE_PRICE_DAYS. Custom holdings are exempt — a manual mark is
+      // MEANT to stand until the owner changes it, so "stale" is its normal
+      // state and flagging it would make the signal useless.
+      if (!own && !customSymbols.has(symbol)) {
+        const ageMs = Date.parse(`${date}T00:00:00Z`) - Date.parse(`${native.date}T00:00:00Z`);
+        if (ageMs > STALE_PRICE_DAYS * 86_400_000) {
+          const seen = stalePricedAsOf.get(symbol);
+          if (seen === undefined || native.date < seen) stalePricedAsOf.set(symbol, native.date);
+        }
+      }
       const divisor = divisorFor(date, native.currency);
       if (!divisor) {
         fxBlocked.add(symbol); // cannot value this bar in the target currency
@@ -704,6 +763,9 @@ export async function buildValuationSeries(
     fxStale,
     fxRatesAsOf,
     historyIncomplete: [...heldUnpriced].sort(),
+    stalePrices: [...stalePricedAsOf.entries()]
+      .map(([symbol, asOf]) => ({ symbol, asOf }))
+      .sort((a, b) => (a.symbol < b.symbol ? -1 : 1)),
     rows,
   };
 }

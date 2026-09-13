@@ -89,7 +89,12 @@ function dashboard(overrides: Partial<DashboardDTO> = {}): DashboardDTO {
     upcomingDividends: [],
     recentDividends: [],
     allocation: [],
-    history: { points: [], changePercent: 0, changeAmount: { amount: "0", currency: "USD" } },
+    history: {
+      points: [],
+      changePercent: 0,
+      changeAmount: { amount: "0", currency: "USD" },
+      stalePrices: [],
+    },
     ...overrides,
   };
 }
@@ -105,6 +110,7 @@ describe("toBriefInput", () => {
           points: [point("1000"), point("1284502")],
           changePercent: 0,
           changeAmount: { amount: "0", currency: "USD" },
+          stalePrices: [],
         },
       }),
       ALL_ON,

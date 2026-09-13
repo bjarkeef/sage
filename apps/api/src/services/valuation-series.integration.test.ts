@@ -884,6 +884,98 @@ describeDb("portfolio history — the newest point is priced like the portfolio"
 });
 
 /**
+ * Forward-fill is how a holding survives a weekend. It was unbounded, so a
+ * symbol whose bars stopped in August was still valued in September at August's
+ * price, silently — on a real book, 18 of 27 holdings had no bar for three
+ * weeks and the chart drew a confident line through all of it.
+ */
+describeDb("portfolio history — prices carried too far", () => {
+  let tdb: TestDb;
+  let app: ReturnType<typeof createApp>;
+  let provider: FakeMarketDataProvider;
+  let userId: string;
+
+  const BUY = daysAgo(120);
+  const STOPPED = daysAgo(40); // last bar for the stale holding
+  const TODAY = daysAgo(1);
+
+  beforeAll(async () => {
+    tdb = await withTestDb();
+    provider = new FakeMarketDataProvider({
+      history: {
+        // Its bars stop 40 days ago; every later date carries that close.
+        STALECO: [bar(BUY, "100"), bar(STOPPED, "100")],
+        // Priced right through, so the series has dates to emit at all.
+        FRESHCO: [bar(BUY, "50"), bar(STOPPED, "50"), bar(TODAY, "50")],
+      },
+    });
+    const auth = createAuth(tdb.db, testEnv);
+    app = createApp(tdb.db, provider, auth);
+    const cookie = await signUpTestUser(app, "stale-prices@test.com");
+    const [row] = await tdb.db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.email, "stale-prices@test.com"))
+      .limit(1);
+    if (!row) throw new Error("test user not found after sign-up");
+    userId = row.id;
+
+    for (const [symbol, price] of [
+      ["STALECO", "100"],
+      ["FRESHCO", "50"],
+    ] as const) {
+      await app.request("/transactions", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({
+          instrument: {
+            symbol,
+            name: symbol,
+            exchange: "NMS",
+            currency: "USD",
+            assetType: "stock",
+          },
+          type: "buy",
+          quantity: "10",
+          price,
+          tradeDate: BUY,
+        }),
+      });
+    }
+  }, 30_000);
+
+  afterAll(async () => {
+    await tdb?.stop();
+  });
+
+  it("names the holding whose price stopped, and the date it stopped", async () => {
+    const series = await buildValuationSeries({ db: tdb.db, provider }, userId, { range: "ALL" });
+    if ("empty" in series) throw new Error("expected a non-empty series");
+
+    expect(series.stalePrices).toEqual([{ symbol: "STALECO", asOf: STOPPED }]);
+  });
+
+  it("still counts it, because dropping it would draw a loss that did not happen", async () => {
+    const series = await buildValuationSeries({ db: tdb.db, provider }, userId, { range: "ALL" });
+    if ("empty" in series) throw new Error("expected a non-empty series");
+
+    // 10 x 100 carried forward, plus 10 x 50 priced today. Silence was the
+    // defect; removing the holding would have been a worse answer than a stale
+    // price, since the book did not lose it.
+    const last = series.points[series.points.length - 1]!;
+    expect(last.marketValue.toFixed(2)).toBe("1500.00");
+    // And it is NOT reported as unpriceable — it has a price, just an old one.
+    expect(series.historyIncomplete).not.toContain("STALECO");
+  });
+
+  it("says nothing about a holding priced right up to the last day", async () => {
+    const series = await buildValuationSeries({ db: tdb.db, provider }, userId, { range: "ALL" });
+    if ("empty" in series) throw new Error("expected a non-empty series");
+    expect(series.stalePrices.map((p) => p.symbol)).not.toContain("FRESHCO");
+  });
+});
+
+/**
  * Task 4: `repairHistory` turns detection (Task 3) into a repair, but ONLY
  * when the caller asks and ONLY for a symbol actually short — the guard
  * against this slowing down every ordinary page load. Exercised against a

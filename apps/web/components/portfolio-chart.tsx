@@ -21,6 +21,7 @@ import { moneyToNumber, formatMoney } from "../lib/format";
 import { AmbientChartSkeleton, HeroSkeleton, HorizonSkeleton } from "./skeletons";
 import { FxApproximatedCallout } from "./fx-approximated-callout";
 import { FxStaleCallout } from "./fx-stale-callout";
+import { StalePricesCallout } from "./stale-prices-callout";
 import { FxUnavailableCallout } from "./fx-unavailable-callout";
 import {
   readChartTheme,
@@ -610,10 +611,13 @@ export function PortfolioChart({
       <div
         className={`relative ${
           horizon
-            ? // Out through the page column's own gutters, so the plot reaches
-              // the window on the right and the sidebar on the left. Anything
-              // narrower is a picture with a margin around it.
-              "-mx-4 h-65 sm:-mx-8"
+            ? // Out to the full width of the content area, not merely through
+              // the column's gutters: the column caps at 1120px, so on a wide
+              // screen the plot still sat in a margin. `100cqw` measures the
+              // `@container/main` wrapper, which is the scroll area minus the
+              // sidebar — the one measurement that is right at every width and
+              // cannot put a scrollbar on the page the way `100vw` would.
+              "h-65 w-[100cqw] ml-[calc((100cqw-100%)/-2)]"
             : ambient
               ? "h-50"
               : "h-60"
@@ -633,14 +637,20 @@ export function PortfolioChart({
           // two canvases their own stacking, so a later sibling still painted
           // UNDER them: `elementFromPoint` on a pill returned CANVAS and the
           // range control could not be clicked at all. Shipped broken once.
-          <div className="pointer-events-none absolute inset-x-4 bottom-3 z-10 flex sm:inset-x-8">
-            <SegmentedControl
-              options={RANGES}
-              value={range}
-              onChange={setRange}
-              size="sm"
-              className="pointer-events-auto opacity-35 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100"
-            />
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10">
+            {/* Centred on the READING column, not on the bleed. The plot now
+                runs the full content width, so anchoring the control to its
+                edge parked it out in the margin, away from everything else on
+                the page. Same centring PageShell uses. */}
+            <div className="mx-auto flex w-full max-w-page px-4 sm:px-8">
+              <SegmentedControl
+                options={RANGES}
+                value={range}
+                onChange={setRange}
+                size="sm"
+                className="pointer-events-auto opacity-35 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100"
+              />
+            </div>
           </div>
         )}
         {isPlaceholderData && (
@@ -767,6 +777,7 @@ export function PortfolioChart({
       )}
       {data.fxApproximated && <FxApproximatedCallout />}
       {data.fxStale && <FxStaleCallout asOf={data.fxRatesAsOf} />}
+      <StalePricesCallout stale={data.stalePrices ?? []} />
     </div>
   );
 }

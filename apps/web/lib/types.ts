@@ -134,6 +134,9 @@ export interface PortfolioHistoryDTO {
   /** Publication date of the ECB rates used for conversion; null when no
    *  conversion was needed or no rates were stored. */
   fxRatesAsOf?: string | null;
+  /** Holdings carried on a close older than the app's staleness bound. They
+   *  are still in the totals, at those prices. */
+  stalePrices: StalePriceDTO[];
 }
 
 export interface RetroactiveIncomeRowDTO {
@@ -595,6 +598,12 @@ export interface PerformanceRelativeDTO {
   beta: number | null;
 }
 
+export interface StalePriceDTO {
+  symbol: string;
+  /** Date of the oldest close the holding is still being valued from. */
+  asOf: string;
+}
+
 export interface PerformanceDTO {
   displayCurrency: string;
   range: string;
@@ -604,6 +613,10 @@ export interface PerformanceDTO {
    *  a kroner reading of `twr`: a time-weighted return strips out cash flows
    *  and corresponds to no amount at all. */
   gain: MoneyDTO | null;
+  /** That gain over what had been paid in when the window opened — the rate the
+   *  overview prints. Published here so the two measures can be read together
+   *  instead of discovered as a discrepancy between pages. */
+  simpleReturn: number | null;
   twr: number | null;
   twrAnnualized: number | null;
   mwr: number | null;
@@ -652,6 +665,9 @@ export interface PerformanceDTO {
   /** Publication date of the ECB rates used for conversion; null when no
    *  conversion was needed or no rates were stored. */
   fxRatesAsOf?: string | null;
+  /** Holdings carried on a close older than the app's staleness bound. They
+   *  are still in the totals, at those prices. */
+  stalePrices: StalePriceDTO[];
 }
 
 // ---- Goal (FI tracker) ----

@@ -115,6 +115,7 @@ const FIXTURE_DASHBOARD: DashboardDTO = {
     ],
     changePercent: 10,
     changeAmount: { amount: "550", currency: "USD" },
+    stalePrices: [],
   },
 };
 
@@ -231,7 +232,12 @@ describe("OverviewClient", () => {
       return renderWithClient(<OverviewClient />, qc);
     }
 
-    const noHistory = { points: [], changePercent: 0, changeAmount: EMPTY_CHANGE };
+    const noHistory = {
+      points: [],
+      changePercent: 0,
+      changeAmount: EMPTY_CHANGE,
+      stalePrices: [],
+    };
 
     it("falls back to the subtotal when the book is in one currency", async () => {
       renderWithDashboard({

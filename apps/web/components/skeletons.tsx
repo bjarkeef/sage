@@ -109,7 +109,7 @@ export function AmbientChartSkeleton() {
  */
 export function HorizonSkeleton() {
   return (
-    <div role="status" aria-label="Loading portfolio" className="space-y-5">
+    <div role="status" aria-label="Loading portfolio" className="space-y-4">
       <div className="flex flex-col gap-5">
         {/* `horizon-num`'s own clamp times its 0.94 line-height — the figure
             measures 102px at 1440, not the 108px the clamp alone suggests. */}
@@ -211,9 +211,11 @@ export function OverviewPageSkeleton() {
     <div data-skeleton-shape="overview">
       {/* One eyebrow and the two quiet controls — the greeting is no longer up
           here, so neither is its placeholder. */}
+      {/* 26px, not the eyebrow's 16: the currency picker is the tallest thing
+          in this row and it is what sets the header's height. Measured. */}
       <header className="mb-12 flex items-center justify-between pt-6 sm:mb-16 sm:pt-12">
-        <Skeleton className="h-4 w-48" />
-        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-[26px] w-48" />
+        <Skeleton className="h-[26px] w-32" />
       </header>
 
       <section className="mb-14 sm:mb-20">
