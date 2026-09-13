@@ -273,4 +273,62 @@ describeDb("reconcileDividends", () => {
     expect(mmmAutos[0]!.tradeDate).toBe("2024-03-15");
     expect(mmmAutos[0]!.quantity).toBe("30");
   });
+
+  // A dividend row's `fee` is the tax withheld before the cash landed. These
+  // rows carried nothing, which states that none was taken — never true of a
+  // real payment, and it split the ledger by provenance: imported rows taxed
+  // at what the broker actually took, reconciled rows at zero. Reporting
+  // income net would then have bent the trend at the point a book stopped
+  // importing and started reconciling.
+  it("withholds tax at the user's declared rate, and leaves earlier rows alone", async () => {
+    // Every auto row so far was created while the rate was unset.
+    const before = (await allTxs()).filter((t) => t.source === "auto");
+    expect(before.length).toBeGreaterThan(0);
+    expect(before.every((t) => t.fee === null && t.feeCurrency === null)).toBe(true);
+
+    await tdb.db.update(user).set({ dividendTaxRate: "15.00" }).where(eq(user.id, userId));
+    await tdb.db.insert(instrument).values({
+      symbol: "WITHHOLD",
+      name: "Withholding Test Co",
+      exchange: "XNYS",
+      currency: "USD",
+      assetType: "stock",
+    });
+    await tdb.db.insert(transaction).values({
+      portfolioId,
+      instrumentSymbol: "WITHHOLD",
+      type: "buy",
+      quantity: "40",
+      price: "10",
+      currency: "USD",
+      tradeDate: "2024-01-02",
+    });
+    await tdb.db.insert(dividendHistory).values({
+      symbol: "WITHHOLD",
+      exDate: "2024-04-01",
+      amountPerShare: "0.25",
+      currency: "USD",
+      paymentDate: "2024-04-15",
+      paymentDateEstimated: false,
+      source: "test",
+    });
+
+    await forceNextRun();
+    await reconcileDividends(tdb.db, userId);
+
+    const [row] = (await allTxs()).filter(
+      (t) => t.instrumentSymbol === "WITHHOLD" && t.source === "auto",
+    );
+    expect(row).toBeDefined();
+    // 40 shares x 0.25 = 10.00 gross; 15% of that is 1.50.
+    expect(Number(row!.fee)).toBeCloseTo(1.5, 10);
+    expect(row!.feeCurrency).toBe("USD");
+
+    // The rows that predate the rate are not retrofitted here — that is the
+    // migration's job, and doing it twice would tax them again.
+    const after = (await allTxs()).filter(
+      (t) => t.source === "auto" && t.instrumentSymbol !== "WITHHOLD",
+    );
+    expect(after.every((t) => t.fee === null)).toBe(true);
+  });
 });

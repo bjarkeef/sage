@@ -7,7 +7,14 @@ import {
   type PositionTransaction,
 } from "@sage/core";
 import type { Database } from "../db/client";
-import { autoDividend, dividendHistory, instrument, portfolio, transaction } from "../db/schema";
+import {
+  autoDividend,
+  dividendHistory,
+  instrument,
+  portfolio,
+  transaction,
+  user,
+} from "../db/schema";
 import { getUserPortfolio } from "../auth";
 
 export const RECONCILE_TTL_MS = 24 * 3600 * 1000;
@@ -64,6 +71,27 @@ export async function reconcileDividends(db: Database, userId: string): Promise<
     .from(autoDividend)
     .where(eq(autoDividend.portfolioId, portfolioId));
 
+  // Withholding, at the user's declared rate.
+  //
+  // A dividend row's `fee` is the tax taken before the cash landed. Imported
+  // rows carry what the broker actually withheld — 34.6% across the reporting
+  // book's 158 of them. Rows this reconciler created carried nothing, which
+  // states that no tax was withheld, and that is never true of a real payment.
+  //
+  // The two now mean the same thing but are not equally certain, and the
+  // ledger already records which is which: `source = 'auto'` marks a row Sage
+  // derived rather than observed. So a reader can tell an estimate from a
+  // receipt without a second column, and an import that later supersedes one
+  // of these brings the broker's real figure with it.
+  //
+  // Matches `custom-income-sync`, which has always taxed the income it mints.
+  const [userRow] = await db
+    .select({ taxRate: user.dividendTaxRate })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  const taxRate = userRow?.taxRate == null ? new Decimal(0) : new Decimal(userRow.taxRate);
+
   const positionTxs: PositionTransaction[] = txs.map((t) => ({
     symbol: t.instrumentSymbol,
     type: t.type as PositionTransaction["type"],
@@ -100,6 +128,7 @@ export async function reconcileDividends(db: Database, userId: string): Promise<
         .onConflictDoNothing()
         .returning({ id: autoDividend.id });
       if (claimed.length === 0) continue; // a concurrent run owns this identity
+      const tax = new Decimal(p.quantity).times(p.price).times(taxRate).dividedBy(100);
       const [created] = await dbtx
         .insert(transaction)
         .values({
@@ -109,6 +138,8 @@ export async function reconcileDividends(db: Database, userId: string): Promise<
           quantity: p.quantity,
           price: p.price,
           currency: p.currency,
+          fee: tax.isZero() ? null : tax.toFixed(),
+          feeCurrency: tax.isZero() ? null : p.currency,
           tradeDate: p.tradeDate,
           source: "auto",
         })

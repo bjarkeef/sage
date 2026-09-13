@@ -204,6 +204,13 @@
       "when": 1787422813485,
       "tag": "0028_account_issuer",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1787422814485,
+      "tag": "0029_auto_dividend_withholding",
+      "breakpoints": true
     }
   ]
 }
