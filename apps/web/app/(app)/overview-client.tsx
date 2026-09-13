@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { PageShell, EmptyState } from "@sage/ui";
+import { PageShell, EmptyState, Card } from "@sage/ui";
 import { getDashboard, getUserSettings } from "../../lib/api";
 import { qk } from "../../lib/query/keys";
 import type { PortfolioHistoryPoint } from "../../lib/types";
@@ -92,23 +92,34 @@ export function OverviewClient() {
       </header>
 
       <section className="mb-8">
-        {/* The numeral is handed to the chart rather than stacked above it, so
-            the figure, the range pills and the plot occupy one block. Apart,
-            with a gap between them, they read as three things. */}
-        <PortfolioChart
-          variant="ambient"
-          initialHistory={dashboard.history}
-          displayCurrency={dashboard.displayCurrency}
-          todayChange={dashboard.todayChange}
-          onScrub={setScrubbed}
-          header={
-            <OverviewHero
-              value={lastValue}
-              todayChange={dashboard.todayChange}
-              scrubbed={scrubbed}
-            />
-          }
-        />
+        {/* On its own surface, like every other block on this page. The numeral
+            is handed to the chart rather than stacked above it, so the figure,
+            the range pills, the plot and the figures under it are one object —
+            and the card is what says so. Bare on the page, with cards below it,
+            the most important block on the overview was the only one that did
+            not look like a thing.
+
+            The chart paints its entrance curtain with `--background` while
+            sitting on `--surface-card`, which is a 1.5% wash over exactly that
+            colour — close enough to be the same paint, so no backdrop has to be
+            plumbed through. If the card surface ever stops being a near-nothing
+            wash, the curtain needs the real one. */}
+        <Card>
+          <PortfolioChart
+            variant="ambient"
+            initialHistory={dashboard.history}
+            displayCurrency={dashboard.displayCurrency}
+            todayChange={dashboard.todayChange}
+            onScrub={setScrubbed}
+            header={
+              <OverviewHero
+                value={lastValue}
+                todayChange={dashboard.todayChange}
+                scrubbed={scrubbed}
+              />
+            }
+          />
+        </Card>
         {prefs.statStrip && (
           <OverviewStatStrip
             ytdPercent={ytdPercent}
