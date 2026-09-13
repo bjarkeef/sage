@@ -12,6 +12,7 @@ import { getUserPortfolio } from "../auth";
 import type { PortfolioViewDeps } from "./portfolio-view";
 import type { Database } from "../db/client";
 import { toPositionTransaction } from "../lib/to-position-transaction";
+import { feeRateLookup } from "./portfolio-book";
 import { getRatesWithProvenance } from "../market-data/fx-provenance";
 
 export interface MoneyJSON {
@@ -201,7 +202,10 @@ export async function buildCategoriesView(
       .orderBy(category.position) as Promise<CategoryRow[]>,
     db.select().from(categoryAssignment).where(eq(categoryAssignment.portfolioId, portfolioId)),
   ]);
-  const txs: PositionTransaction[] = rows.map(toPositionTransaction);
+  // Same fee conversion the portfolio book applies, so a holding's cost is one
+  // number wherever it is shown rather than two that differ by a fee.
+  const feeRates = await feeRateLookup(db, rows);
+  const txs: PositionTransaction[] = rows.map((r) => toPositionTransaction(r, feeRates));
   const positions = computePositions(txs);
 
   const empty = (): MoneyJSON => ({ amount: "0.00", currency: targetCurrency });

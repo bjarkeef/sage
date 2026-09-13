@@ -37,7 +37,7 @@ async function assertImportLedger(
     .select()
     .from(transaction)
     .where(eq(transaction.portfolioId, portfolioId));
-  const simulated: PositionTransaction[] = existing.map(toPositionTransaction);
+  const simulated: PositionTransaction[] = existing.map((r) => toPositionTransaction(r));
   for (const row of plan) {
     const willInsert =
       row.disposition === "insert" || (row.disposition === "tombstoned" && restoreDeleted);
