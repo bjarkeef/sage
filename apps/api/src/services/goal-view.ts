@@ -192,14 +192,21 @@ export async function buildGoalView(
     ? growthWeighted.dividedBy(growthWeights).times(100)
     : null;
 
-  // Value-mode default return: all-time annualized MWR (fraction → percent).
-  // Skip benchmark series — goal only needs the scalar MWR default.
+  // Value-mode default return: the book's own all-time annualized TWR
+  // (fraction → percent). Skip benchmark series — goal only needs the scalar.
+  //
+  // This used to be the money-weighted return, which on a book that moves
+  // money between holdings reads far too high — 36% a year on the reporting
+  // book — and offering that as a default expected return would have projected
+  // a retirement out of an artefact. The time-weighted rate is the compound
+  // growth the holdings actually delivered, which is the thing being projected
+  // forward. See `buildPerformanceView` for why no MWR is published at all.
   const perf = await buildPerformanceView(deps, userId, {
     range: "ALL",
     benchmarks: [],
   });
   const annualReturnPct =
-    perf.mwrAnnualized == null ? null : new Decimal(perf.mwrAnnualized).times(100);
+    perf.twrAnnualized == null ? null : new Decimal(perf.twrAnnualized).times(100);
 
   // Average monthly buys over the trailing 12 months, in the computation
   // currency. Same-currency rows only (mirrors the yield-on-cost convention);

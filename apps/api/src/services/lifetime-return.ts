@@ -1,4 +1,4 @@
-import { Decimal, computeDisposals, type PositionTransaction } from "@sage/core";
+import { Decimal, computeDisposals, computePositions, type PositionTransaction } from "@sage/core";
 import { toPositionTransaction } from "../lib/to-position-transaction";
 import type { TransactionRow } from "./portfolio-book";
 import type { SeriesFxLookup } from "./valuation-series";
@@ -24,6 +24,9 @@ export interface LifetimeReturn {
   realised: Decimal;
   /** Dividends and interest actually banked: gross less the tax withheld. */
   income: Decimal;
+  /** What the still-open positions cost to acquire, converted at `asOf`.
+   *  Subtract from today's market value for the unrealised third of the sum. */
+  openCost: Decimal;
   /** True when some flow could not be priced and was left out, so the totals
    *  are short rather than wrong. */
   incomplete: boolean;
@@ -42,6 +45,9 @@ export function computeLifetimeReturn(
   rows: TransactionRow[],
   fxLookup: SeriesFxLookup,
   targetCurrency: string,
+  /** Date to price open cost at — the series' last date, so the unrealised
+   *  third is stated against the same day its market value is. */
+  asOf: string,
 ): LifetimeReturn {
   let incomplete = false;
   let approximated = false;
@@ -93,5 +99,17 @@ export function computeLifetimeReturn(
     income = income.minus(withheld);
   }
 
-  return { realised, income, incomplete, approximated };
+  // Cost of what is still held, at one date. Unlike the two figures above,
+  // this deliberately does NOT convert at each purchase's own date: it is
+  // subtracted from a market value stated at `asOf`, and mixing the two dates
+  // would book a currency move as a gain on shares nobody sold. The portfolio
+  // card does the same, so the two pages state one unrealised figure.
+  let openCost = new Decimal(0);
+  for (const position of computePositions(txs)) {
+    const converted = convert(position.costBasis.toDecimal(), position.costBasis.currency, asOf);
+    if (converted === null) continue;
+    openCost = openCost.plus(converted);
+  }
+
+  return { realised, income, openCost, incomplete, approximated };
 }

@@ -36,7 +36,7 @@ describe("OverviewStatStrip", () => {
       />,
     );
     expect(screen.getByText("YTD return")).toBeInTheDocument();
-    expect(screen.getByText("Vs cost")).toBeInTheDocument();
+    expect(screen.getByText("Made since you started")).toBeInTheDocument();
     expect(screen.getByText("—")).toBeInTheDocument(); // null totalReturn
   });
 });

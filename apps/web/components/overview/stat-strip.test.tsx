@@ -44,14 +44,14 @@ describe("OverviewStatStrip", () => {
         ytdPercent={8}
         income={income}
         annualIncome={{ amount: "3600", currency: "DKK" }}
-        totalReturn={{ amount: { amount: "500", currency: "DKK" }, percent: 12 }}
+        totalReturn={{ amount: { amount: "500", currency: "DKK" } }}
         taxRate={null}
       />,
     );
     for (const el of container.querySelectorAll(".label-caps")) {
       expect(el.textContent).not.toContain("·");
     }
-    expect(container.textContent).toContain("all-time");
-    expect(container.textContent).not.toContain("· all-time");
+    expect(container.textContent).toContain("held, sold and paid out");
+    expect(container.textContent).not.toContain("· held");
   });
 });

@@ -60,11 +60,13 @@ export function PerformanceCard({
       )}
       <div className="mt-1 text-xs text-muted-foreground">
         {totalReturn
-          ? // All-time simple return (price + dividends vs cost) — not the same
-            // period or method as the YTD TWR above; both can legitimately
-            // disagree in sign when deposits/timing differ from cost basis.
-            `All-time vs cost ${totalReturn.percent >= 0 ? "+" : "−"}${formatMoney(totalReturn.amount).replace(/^-/, "")} (${pct(totalReturn.percent)})`
-          : "All-time vs cost —"}
+          ? // The book's whole life in money: what today's holdings have gained,
+            // every sale ever made, and the income banked after tax. Neither the
+            // period nor the method of the YTD rate above, and deliberately no
+            // percentage of its own — a lifetime gain has no denominator anyone
+            // agrees on, so the rate stays a time-weighted one over a window.
+            `Made since you started ${totalReturn.amount.amount.startsWith("-") ? "−" : "+"}${formatMoney(totalReturn.amount).replace(/^-/, "")}`
+          : "Made since you started —"}
       </div>
     </Card>
   );

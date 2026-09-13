@@ -26,7 +26,12 @@ export function OverviewStatStrip({
 }) {
   const f = netFactor(taxRate);
   const ytdTone = ytdPercent == null ? "" : ytdPercent >= 0 ? "text-gain" : "text-loss";
-  const trTone = totalReturn == null ? "" : totalReturn.percent >= 0 ? "text-gain" : "text-loss";
+  const trTone =
+    totalReturn == null
+      ? ""
+      : totalReturn.amount.amount.startsWith("-")
+        ? "text-loss"
+        : "text-gain";
   // Headline this month's FULL total, matching the Income card below — the
   // strip used to show received-so-far, so the same month read two ways on one
   // screen. Received is demoted to the context line.
@@ -55,7 +60,7 @@ export function OverviewStatStrip({
       />
       <Stat
         size="sm"
-        label="Vs cost"
+        label="Made since you started"
         value={
           totalReturn ? (
             <span className={trTone}>
@@ -66,7 +71,7 @@ export function OverviewStatStrip({
             "—"
           )
         }
-        context={totalReturn ? `${pct(totalReturn.percent)} all-time` : undefined}
+        context="held, sold and paid out"
       />
     </StatStrip>
   );

@@ -537,7 +537,10 @@ export interface DashboardDTO {
   todayChange: { amount: MoneyDTO; percent: number } | null;
   /** Display-currency total return (price gain/loss + lifetime dividends),
    *  aggregated across holdings. Null when no display currency is set. */
-  totalReturn: { amount: MoneyDTO; percent: number } | null;
+  /** What the book has made over its whole life: unrealised gain, every sale
+   *  ever made, and income banked after tax. No percentage — see the API's
+   *  dashboard route for why a lifetime gain has no agreed denominator. */
+  totalReturn: { amount: MoneyDTO } | null;
   /** YTD time-weighted return (fraction, e.g. 0.042 = +4.2%). Embedded so
    *  the overview does not need a separate GET /performance call. */
   ytdTwr: number | null;
@@ -619,8 +622,14 @@ export interface PerformanceDTO {
   simpleReturn: number | null;
   twr: number | null;
   twrAnnualized: number | null;
-  mwr: number | null;
-  mwrAnnualized: number | null;
+  /** Realised gains and income banked over the WHOLE book, not this window.
+   *  Null when the series could not be built. */
+  lifetime: {
+    unrealised: MoneyDTO;
+    realised: MoneyDTO;
+    income: MoneyDTO;
+    total: MoneyDTO;
+  } | null;
   volatility: number | null;
   maxDrawdown: number | null;
   bestDay: PerformancePointDTO | null;

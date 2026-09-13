@@ -45,8 +45,12 @@ interface PerformanceBody {
   insufficientData: boolean;
   twr: number | null;
   twrAnnualized: number | null;
-  mwr: number | null;
-  mwrAnnualized: number | null;
+  lifetime: {
+    unrealised: { amount: string; currency: string };
+    realised: { amount: string; currency: string };
+    income: { amount: string; currency: string };
+    total: { amount: string; currency: string };
+  } | null;
   volatility: number | null;
   maxDrawdown: number | null;
   bestDay: { date: string; value: number } | null;
@@ -151,10 +155,16 @@ describeDb("GET /performance", () => {
     // Single-currency book: nothing was converted, so nothing was approximated.
     expect(body.fxApproximated).toBe(false);
     expect(body.twrAnnualized).toBeNull(); // window ≤ 365 days
-    // XIRR of −100 @ d0, +5 @ ~d183, +121 @ ~d364 ≈ 0.27 annualized
-    expect(body.mwr).toBeGreaterThan(0.25);
-    expect(body.mwr).toBeLessThan(0.29);
-    expect(body.mwrAnnualized).toBeNull();
+    // The book's whole life, which for a book with no sales is the shares'
+    // unrealised gain plus the dividend that landed. Deliberately checked here
+    // rather than only in the unit test: this is the response field the
+    // overview's headline reads.
+    expect(body.lifetime!.realised.amount).toBe("0.00");
+    expect(Number(body.lifetime!.income.amount)).toBeCloseTo(5, 2);
+    expect(Number(body.lifetime!.total.amount)).toBeCloseTo(
+      Number(body.lifetime!.unrealised.amount) + 5,
+      2,
+    );
     // stdev(0.15, 0.10) × √252 = 0.025/√2 … = 0.5612
     expect(body.volatility).toBeCloseTo(0.5612, 3);
     expect(body.maxDrawdown).toBeCloseTo(0, 6);
@@ -231,7 +241,7 @@ describeDb("GET /performance", () => {
     const body = (await res.json()) as PerformanceBody;
     expect(body.insufficientData).toBe(true);
     expect(body.twr).toBeNull();
-    expect(body.mwr).toBeNull();
+    expect(body.lifetime).toBeNull();
     expect(body.indexSeries).toEqual([]);
     expect(body.window).toBeNull();
     // Easiest of the three response paths to forget: a page that gives up on
