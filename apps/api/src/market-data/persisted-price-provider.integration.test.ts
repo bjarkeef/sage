@@ -553,4 +553,74 @@ describeDb("PersistedPriceProvider", () => {
     release();
     await drainPriceRefreshesForTests();
   });
+
+  // ---- a settled close beats an intraday print from the same session -------
+  //
+  // The reporting book served a Milan ETF's 07:04 print — nine minutes after
+  // the open — as its current price two days later, while that session's
+  // official close sat in `price_daily` all along. Two reads a minute apart
+  // with the market shut reported different portfolio totals.
+
+  it("serves the stored close when a bar exists for the quote's own date", async () => {
+    const intraday: Quote = {
+      symbol: "SETTLED1",
+      // 07:04 UTC: inside the session, hours before it closed.
+      price: Money.of("21.915", "USD"),
+      asOf: new Date(`${new Date(NOW).toISOString().slice(0, 10)}T07:04:18Z`),
+      previousClose: Money.of("21.80", "USD"),
+    };
+    await store.writeQuote(intraday, new Date(NOW));
+    await store.writeBars("SETTLED1", [bar(new Date(NOW), "21.92")], new Date(NOW));
+
+    const q = await provider.getQuote("SETTLED1");
+
+    expect(q.price.amount.toString()).toBe("21.92");
+    // Day-over-day still compares against the PRIOR session, untouched.
+    expect(q.previousClose!.amount.toString()).toBe("21.8");
+  });
+
+  it("keeps the quote when no bar exists for its date", async () => {
+    // The case this whole quote path exists for: history has fallen behind, so
+    // the quote is genuinely the newest thing known and must stand.
+    await store.writeQuote({ ...liveQuote("39.551"), symbol: "STALEBARS1" }, new Date(NOW));
+    await store.writeBars("STALEBARS1", [bar(dayOffset(-22), "38.10")], new Date(NOW));
+
+    const q = await provider.getQuote("STALEBARS1");
+
+    expect(q.price.amount.toString()).toBe("39.551");
+  });
+
+  it("keeps the quote when the stored bar is in another currency", async () => {
+    // Not the same measurement; swapping one for the other would mis-state the
+    // holding rather than merely date it.
+    const usd: Quote = { ...liveQuote("100"), symbol: "CCYMIX1" };
+    await store.writeQuote(usd, new Date(NOW));
+    const eur = bar(new Date(NOW), "90");
+    await store.writeBars(
+      "CCYMIX1",
+      [
+        {
+          ...eur,
+          open: Money.of("90", "EUR"),
+          high: Money.of("90", "EUR"),
+          low: Money.of("90", "EUR"),
+          close: Money.of("90", "EUR"),
+        },
+      ],
+      new Date(NOW),
+    );
+
+    const q = await provider.getQuote("CCYMIX1");
+
+    expect(q.price.amount.toString()).toBe("100");
+  });
+
+  it("applies the same rule to a cold symbol fetched upstream", async () => {
+    upstream.quote = liveQuote("21.915");
+    await store.writeBars("COLDSETTLED1", [bar(new Date(NOW), "21.92")], new Date(NOW));
+
+    const q = await provider.getQuote("COLDSETTLED1");
+
+    expect(q.price.amount.toString()).toBe("21.92");
+  });
 });

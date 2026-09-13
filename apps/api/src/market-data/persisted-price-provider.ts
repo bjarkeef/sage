@@ -158,13 +158,47 @@ export class PersistedPriceProvider implements IMarketDataProvider {
       // including SymbolNotFoundError, which must stay neutral.
       const fresh = await this.inner.getQuote(symbol);
       await this.store.writeQuote(fresh, new Date(this.now()));
-      return fresh;
+      return this.settled(symbol, fresh);
     }
 
     if (!isFresh(stored.fetchedAt, this.now(), QUOTE_TTL_MS)) {
       this.refreshQuoteInBackground(symbol);
     }
-    return stored.quote;
+    return this.settled(symbol, stored.quote);
+  }
+
+  /**
+   * A settled close beats an intraday print from the same session.
+   *
+   * A quote's `asOf` is whenever the provider last saw a trade, which for a
+   * thin listing can be hours before that session ended: on the reporting book
+   * a Milan ETF was quoted at 07:04 UTC — nine minutes after the open — and an
+   * Amsterdam one at 14:48, and both were being served as "the current price"
+   * two days later. Meanwhile the official close for the very same date was
+   * already sitting in `price_daily`.
+   *
+   * So the portfolio total moved between two reads a minute apart with the
+   * market shut, and the newest point of the chart was a mid-session print
+   * while every point behind it was a close — two different bases in one line.
+   *
+   * The rule: if we hold a bar for the quote's own calendar date, that bar is
+   * the same session's settled answer and wins. A quote from a date we have no
+   * bar for is genuinely newer than anything stored — a live session, or a
+   * symbol whose history has fallen behind — and stands unchanged, which is
+   * the case this quote path exists to serve.
+   */
+  private async settled(symbol: string, quote: Quote): Promise<Quote> {
+    const day = new Date(`${toIsoDay(quote.asOf)}T00:00:00Z`);
+    let bar: PriceBar | undefined;
+    try {
+      [bar] = await this.store.readBars(symbol, day, day);
+    } catch {
+      return quote; // the store is the optimisation, never the dependency
+    }
+    // Currencies differing means the two are not the same measurement, and
+    // silently swapping one for the other would mis-state the holding.
+    if (!bar || bar.close.currency !== quote.price.currency) return quote;
+    return { ...quote, price: bar.close };
   }
 
   async getHistoricalPrices(
