@@ -15,11 +15,13 @@ import { reconcileDividends } from "../services/dividend-reconciliation";
 type IncomeView = Awaited<ReturnType<typeof buildDividendIncomeView>>;
 type AnnouncedRow = IncomeView["announced"][number];
 type ProjectedRow = IncomeView["projected"][number];
+type RetroactiveRow = IncomeView["retroactive"][number];
 type MonthlyBreakdownRow = IncomeView["summary"]["monthlyBreakdown"][number];
 
 const WINDOW_DAYS = 30;
 const MAX_ROWS = 5;
 const MIN_ROWS = 3;
+const MAX_STREAM_POINTS = 800;
 
 export interface UpcomingRow {
   symbol: string;
@@ -84,12 +86,104 @@ export function previousMarketDay(todayIso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Adds `n` months to an ISO date in UTC, clamping the day so that adding to
+ *  the 31st never rolls into the following month (JS Date would turn
+ *  2026-03-31 minus one month into 2026-03-03). */
+function addMonths(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + n);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  return d.toISOString().slice(0, 10);
+}
+
 /** Adds `n` days to an ISO date, in UTC — same arithmetic shape as
  *  previousMarketDay, so callers stay immune to local-timezone drift. */
 function addDays(iso: string, n: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
+}
+
+/** How sure Sage is that a payment happens for the amount shown. The three
+ *  tiers are not a scale Sage invents — they are exactly the three arrays the
+ *  income view already returns, which is why the stream can be built from a
+ *  payload the dashboard was loading anyway. */
+export type PaymentCertainty = "paid" | "confirmed" | "estimated";
+
+export interface IncomeStreamPointDTO {
+  /** Payment date, falling back to the ex-date when the payer has not named
+   *  one — same fallback `selectUpcoming` uses, so a payment cannot appear on
+   *  two different days depending on which component drew it. */
+  date: string;
+  /** Already in the display currency: the income view FX-converts all three
+   *  arrays before they leave it. Gross — the tax rate travels separately on
+   *  `income.dividendTaxRate` and is applied at render, the way every other
+   *  income surface in the app does it. */
+  amount: string;
+  currency: string;
+  symbol: string;
+  certainty: PaymentCertainty;
+}
+
+/** Twelve months back and twelve forward, every payment as one point.
+ *
+ *  The window is symmetric on purpose: the forward half is the span the hero
+ *  figure names ("income, next twelve months"), so the reader can see the
+ *  figure's own territory rather than being asked to trust it. The backward
+ *  half is what makes the forward half legible — a lumpy book looks like a
+ *  forecasting artefact until you can see it was lumpy last year too.
+ *
+ *  Capped, because a monthly-paying book of a few hundred holdings would
+ *  otherwise put thousands of points on the wire for a chart 1,200px wide.
+ *  The cap drops the OLDEST points first: the right-hand half is the half the
+ *  headline is about.
+ *
+ *  Pure — "today" is an argument, not a clock read — so it unit-tests directly
+ *  and cannot rot the way a fixture with a hardcoded date does.
+ */
+export function selectIncomeStream(
+  retroactive: RetroactiveRow[],
+  announced: AnnouncedRow[],
+  projected: ProjectedRow[],
+  todayIso: string,
+): IncomeStreamPointDTO[] {
+  const from = addMonths(todayIso, -12);
+  const to = addMonths(todayIso, 12);
+
+  const points: IncomeStreamPointDTO[] = [
+    ...retroactive.map((r) => ({
+      date: r.paymentDate ?? r.exDate,
+      amount: r.income,
+      currency: r.currency,
+      symbol: r.symbol,
+      certainty: "paid" as const,
+    })),
+    ...announced.map((a) => ({
+      date: a.paymentDate ?? a.exDate,
+      amount: a.income,
+      currency: a.currency,
+      symbol: a.symbol,
+      certainty: "confirmed" as const,
+    })),
+    ...projected.map((p) => ({
+      date: p.paymentDate ?? p.projectedExDate,
+      amount: p.income,
+      currency: p.currency,
+      symbol: p.symbol,
+      certainty: "estimated" as const,
+    })),
+  ]
+    // A zero drawn at zero height is an invisible mark that still costs a DOM
+    // node and still answers a hover; drop them rather than draw nothing.
+    .filter((pt) => pt.date >= from && pt.date <= to && new Decimal(pt.amount).gt(0))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return points.length > MAX_STREAM_POINTS
+    ? points.slice(points.length - MAX_STREAM_POINTS)
+    : points;
 }
 
 export function selectRecentDividends(announced: AnnouncedRow[], todayIso: string): AnnouncedRow[] {
@@ -210,6 +304,12 @@ export function dashboardRoutes(
     const currentMonth = todayIso.slice(0, 7);
 
     const upcomingDividends = selectUpcoming(income.announced, income.projected, todayIso);
+    const incomeStream = selectIncomeStream(
+      income.retroactive,
+      income.announced,
+      income.projected,
+      todayIso,
+    );
     const recentDividends = selectRecentDividends(income.announced, todayIso);
     const thisMonth = selectThisMonth(income.summary.monthlyBreakdown, currentMonth);
     const allocation = selectAllocation(
@@ -278,6 +378,7 @@ export function dashboardRoutes(
         thisMonth,
         dividendTaxRate: income.dividendTaxRate,
       },
+      incomeStream,
       upcomingDividends,
       recentDividends,
       allocation,

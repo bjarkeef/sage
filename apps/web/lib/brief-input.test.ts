@@ -86,6 +86,7 @@ function dashboard(overrides: Partial<DashboardDTO> = {}): DashboardDTO {
       thisMonth: null,
       dividendTaxRate: null,
     },
+    incomeStream: [],
     upcomingDividends: [],
     recentDividends: [],
     allocation: [],

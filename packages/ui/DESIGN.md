@@ -14,13 +14,13 @@ Live values: `packages/ui/src/styles/tokens.css` + `globals.css`.
 
 ### Container & rhythm
 
-| Token / primitive | Value                                                                                                                  |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Page container    | `max-w-page` **1120px**, centered, `px-4 sm:px-8` (16px below `sm`, 32px above — 32 each side is 17% of a 375px phone) |
-| Narrow container  | `max-w-narrow` **720px** — `<PageShell width="narrow">` (Settings; Import stays default-width for its preview tables)  |
-| Section spacing   | **56px** vertical between page sections; whitespace is the separator, never a background shift                         |
-| Card padding      | **24px** (`p-6`); `<Card compact>` → **20px** (`p-5`); intra-card gaps **12–14px**                                     |
-| Row height        | **44px** (`min-h-11`) single-line rows; two-line cells (primary + secondary) grow the same row, no separate track      |
+| Token / primitive | Value                                                                                                                                                                                                                                                                                                                |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page container    | `max-w-page` **1200px**, centered, `px-4 sm:px-8` (16px below `sm`, 32px above — 32 each side is 17% of a 375px phone). Was 1120; the overview leads with a chart of discrete events, and event charts buy legibility with horizontal room. Two-column cards land at ~575px each, which is still a comfortable card. |
+| Narrow container  | `max-w-narrow` **720px** — `<PageShell width="narrow">` (Settings; Import stays default-width for its preview tables)                                                                                                                                                                                                |
+| Section spacing   | **56px** vertical between page sections; whitespace is the separator, never a background shift                                                                                                                                                                                                                       |
+| Card padding      | **24px** (`p-6`); `<Card compact>` → **20px** (`p-5`); intra-card gaps **12–14px**                                                                                                                                                                                                                                   |
+| Row height        | **44px** (`min-h-11`) single-line rows; two-line cells (primary + secondary) grow the same row, no separate track                                                                                                                                                                                                    |
 
 ### Breakpoints
 
@@ -137,6 +137,7 @@ Geist + Geist Mono. Mono is demoted to data only — the core fix over the old
 | Role                   | Class / utility                                                                        | Spec                                                                                                                                                                                                |
 | ---------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hero numeral           | `hero-num`                                                                             | Geist 300, 44px, `-0.02em`, tabular-nums                                                                                                                                                            |
+| Overview figure        | `horizon-num`                                                                          | Geist 200, `clamp(38px, 4vw, 56px)`, `-0.035em`, tabular-nums — the one page-leading figure. **56px is a ceiling, not a starting point**; see below                                                 |
 | Stat numeral           | `stat-num`                                                                             | Geist 300, 32px, `-0.02em`, tabular-nums                                                                                                                                                            |
 | Small stat numeral     | `<Stat size="sm">` (`font-display text-xl font-light tracking-[-0.01em] tabular-nums`) | Geist 300, 20px — for dense strips beneath a hero/md stat                                                                                                                                           |
 | Page title             | `<PageHeader>` h1 (`font-display text-title font-semibold tracking-[-0.03em]`)         | Geist 600, 28px, `-0.03em`                                                                                                                                                                          |
@@ -149,6 +150,60 @@ Geist + Geist Mono. Mono is demoted to data only — the core fix over the old
 
 Dates are always human (`May 11, 2026`) via the shared `formatDate` helper —
 ISO strings never render in the UI.
+
+#### A figure is sized by what has to live under it
+
+`horizon-num` shipped at `clamp(48px, 8vw, 108px)`, which resolved to **108px**
+on a 1440 screen. That number came from a misreading: `SAGE_vision.md` cites
+48–54px "from Fey's dashboard", but those measurements were taken from
+**fey.com, the marketing site**, not the app. Measured on the shipped apps this
+design is held against — Fey ~18px, Monarch ~28px, shadcn dashboard-01 ~30px.
+
+The cost was structural rather than aesthetic. Once the lead is 108px the next
+tier has to be set at 32px to register beside it, and 32px is card-headline
+size — so the overview's footnote row rendered at the same weight as its cards
+and **nothing on the page read as secondary**. Fey's calm comes from restraint
+at small sizes plus density; copying the scale copies the opposite of the thing.
+
+The rule: pick the lead figure's size from the quietest thing that must sit
+under it, not from how important the figure feels. If a 13px supporting line
+cannot read as supporting, the figure is too big.
+
+#### One page, one question
+
+A page leads with **one** figure and does not restate it in another framing.
+The overview shipped with four ways of saying "what have I made" — a lifetime
+gain on money in, a one-year gain on money in, a YTD time-weighted rate, and a
+lifetime total return — differing by a quarter on a real book with nothing on
+screen reconciling them. All four were individually correct and individually
+defensible, which is exactly why they accumulated.
+
+Before adding a figure, name the question it answers and check no figure on the
+page already answers it. If two figures answer the same question by different
+methods, they do not belong on the same screen: the one with a home elsewhere
+goes there, and the survivor names its own basis in words
+("YTD, time-weighted", "+13.01% on money in").
+
+### The certainty ramp is the app's signature
+
+`--certainty-paid` / `--certainty-confirmed` / `--certainty-estimated` are not
+three decorative golds. They are the three arrays the dividend income view
+already separates — `retroactive`, `announced`, `projected` — and the ramp is
+**ordinal**, stepping in lightness rather than hue: on dark `paid` is the
+lightest step, on light it is the darkest, because "most certain" must read as
+"most solid" against whichever ground it sits on. Both ramps are
+contrast-validated in `tokens.css`; read the comments there before touching a
+value.
+
+Any surface that mixes what has happened with what is forecast should use it,
+and should use nothing else to say the same thing. Sage is the only app in its
+benchmark set that knows the difference between a declared dividend and a
+predicted one; drawing that difference is the most distinctive thing the design
+system owns. The overview's income stream and the /dividends bars are the same
+vocabulary at two scales.
+
+Never encode certainty as opacity alone — a 40%-alpha bar on a busy ground
+reads as a rendering artefact, not as a forecast.
 
 ### Color
 

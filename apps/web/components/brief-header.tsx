@@ -61,12 +61,15 @@ export function BriefHeader({
   useEffect(() => setMounted(true), []);
 
   if (layout === "inline") {
+    // No greeting. "Good evening, Sage." is a greeting used as information,
+    // which is on this app's own rejected list — the hour is already in the
+    // eyebrow two lines above, and the slot is the only one on the page that
+    // can carry something real. The grammar here is what moved, then what is
+    // coming; `composeColorLine` already composes exactly that.
+    if (segments.length === 0) return null;
     return (
-      <p className="max-w-[46ch] text-lg/relaxed font-light text-muted-foreground text-balance">
-        <span className="text-foreground" suppressHydrationWarning>
-          {`${greeting}${first ? `, ${first}` : ""}.`}
-        </span>{" "}
-        {segments.length > 0 && renderSegments(segments)}
+      <p className="max-w-[54ch] text-lg/relaxed font-light text-muted-foreground text-balance">
+        {renderSegments(segments)}
       </p>
     );
   }
