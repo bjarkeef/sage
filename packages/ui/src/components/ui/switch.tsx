@@ -11,7 +11,12 @@ const Switch = React.forwardRef<
   <SwitchPrimitive.Root
     ref={ref}
     className={cn(
-      "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary",
+      // Checked is `bg-foreground`, not `bg-primary`: a switch is chrome, and
+      // the accent does not fill chrome (DESIGN.md §1). This also matches
+      // `Button`'s default variant — on/primary is a foreground-coloured pill
+      // in both, so the two read as the same kind of affordance. Nine of these
+      // stacked down Settings in sage green were the loudest thing in the app.
+      "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-foreground",
       className,
     )}
     {...props}

@@ -22,6 +22,18 @@ describe("Callout", () => {
         Done
       </Callout>,
     );
-    expect(screen.getByTestId("c").className).toContain("border-gain/30");
+    expect(screen.getByTestId("c").className).toContain("bg-gain/10");
+  });
+
+  // A callout sits in the page flow, so it is a surface and takes its edge
+  // from its wash. Borders belong to things that float over arbitrary content
+  // — Popover, Dialog, Toast. See DESIGN.md §1.
+  it.each(["info", "error", "success"] as const)("%s tone draws no border", (tone) => {
+    render(
+      <Callout tone={tone} data-testid="c">
+        Body
+      </Callout>,
+    );
+    expect(screen.getByTestId("c").className).not.toMatch(/\bborder(-|\b)/);
   });
 });

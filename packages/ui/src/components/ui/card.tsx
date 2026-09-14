@@ -6,14 +6,23 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   compact?: boolean;
 }
 
-/** Surface shell: white-alpha wash + hairline. Depth by layering, never shadow. */
+/** Surface shell: a white-alpha wash and nothing else. Depth by layering, never
+ *  a border and never a shadow.
+ *
+ *  The border is deliberately absent. With `--surface-card` at 0.015 and
+ *  `--hairline` at 0.07 the outline was ~4.7x the fill it enclosed, so cards
+ *  read as empty boxes ruled onto the ground rather than as raised surfaces —
+ *  the opposite of what DESIGN.md §1 asks for, and the single biggest reason
+ *  the app looked boxy next to Fey. The fix is one token up and one class off:
+ *  the wash now carries the edge by itself. Do not re-add `border-hairline`
+ *  here; if two adjacent cards need separating, that is a gap, not a rule. */
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, compact, ...props }, ref) => (
     <div
       ref={ref}
       data-card=""
       className={cn(
-        "rounded-card border border-hairline bg-surface-card text-card-foreground",
+        "rounded-card bg-surface-card text-card-foreground",
         compact ? "p-5" : "p-6",
         className,
       )}

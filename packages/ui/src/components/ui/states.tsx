@@ -32,7 +32,7 @@ export function ErrorState({ message, onRetry, className }: ErrorStateProps) {
     <div
       role="alert"
       className={cn(
-        "flex flex-col items-center gap-3 rounded-card border border-hairline bg-surface-card px-6 py-10 text-center",
+        "flex flex-col items-center gap-3 rounded-card bg-surface-card px-6 py-10 text-center",
         className,
       )}
     >

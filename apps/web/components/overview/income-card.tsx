@@ -36,7 +36,7 @@ export function IncomeCard({
       <div className="mb-3.5">
         <CardTitle className="mb-0" meta={<BasisChip taxed={taxed} />}>
           <span className="inline-flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-income" />
+            <span className="h-2 w-2 rounded-full bg-income-fill" />
             Income
           </span>
         </CardTitle>
@@ -44,7 +44,7 @@ export function IncomeCard({
       </div>
       <div className="stat-num">{monthTotal ? formatMoney(monthTotal) : "—"}</div>
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-hairline">
-        <div className="h-full rounded-full bg-income" style={{ width: `${ratio}%` }} />
+        <div className="h-full rounded-full bg-income-fill" style={{ width: `${ratio}%` }} />
       </div>
       <div className="mt-2 text-xs text-muted-foreground">
         {received ? `${formatMoney(received)} received so far` : "No income this month"}
