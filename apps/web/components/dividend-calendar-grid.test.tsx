@@ -405,15 +405,17 @@ describe("DividendCalendarGrid", () => {
       vi.setSystemTime(day1);
       const { rerender } = render(<DividendCalendarGrid retroactive={[]} projected={[]} />);
 
-      const day15 = screen.getByText("15", { selector: "span" });
-      expect(day15.className).toContain("bg-primary");
+      // Asserted through `data-today`, not through the marker's colour class.
+      // This test is about WHICH day is marked; it used to check for
+      // `bg-primary` and so failed the moment the marker stopped being sage,
+      // reporting a styling change as a broken midnight boundary.
+      expect(screen.getByText("15", { selector: "span" })).toHaveAttribute("data-today");
 
       vi.setSystemTime(day2);
       rerender(<DividendCalendarGrid retroactive={[]} projected={[]} />);
 
-      const day16 = screen.getByText("16", { selector: "span" });
-      expect(day16.className).toContain("bg-primary");
-      expect(screen.getByText("15", { selector: "span" }).className).not.toContain("bg-primary");
+      expect(screen.getByText("16", { selector: "span" })).toHaveAttribute("data-today");
+      expect(screen.getByText("15", { selector: "span" })).not.toHaveAttribute("data-today");
     } finally {
       vi.useRealTimers();
     }

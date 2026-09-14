@@ -55,7 +55,7 @@ export function InstrumentSearch({
             <li key={`${r.symbol}-${r.exchange}`}>
               <button
                 type="button"
-                className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-surface-hover"
                 onClick={() => {
                   onSelect(r);
                   setQuery(`${r.symbol} — ${r.name}`);

@@ -22,12 +22,16 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-sidebar: var(--sidebar);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-gain: var(--gain);
   --color-gain-foreground: var(--gain-foreground);
   --color-income: var(--income);
+  /* `bg-income-fill` — areas (bars, dots, swatches). `text-income` stays the
+     contrast-tuned text value. See tokens.css for why they differ in light. */
+  --color-income-fill: var(--income-fill);
   --color-income-muted: var(--income-muted);
   --color-loss: var(--loss);
   --color-loss-foreground: var(--loss-foreground);
@@ -142,6 +146,30 @@
       animation: none;
     }
   }
+}
+
+/** The overview chart's bleed — wider than the reading column, but capped.
+ *
+ *  The plot runs past the column on purpose: on that page the chart IS the
+ *  composition, and boxed into 1120px it read as an illustration of the number
+ *  above it rather than the ground beneath it.
+ *
+ *  The cap is the part that was missing. At `100cqw` the bleed tracked the
+ *  whole content area with no ceiling, so on a 2560px screen the plot was
+ *  2325px against a 1120px column — twice the width of every other element on
+ *  the page, including this chart's own range control, which centres on the
+ *  reading column and so ended up floating in the middle of the plot. 1440px
+ *  is the ceiling: at the 1440px design width `100cqw` already resolves
+ *  narrower than that, so nothing moves there, and above it the plot stops
+ *  growing and the page holds one composition at every width.
+ *
+ *  `cqw` rather than `vw` because it measures the scroll area minus the
+ *  sidebar, so it can never put a scrollbar on the page. Needs the
+ *  `@container/main` wrapper to resolve against. */
+@utility horizon-bleed {
+  --horizon-w: min(100cqw, 1440px);
+  width: var(--horizon-w);
+  margin-left: calc((var(--horizon-w) - 100%) / -2);
 }
 
 @utility fade-up {

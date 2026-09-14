@@ -26,7 +26,7 @@ export function AnnualIncomeCard({
       className="relative flex h-full min-h-[138px] flex-col"
     >
       <div className="flex items-center gap-2 label-caps text-muted-foreground">
-        <span className="h-2 w-2 rounded-full bg-income" />
+        <span className="h-2 w-2 rounded-full bg-income-fill" />
         <span>Annual income</span>
         <InfoTooltip label="About this figure">
           Forward 12-month dividend income across your holdings, after dividend tax when a rate is

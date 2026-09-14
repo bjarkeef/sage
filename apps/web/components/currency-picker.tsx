@@ -49,7 +49,7 @@ export function CurrencyPicker({ initialCurrency = null }: { initialCurrency?: s
         <button
           type="button"
           onClick={() => void handleSelect(null)}
-          className={`w-full px-3 py-1.5 text-left text-xs hover:bg-accent ${current === null ? "font-medium text-foreground" : "text-muted-foreground"}`}
+          className={`w-full px-3 py-1.5 text-left text-xs hover:bg-surface-hover ${current === null ? "font-medium text-foreground" : "text-muted-foreground"}`}
         >
           Native
         </button>
@@ -58,7 +58,7 @@ export function CurrencyPicker({ initialCurrency = null }: { initialCurrency?: s
             key={ccy}
             type="button"
             onClick={() => void handleSelect(ccy)}
-            className={`w-full px-3 py-1.5 text-left text-xs hover:bg-accent ${current === ccy ? "font-medium text-foreground" : "text-muted-foreground"}`}
+            className={`w-full px-3 py-1.5 text-left text-xs hover:bg-surface-hover ${current === ccy ? "font-medium text-foreground" : "text-muted-foreground"}`}
           >
             {ccy}
           </button>

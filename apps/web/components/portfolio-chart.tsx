@@ -611,13 +611,12 @@ export function PortfolioChart({
       <div
         className={`relative ${
           horizon
-            ? // Out to the full width of the content area, not merely through
-              // the column's gutters: the column caps at 1120px, so on a wide
-              // screen the plot still sat in a margin. `100cqw` measures the
-              // `@container/main` wrapper, which is the scroll area minus the
-              // sidebar — the one measurement that is right at every width and
-              // cannot put a scrollbar on the page the way `100vw` would.
-              "h-65 w-[100cqw] ml-[calc((100cqw-100%)/-2)]"
+            ? // Wider than the reading column, but capped — see `horizon-bleed`
+              // in globals.css. This used to be a bare `w-[100cqw]`, which
+              // bleeds without a ceiling: past ~1500px the plot outgrew every
+              // other element on the page and the range control below, which
+              // centres on the reading column, sat marooned in the middle of it.
+              "h-65 horizon-bleed"
             : ambient
               ? "h-50"
               : "h-60"

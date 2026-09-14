@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Callout, Card, CardTitle, DataRow, RowCell, RowGrid, RowHeader } from "@sage/ui";
 import { getSystemStatus } from "@/lib/api";
@@ -103,14 +104,29 @@ export function SystemSection() {
     staleTime: 60_000,
   });
 
+  // Uptime is withheld until after mount, so the server render and the first
+  // client render agree that it is absent.
+  //
+  // This is a `meta` prop, and `CardTitle` renders the whole `<div>` only when
+  // it is set — so a server/client disagreement here is not a text difference
+  // React can reconcile, it is an element appearing out of nowhere, and it
+  // threw "Hydration failed… this tree will be regenerated on the client" on
+  // /settings. It reproduced intermittently, which is what a cache-warmth race
+  // looks like: whether `data` is already resolved on the client's first
+  // render depends on what the router had prefetched.
+  //
+  // Gating on mount removes the race outright rather than narrowing it. The
+  // figure is a server-clock duration that never ticks once painted, so it has
+  // no business participating in hydration in the first place.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  const uptime =
+    mounted && data ? `${formatUptime(data.environment.uptimeSeconds)} uptime` : undefined;
+
   return (
     <div className="mt-8">
       <Card className="space-y-5">
-        <CardTitle
-          meta={data ? formatUptime(data.environment.uptimeSeconds) + " uptime" : undefined}
-        >
-          System
-        </CardTitle>
+        <CardTitle meta={uptime}>System</CardTitle>
 
         {isLoading && <p className="text-xs text-muted-foreground">Reading system status…</p>}
 

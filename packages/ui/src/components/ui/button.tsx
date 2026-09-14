@@ -12,8 +12,12 @@ const buttonVariants = cva(
       variant: {
         default: "bg-foreground text-background shadow-sm hover:bg-foreground/90",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        outline: "border border-border bg-background hover:bg-accent hover:text-accent-foreground",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+        // Hover is a wash, not the accent. `bg-accent` here tinted every ghost
+        // and outline button sage on hover — including the ones in the mobile
+        // More sheet and the "Load more" rows — which is the accent on chrome
+        // (DESIGN.md §1). A button's border is fine: `outline` is defined by it.
+        outline: "border border-border bg-background hover:bg-surface-hover hover:text-foreground",
+        ghost: "hover:bg-surface-hover hover:text-foreground",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
       },
       size: {

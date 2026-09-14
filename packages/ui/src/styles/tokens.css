@@ -49,6 +49,18 @@
   --gold-400: #9a7430;
   --gold-500: #7a5c1f;
 
+  /* Warm paper — the LIGHT theme's ground family, and deliberately not part of
+     the `--gray-*` ramp above. Those greys are true neutrals (R≈G≈B) and have
+     to stay that way: they were made neutral to fix a green cast in dark, and
+     dark still depends on it. Light wants the opposite — a ground with a
+     little warmth in it, so that gold (this file's reserved income hue) reads
+     as chosen rather than as a neutral that got dirty. Two steps are enough;
+     `--paper-200` is here for a third region if one ever earns it. */
+  --paper-50: #faf8f4;
+  --paper-100: #f1ede4;
+  --paper-200: #e6e0d3;
+  --ink-900: #1a1714;
+
   --white: #ffffff;
 }
 
@@ -57,36 +69,48 @@
    Light theme.
    ───────────────────────────────────────────────────────────── */
 :root {
-  --background: var(--gray-50);
-  --foreground: #141413;
+  --background: var(--paper-50);
+  /* The shell ground. Dark keeps Fey's one-flat-ground rule (identical to
+     --background); light steps it down, because two near-whites separated by
+     a 7%-alpha hairline do not read as two regions. */
+  --sidebar: var(--paper-100);
+  --foreground: var(--ink-900);
   --card: var(--white);
-  --card-foreground: #141413;
+  --card-foreground: var(--ink-900);
   --popover: var(--white);
-  --popover-foreground: #141413;
-  --muted: var(--gray-100);
-  --muted-foreground: rgba(20, 20, 19, 0.65);
+  --popover-foreground: var(--ink-900);
+  --muted: var(--paper-100);
+  --muted-foreground: rgba(26, 23, 20, 0.62);
 
   --primary: var(--brand-600);
   --primary-foreground: var(--white);
-  --secondary: var(--gray-100);
-  --secondary-foreground: #141413;
+  --secondary: var(--paper-100);
+  --secondary-foreground: var(--ink-900);
   --accent: var(--brand-100);
   --accent-foreground: var(--brand-700);
   --destructive: var(--red-500);
   --destructive-foreground: var(--white);
 
-  --border: rgba(20, 20, 19, 0.12);
-  --input: rgba(20, 20, 19, 0.12);
+  /* Every alpha below composites over warm paper, so the ink being layered has
+     to be warm too (48 38 22, not the old neutral 20 20 19). A neutral-grey
+     alpha over a warm ground reads as a faint cool film — the thing that made
+     the old light theme look washed out rather than quiet. */
+  --border: rgba(48, 38, 22, 0.12);
+  --input: rgba(48, 38, 22, 0.12);
   --ring: var(--brand-400);
   --radius: 16px;
 
-  /* layering — depth from washes and hairlines, not borders (round 3) */
-  --surface-hover: rgba(20, 20, 19, 0.04);
-  --surface-active: rgba(20, 20, 19, 0.07);
-  --hairline: rgba(20, 20, 19, 0.07);
-  --surface-card: rgba(20, 20, 19, 0.015);
-  --surface-focus: rgba(20, 20, 19, 0.09);
-  --hairline-faint: rgba(20, 20, 19, 0.05);
+  /* layering — depth from washes and hairlines, not borders (round 3)
+     `--surface-card` carries the card on its own: `Card` draws no border, so
+     this value IS the card edge. It was 0.015 while `--hairline` was 0.07,
+     which meant every card read as an outline with nothing inside it — the
+     exact inversion of this section's name. See DESIGN.md §1 "Depth". */
+  --surface-hover: rgba(48, 38, 22, 0.04);
+  --surface-active: rgba(48, 38, 22, 0.07);
+  --hairline: rgba(48, 38, 22, 0.08);
+  --surface-card: rgba(48, 38, 22, 0.035);
+  --surface-focus: rgba(48, 38, 22, 0.09);
+  --hairline-faint: rgba(48, 38, 22, 0.05);
   --bloom: color-mix(in srgb, var(--primary) 8%, transparent);
 
   /* finance semantics — first-class, themeable */
@@ -104,25 +128,43 @@
   --certainty-estimated-border: color-mix(in srgb, var(--brand-500) 30%, transparent);
 
   /* Bar fills, light theme — an ordinal confidence ramp, so the steps step in
-     lightness. Validated against this surface (white card): adjacent ΔE 16.3
-     (normal vision, floor 15) and the lowest step 3.69:1 (floor 3:1).
-     Inverted relative to dark: on white the darkest gold reads as the most
-     certain, so `paid` is the darkest step here and the lightest one there.
-     Held to a fourth, non-validator criterion too: OKLCH chroma per step, at
-     the same hue as --income (81.7°), pushed to the edge of the sRGB gamut
-     at each step's lightness so the ramp stays visibly gold rather than
-     desaturating to near-black. Chroma 0.062 / 0.095 / 0.128 — still below
-     the validator's categorical 0.10 floor at the darkest two steps (gold is
-     gamut-starved at low lightness; the floor is a categorical-palette check
-     this ordinal ramp is exempt from), but roughly double the first pass's
-     0.03 / 0.069, which the validator's own chroma reading called "reads
-     gray" for the darkest step. */
-  --certainty-paid: #3d2a00;
-  --certainty-confirmed: #725200;
-  --certainty-estimated: #ac7d00;
+     lightness. Inverted relative to dark: on white the darkest gold reads as
+     the most certain, so `paid` is the darkest step here and the lightest one
+     there.
 
-  /* income vocabulary — gold's reserved job: dividend/income surfaces only */
+     REVISED 2026-09-14, and it is a deliberate trade. The previous ramp was
+     #3d2a00 / #725200 / #ac7d00, chosen to hold adjacent ΔE 16.3 with the
+     lightest step at 3.69:1. Holding that separation with the lightest step
+     pinned near the 3:1 floor forced the darkest step down to L* ~18, where
+     gold is gamut-starved and simply renders black-brown — the previous
+     comment said as much, noting its own chroma check "reads gray" there. On
+     a real page the /dividends month bars read as a row of near-black blocks
+     with no family resemblance to the gold legend beside them.
+
+     This ramp keeps every step on the pure gold hue (blue channel at 0, so
+     chroma is maximal for that hue at each lightness) and spaces it evenly in
+     lightness at L* ~30 / 45 / 60. Contrast against the white card is
+     9.0 : 5.3 : 3.25 — all still clear of the 3:1 floor. The cost is adjacent
+     separation, now ~15 points of L* rather than ~20: the three steps are
+     closer together than they were, in exchange for all three reading as gold.
+
+     The alternative — outlining or hatching the faintest step so the ramp
+     needs only two fills — is NOT available: see certainty-bars.tsx, where
+     that was tried and reverted because at twelve-thin-bar scale the chart
+     read as a row of near-empty dashed boxes. */
+  --certainty-paid: #5e4000;
+  --certainty-confirmed: #8a6200;
+  --certainty-estimated: #b98600;
+
+  /* income vocabulary — gold's reserved job: dividend/income surfaces only.
+     Two roles, because one value cannot serve both on a light ground:
+     `--income` is TEXT and must clear 4.5:1 against the card, which on white
+     pushes gold down to a brown; `--income-fill` is for AREAS (progress bars,
+     dots, swatches), which only need 3:1 and so can sit where gold still
+     looks like gold. Using the text value as a bar fill is what made the
+     overview's income bar read muddy. In dark the two coincide. */
   --income: var(--gold-500);
+  --income-fill: var(--gold-400);
   --income-muted: color-mix(in srgb, var(--gold-500) 55%, transparent);
 
   /* chart language — line is always the accent; comparisons are muted, dashed.
@@ -159,6 +201,7 @@
 /* Dark theme — same roles, remapped. */
 .dark {
   --background: var(--gray-950);
+  --sidebar: var(--gray-950);
   --foreground: #ececea;
   --card: #161615;
   --card-foreground: #ececea;
@@ -183,7 +226,7 @@
   --surface-hover: rgba(255, 255, 255, 0.04);
   --surface-active: rgba(255, 255, 255, 0.07);
   --hairline: rgba(255, 255, 255, 0.07);
-  --surface-card: rgba(255, 255, 255, 0.015);
+  --surface-card: rgba(255, 255, 255, 0.035);
   --surface-focus: rgba(255, 255, 255, 0.09);
   --hairline-faint: rgba(255, 255, 255, 0.05);
   --bloom: color-mix(in srgb, var(--primary) 10%, transparent);
@@ -212,7 +255,11 @@
   --certainty-confirmed: #c2985c;
   --certainty-estimated: #8a6a3f;
 
+  /* Dark needs no text/fill split: gold is comfortably chromatic at the
+     lightness that reads on near-black, so both roles take the same value.
+     The alias exists so components can name the role they mean. */
   --income: var(--gold-300);
+  --income-fill: var(--gold-300);
   --income-muted: color-mix(in srgb, var(--gold-300) 55%, transparent);
 
   --chart-marker: var(--foreground);
