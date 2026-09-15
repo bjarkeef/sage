@@ -75,7 +75,25 @@ export function AllocationBars({
             />
           ))}
         </div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-x-6 gap-y-0.5">
+        {/* The track floor has to cover what the row actually holds.
+            `auto-fit` packs in as many columns as the floor allows and then
+            stretches them, so a floor that is too low does not overflow — it
+            silently compresses every cell, and `min-w-0 truncate` on the label
+            turns that into clipped text rather than a visible break.
+            190px fits `[dot] [label] [%]`. It does not fit the money column
+            that `value` adds: on /diversification's full-width cards that
+            packed five columns into 1072px and left the label 25px, rendering
+            "VanEck Morningstar Developed Markets…" as "Van…". With a value
+            present the floor rises to 300px, which packs three and leaves the
+            label ~170px. */}
+        <div
+          className={cn(
+            "grid gap-x-6 gap-y-0.5",
+            display.some((row) => row.value)
+              ? "grid-cols-[repeat(auto-fit,minmax(300px,1fr))]"
+              : "grid-cols-[repeat(auto-fit,minmax(190px,1fr))]",
+          )}
+        >
           {display.map((row, i) => (
             <div
               key={row.label}

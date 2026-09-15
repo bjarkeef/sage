@@ -67,6 +67,42 @@ describe("AllocationBars", () => {
     expect(screen.getByRole("img").getAttribute("aria-label")).toContain("By Sector");
   });
 
+  // jsdom computes no layout, so the defect this guards — labels compressed to
+  // ~25px and ellipsised — is invisible to any width assertion. The track floor
+  // is the thing that actually decides it, so assert the floor.
+  it("widens the legend track when rows carry a value", () => {
+    // `auto-fit` stretches columns to fill, so too low a floor does not
+    // overflow: it packs in more columns and silently squeezes every label.
+    // A money column needs ~90px of the row, which 190px does not leave.
+    const { container } = render(
+      <AllocationBars
+        title="By sector"
+        rows={[{ label: "Consumer Defensive", percent: 50, value: "DKK 50,193.88" }]}
+        variant="bar"
+      />,
+    );
+    // An attribute selector cannot carry the unescaped parens in the arbitrary
+    // class, so match on the className string instead.
+    const legend = [...container.querySelectorAll("div")].find((d) =>
+      d.className.includes("auto-fit"),
+    )!;
+
+    expect(legend.className).toContain("minmax(300px,1fr)");
+  });
+
+  it("keeps the narrow track when rows are label and percent only", () => {
+    const { container } = render(
+      <AllocationBars title="By sector" rows={[{ label: "Cash", percent: 50 }]} variant="bar" />,
+    );
+    // An attribute selector cannot carry the unescaped parens in the arbitrary
+    // class, so match on the className string instead.
+    const legend = [...container.querySelectorAll("div")].find((d) =>
+      d.className.includes("auto-fit"),
+    )!;
+
+    expect(legend.className).toContain("minmax(190px,1fr)");
+  });
+
   it("hideTitle suppresses the heading in rows variant too", () => {
     const rows = [{ label: "Tech", percent: 60 }];
     render(<AllocationBars title="By Sector" rows={rows} variant="rows" hideTitle />);
