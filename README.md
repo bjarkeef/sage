@@ -5,6 +5,8 @@
   </picture>
 </p>
 
+[![CI](https://github.com/bjarkeef/sage/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bjarkeef/sage/actions/workflows/ci.yml)
+[![Self-host smoke](https://github.com/bjarkeef/sage/actions/workflows/self-host-smoke.yml/badge.svg?branch=main)](https://github.com/bjarkeef/sage/actions/workflows/self-host-smoke.yml)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-3d6a4d)](./LICENSE)
 [![Self-hosted: Docker Compose](https://img.shields.io/badge/self--hosted-Docker%20Compose-3d6a4d)](./docs/DEPLOYMENT.md)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-3d6a4d)](./CONTRIBUTING.md)

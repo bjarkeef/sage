@@ -15,6 +15,10 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # The suite runs in about three minutes. Twenty is not a budget, it is a
+    # tripwire: without it a hung test sits on a runner until GitHub's six-hour
+    # default, and every other workflow here already carries one.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
