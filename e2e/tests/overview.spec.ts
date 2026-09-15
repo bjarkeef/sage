@@ -2,18 +2,28 @@ import { test, expect } from "@playwright/test";
 import { createCustomHolding, signUpFreshUser, submitTransaction } from "./support";
 
 /**
- * The overview's range control sits ON the plot, and the plot is a canvas.
+ * The overview's value chart is a canvas, and its range control has to be
+ * clickable where it is drawn.
  *
- * It shipped unclickable: lightweight-charts gives its two canvases their own
- * stacking, so a later sibling still painted under them and `elementFromPoint`
- * on a pill returned CANVAS. Nothing caught it — jsdom has no layout and no
- * paint order, so a unit test can click a control that is buried under a canvas
- * in every real browser and pass. Only a real click at real coordinates can
- * tell the difference, which is what this is.
+ * It shipped unclickable once: lightweight-charts gives its two canvases their
+ * own stacking, so a later sibling still painted under them and
+ * `elementFromPoint` on a pill returned CANVAS. Nothing caught it — jsdom has
+ * no layout and no paint order, so a unit test can click a control buried under
+ * a canvas in every real browser and pass. Only a real click at real
+ * coordinates can tell the difference, which is what this is.
  *
  * It deliberately clicks by POSITION rather than by role. Asserting the control
  * responds to `getByRole(...).click()` would pass even with the canvas on top,
  * because Playwright scrolls to and actuates the element itself.
+ *
+ * NOTE (2026-09-15): the control no longer sits ON the plot. The overview leads
+ * with the income stream now, and the value chart moved into a card below the
+ * fold in its `ambient` variant, where the range control is a normal sibling
+ * above the canvas rather than an overlay. So this no longer guards the
+ * stacking bug it was written for — it guards that the control is reachable at
+ * all, which is still worth a real browser. The overlay path survives in
+ * `PortfolioChart`'s `horizon` variant, which nothing currently renders; if
+ * that variant is ever deleted, delete the `z-10` note with it.
  */
 test.describe("the overview's range control", () => {
   test("is clickable where it is drawn, not just present in the DOM", async ({ page }) => {
