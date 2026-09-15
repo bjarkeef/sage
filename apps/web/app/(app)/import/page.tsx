@@ -233,8 +233,9 @@ export default function ImportPage() {
 
   return (
     <PageShell className="py-10">
+      {/* Sentence case, like every other page title in the app. */}
       <PageHeader
-        title="Import Portfolio"
+        title="Import portfolio"
         description="Bring in your transactions from any broker's CSV export — you map the columns — or from a Snowball Analytics export."
       />
 
