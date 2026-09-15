@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Delta, SectionHeader, Stat } from "@sage/ui";
+import { Card, Delta, SectionHeader, Stat } from "@sage/ui";
 import { getPortfolio } from "../../../../lib/api";
 import { qk } from "../../../../lib/query/keys";
 import { formatMoney, moneyToNumber } from "../../../../lib/format";
@@ -107,13 +107,16 @@ export function PositionSection({
   return (
     <section className="mb-10">
       <SectionHeader title="Your position" />
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-card border border-hairline-faint bg-hairline-faint sm:grid-cols-5">
+      {/* One surface with ten labelled figures on it — not ten boxes. This was
+          a `gap-px` grid over `bg-hairline-faint`, the trick that draws a full
+          table ruling out of background bleed, which made the densest block on
+          the asset page also the boxiest thing in the app. Whitespace separates
+          the cells now; the card's wash holds them together (DESIGN.md §1). */}
+      <Card className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-5">
         {cells.map((c) => (
-          <div key={c.label} className="bg-background p-4">
-            <Stat size="sm" label={c.label} value={c.value} context={c.context} />
-          </div>
+          <Stat key={c.label} size="sm" label={c.label} value={c.value} context={c.context} />
         ))}
-      </div>
+      </Card>
     </section>
   );
 }

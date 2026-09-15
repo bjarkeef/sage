@@ -47,17 +47,14 @@ const pos = (o: Partial<PositionDTO>): PositionDTO => ({
 });
 
 describe("PerformanceCard", () => {
-  it("shows YTD and total return", () => {
-    render(
-      <PerformanceCard
-        ytdPercent={16.15}
-        totalReturn={{ amount: { amount: "2192", currency: "USD" } }}
-        relative={null}
-        benchmarkYtdTwr={null}
-      />,
-    );
+  it("shows the YTD rate and nothing that restates it", () => {
+    render(<PerformanceCard ytdPercent={16.15} relative={null} benchmarkYtdTwr={null} />);
     expect(screen.getByText(/16\.15%/)).toBeInTheDocument();
-    expect(screen.getByText(/2,192/)).toBeInTheDocument();
+    // The lifetime "made since you started" figure used to sit here as well.
+    // It is a third framing of "what have I made" beside a time-weighted rate
+    // and the Value card's Gain cell; it now lives only on the Value card.
+    // Asserted absent so a re-add fails here rather than in a design review.
+    expect(screen.queryByText(/Made since you started/)).not.toBeInTheDocument();
   });
 
   // `PerformanceRelativeDTO` carries risk ratios, not a return — the gap
@@ -67,7 +64,6 @@ describe("PerformanceCard", () => {
     render(
       <PerformanceCard
         ytdPercent={16.02}
-        totalReturn={null}
         relative={{
           benchmarkId: "sp500",
           benchmarkName: "S&P 500",
@@ -87,14 +83,7 @@ describe("PerformanceCard", () => {
 
   it("keeps its shape when no benchmark is available", () => {
     // Null is the honest answer on a book whose history outruns every index.
-    render(
-      <PerformanceCard
-        ytdPercent={16.02}
-        totalReturn={null}
-        relative={null}
-        benchmarkYtdTwr={null}
-      />,
-    );
+    render(<PerformanceCard ytdPercent={16.02} relative={null} benchmarkYtdTwr={null} />);
     expect(screen.getByText("+16.02%")).toBeInTheDocument();
     expect(screen.queryByText(/S&P 500/)).not.toBeInTheDocument();
   });
@@ -106,7 +95,6 @@ describe("PerformanceCard", () => {
     render(
       <PerformanceCard
         ytdPercent={16.02}
-        totalReturn={null}
         relative={{
           benchmarkId: "sp500",
           benchmarkName: "S&P 500",
@@ -268,27 +256,12 @@ describe("UpcomingCard", () => {
   });
 
   it("marks a YTD figure computed over incomplete price history", () => {
-    render(
-      <PerformanceCard
-        ytdPercent={9.1}
-        totalReturn={null}
-        incomplete
-        relative={null}
-        benchmarkYtdTwr={null}
-      />,
-    );
+    render(<PerformanceCard ytdPercent={9.1} incomplete relative={null} benchmarkYtdTwr={null} />);
     expect(screen.getByLabelText(/incomplete/i)).toBeInTheDocument();
   });
 
   it("shows no marker on a complete figure", () => {
-    render(
-      <PerformanceCard
-        ytdPercent={9.1}
-        totalReturn={null}
-        relative={null}
-        benchmarkYtdTwr={null}
-      />,
-    );
+    render(<PerformanceCard ytdPercent={9.1} relative={null} benchmarkYtdTwr={null} />);
     expect(screen.queryByLabelText(/incomplete/i)).not.toBeInTheDocument();
   });
 });

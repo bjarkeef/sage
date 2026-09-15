@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { selectUpcoming } from "./dashboard";
+import { selectUpcoming, selectIncomeStream } from "./dashboard";
 
 type AnnouncedRow = Parameters<typeof selectUpcoming>[0][number];
 type ProjectedRow = Parameters<typeof selectUpcoming>[1][number];
+type RetroactiveRow = Parameters<typeof selectIncomeStream>[0][number];
 
 /** n days from the moment the suite runs, in UTC — never a literal date, so
  *  this file can't rot into a past-dated fixture the way a hardcoded string
@@ -128,5 +129,98 @@ describe("selectUpcoming", () => {
       TODAY,
     );
     expect(rows.map((r) => r.symbol)).toEqual(["O"]);
+  });
+});
+
+function retro(
+  symbol: string,
+  paymentDate: string | null,
+  opts: { exDate?: string; income?: string } = {},
+): RetroactiveRow {
+  return {
+    symbol,
+    name: `${symbol} Inc`,
+    exDate: opts.exDate ?? paymentDate ?? TODAY,
+    paymentDate,
+    paymentDateEstimated: false,
+    amountPerShare: "0.25",
+    sharesHeld: "40",
+    income: opts.income ?? "10.00",
+    currency: "USD",
+  };
+}
+
+describe("selectIncomeStream", () => {
+  it("tags each source array with the certainty it represents", () => {
+    const pts = selectIncomeStream(
+      [retro("O", fromToday(-30))],
+      [announced("KO", fromToday(5), fromToday(10))],
+      [projected("PG", fromToday(100), fromToday(105))],
+      TODAY,
+    );
+
+    expect(pts.map((p) => [p.symbol, p.certainty])).toEqual([
+      ["O", "paid"],
+      ["KO", "confirmed"],
+      ["PG", "estimated"],
+    ]);
+  });
+
+  it("spans twelve months either side of today and drops what falls outside", () => {
+    const pts = selectIncomeStream(
+      [retro("OLD", fromToday(-400)), retro("IN", fromToday(-300))],
+      [],
+      [projected("FAR", fromToday(400), fromToday(400))],
+      TODAY,
+    );
+
+    expect(pts.map((p) => p.symbol)).toEqual(["IN"]);
+  });
+
+  it("falls back to the ex-date when the payer named no payment date", () => {
+    // Same fallback selectUpcoming uses. If these two ever diverge, one payment
+    // renders on two different days depending on which component drew it.
+    const ex = fromToday(-8);
+    const [pt] = selectIncomeStream([retro("O", null, { exDate: ex })], [], [], TODAY);
+
+    expect(pt!.date).toBe(ex);
+  });
+
+  it("sorts ascending across all three sources, not within each", () => {
+    const pts = selectIncomeStream(
+      [retro("A", fromToday(-10))],
+      [announced("B", fromToday(-20), fromToday(-20))],
+      [projected("C", fromToday(-30), fromToday(-30))],
+      TODAY,
+    );
+
+    expect(pts.map((p) => p.symbol)).toEqual(["C", "B", "A"]);
+  });
+
+  it("drops zero-amount payments rather than drawing an invisible mark", () => {
+    const pts = selectIncomeStream(
+      [retro("ZERO", fromToday(-5), { income: "0.00" }), retro("REAL", fromToday(-4))],
+      [],
+      [],
+      TODAY,
+    );
+
+    expect(pts.map((p) => p.symbol)).toEqual(["REAL"]);
+  });
+
+  it("keeps the forward half when the cap bites, dropping the oldest first", () => {
+    // 900 payments, all in the past year, oldest first — over the 800 cap.
+    const many = Array.from({ length: 900 }, (_, i) =>
+      retro(`S${i}`, fromToday(-360 + Math.floor(i / 3))),
+    );
+    const pts = selectIncomeStream(
+      many,
+      [],
+      [projected("TOMORROW", fromToday(1), fromToday(1))],
+      TODAY,
+    );
+
+    expect(pts).toHaveLength(800);
+    expect(pts.at(-1)?.symbol).toBe("TOMORROW");
   });
 });

@@ -79,14 +79,15 @@ const FIXTURE_DASHBOARD: DashboardDTO = {
   relative: null,
   benchmarkYtdTwr: null,
   income: {
-    projectedTwelveMonth: null,
-    trailingTwelveMonth: null,
+    projectedTwelveMonth: { amount: "1284.00", currency: "USD" },
+    trailingTwelveMonth: { amount: "1100.00", currency: "USD" },
     thisMonth: {
       received: { amount: "100", currency: "USD" },
       projected: { amount: "200", currency: "USD" },
     },
     dividendTaxRate: 35,
   },
+  incomeStream: [],
   upcomingDividends: [
     {
       symbol: "O",
@@ -118,8 +119,6 @@ const FIXTURE_DASHBOARD: DashboardDTO = {
     stalePrices: [],
   },
 };
-
-const EMPTY_CHANGE = { amount: "0", currency: "USD" };
 
 const FIXTURE_SETTINGS: UserSettingsDTO = {
   name: "Test User",
@@ -174,14 +173,15 @@ describe("OverviewClient", () => {
     // cache, not just fast enough to race a refetch.
     renderOverview();
 
-    await waitFor(() => expect(allByMoney("$4,550.00")).toHaveLength(1));
+    // Netted through the fixture's 35% rate: 1284.00 gross -> 834.60.
+    await waitFor(() => expect(allByMoney("$834.60")).toHaveLength(1));
     expect(dashSpy).not.toHaveBeenCalled();
     expect(settingsSpy).not.toHaveBeenCalled();
   });
 
   it("hides the stat strip by default and shows it when statStrip is on", async () => {
     const { queryClient } = renderOverview({ statStrip: false });
-    await screen.findByText(/Good /);
+    await screen.findByText("Income · next twelve months");
     expect(screen.queryByText("YTD return")).not.toBeInTheDocument();
 
     queryClient.setQueryData(qk.userSettings(), {
@@ -194,13 +194,13 @@ describe("OverviewClient", () => {
 
   it("hides a card when its pref is off", async () => {
     renderOverview({ upcomingCard: false });
-    await screen.findByText(/Good /);
+    await screen.findByText("Income · next twelve months");
     expect(screen.queryByText("Upcoming")).not.toBeInTheDocument();
   });
 
   it("nets the Upcoming card's dividend amounts through the real page wiring", async () => {
     renderOverview();
-    await screen.findByText(/Good /);
+    await screen.findByText("Income · next twelve months");
     // FIXTURE_DASHBOARD's upcoming dividend is gross $40.00 with a 35% tax
     // rate configured: the card must show the netted $26.00 and never the raw
     // gross figure, pinning overview-client.tsx's netting wire-up (regressing
@@ -213,18 +213,22 @@ describe("OverviewClient", () => {
     expect(within(upcomingCard).getByText("After tax")).toBeInTheDocument();
   });
 
-  it("greeting sentence carries no portfolio value or total day-change figure", async () => {
+  it("opens with no greeting and no figure the page already prints", async () => {
     renderOverview({});
-    await screen.findByText(/Good /);
+    await screen.findByText("Income · next twelve months");
+    // Two rejected patterns, both of which have shipped before. A greeting used
+    // as information ("Good evening, Sage") duplicates the eyebrow two lines
+    // up and spends the one slot that could carry a fact; "stands at" restated
+    // a figure already set in the largest type on the page.
     expect(document.body.textContent).not.toContain("stands at");
+    expect(screen.queryByText(/Good (morning|afternoon|evening)/)).not.toBeInTheDocument();
   });
 
-  /** The hero reads the last point of the value series, and that series is
-   *  empty until a portfolio has a day of price history behind it. A first-run
-   *  book whose only transaction is dated today rendered the biggest number on
-   *  the page as an em dash, beside a today-change in full and above a
-   *  Portfolio card showing the value — the page disagreed with itself. */
-  describe("hero value with no history yet", () => {
+  /** The book's worth is no longer the hero — it is one fact on the supporting
+   *  line under the stream. What survives from the old hero is the rule it was
+   *  built to enforce: this app does not sum across currencies, and it says so
+   *  rather than quietly dropping the row. */
+  describe("book value on the supporting line", () => {
     function renderWithDashboard(overrides: Partial<DashboardDTO>) {
       const qc = makeTestQueryClient();
       qc.setQueryData(qk.dashboard(), { ...FIXTURE_DASHBOARD, ...overrides });
@@ -232,41 +236,25 @@ describe("OverviewClient", () => {
       return renderWithClient(<OverviewClient />, qc);
     }
 
-    const noHistory = {
-      points: [],
-      changePercent: 0,
-      changeAmount: EMPTY_CHANGE,
-      stalePrices: [],
+    const usd = {
+      currency: "USD",
+      costBasis: { amount: "3197", currency: "USD" },
+      marketValue: { amount: "3197", currency: "USD" },
+      gainLoss: { amount: "0", currency: "USD" },
     };
 
-    it("falls back to the subtotal when the book is in one currency", async () => {
-      renderWithDashboard({
-        history: noHistory,
-        subtotalsByCurrency: [
-          {
-            currency: "USD",
-            costBasis: { amount: "3197", currency: "USD" },
-            marketValue: { amount: "3197", currency: "USD" },
-            gainLoss: { amount: "0", currency: "USD" },
-          },
-        ],
-      });
-
+    it("reads the subtotal when the book is in one currency", async () => {
+      renderWithDashboard({ subtotalsByCurrency: [usd] });
       await waitFor(() => expect(allByMoney("$3,197.00")).toHaveLength(1));
     });
 
     /** Summing across currencies is the one thing this app refuses to do, so
-     *  here the dash is the right answer rather than a gap to be filled. */
-    it("keeps the dash when the book spans more than one currency", async () => {
+     *  here the dash is the right answer rather than a gap to be filled — and
+     *  the label stays, so the refusal is visible instead of silent. */
+    it("keeps the label against a dash when the book spans more than one", async () => {
       renderWithDashboard({
-        history: noHistory,
         subtotalsByCurrency: [
-          {
-            currency: "USD",
-            costBasis: { amount: "3197", currency: "USD" },
-            marketValue: { amount: "3197", currency: "USD" },
-            gainLoss: { amount: "0", currency: "USD" },
-          },
+          usd,
           {
             currency: "EUR",
             costBasis: { amount: "1000", currency: "EUR" },
@@ -276,47 +264,22 @@ describe("OverviewClient", () => {
         ],
       });
 
-      await screen.findByText(/Good /);
+      await screen.findByText("Income · next twelve months");
+      expect(screen.getByText("Book value")).toBeInTheDocument();
       expect(screen.queryByText("$3,197.00")).not.toBeInTheDocument();
       expect(screen.getByText("—")).toBeInTheDocument();
     });
 
-    it("still prefers the series once there is history", async () => {
-      renderWithDashboard({
-        subtotalsByCurrency: [
-          {
-            currency: "USD",
-            costBasis: { amount: "1", currency: "USD" },
-            marketValue: { amount: "1", currency: "USD" },
-            gainLoss: { amount: "0", currency: "USD" },
-          },
-        ],
-      });
-
-      await waitFor(() => expect(allByMoney("$4,550.00")).toHaveLength(1));
-      expect(screen.queryByText("$1.00")).not.toBeInTheDocument();
-    });
-
-    it("prints the portfolio's value once, not once per component that knows it", async () => {
+    it("prints the book's value once, not once per component that knows it", async () => {
       // The chart's stat strip briefly carried a "Worth" cell repeating the
-      // hero numeral a few pixels below it. Locally the assertion above raced
-      // past it — the chart is lazily imported, so the hero resolved first and
-      // `findByText` was satisfied before the duplicate mounted. CI, on
-      // different timing, found both and failed. An explicit count cannot race:
-      // it waits for the chart, then counts.
-      renderWithDashboard({
-        subtotalsByCurrency: [
-          {
-            currency: "USD",
-            costBasis: { amount: "1", currency: "USD" },
-            marketValue: { amount: "1", currency: "USD" },
-            gainLoss: { amount: "0", currency: "USD" },
-          },
-        ],
-      });
+      // hero numeral a few pixels below it. The chart is lazily imported, so a
+      // plain findByText can resolve before the duplicate mounts and pass on a
+      // page that is wrong — CI, on different timing, found both. Waiting for
+      // the chart's own copy and then counting cannot race.
+      renderWithDashboard({ subtotalsByCurrency: [usd] });
 
       await screen.findByText(/Money in/);
-      expect(allByMoney("$4,550.00")).toHaveLength(1);
+      expect(allByMoney("$3,197.00")).toHaveLength(1);
     });
   });
 });

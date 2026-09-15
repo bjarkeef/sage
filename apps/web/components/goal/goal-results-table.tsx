@@ -30,7 +30,17 @@ export function GoalResultsTable({
   const headerCells = alternative
     ? ["Year", "Goal", "Portfolio", "Alternative"]
     : ["Year", "Goal", "Portfolio"];
-  const columns = alternative ? "minmax(0,1fr) 110px 140px 120px" : "minmax(0,1fr) 110px 140px";
+  // `max-content` rather than fixed pixels. The old 110/140/120 were sized
+  // against a book in the tens of thousands; a goal projection runs to the
+  // year it is aimed at, so by construction its last rows are the largest
+  // numbers in the app. On this book "DKK 2,448,954.74" needed 125px in a
+  // 120px column and rendered clipped. No pixel guess survives a long currency
+  // code, a bigger book or a JPY ledger — sizing to the content does. The
+  // label column stays `1fr` and the wrapper is already `overflow-x-auto`, so
+  // an extreme value scrolls rather than clipping.
+  const columns = alternative
+    ? "minmax(0,1fr) max-content max-content max-content"
+    : "minmax(0,1fr) max-content max-content";
 
   return (
     <div>

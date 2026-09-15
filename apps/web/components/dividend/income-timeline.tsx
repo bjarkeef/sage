@@ -235,7 +235,7 @@ export function IncomeTimeline({
 
       <div className="mt-3.5 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-[11px] w-[11px] rounded-full bg-income" />
+          <span className="h-[11px] w-[11px] rounded-full bg-income-fill" />
           Received
         </span>
         <span className="flex items-center gap-1.5">

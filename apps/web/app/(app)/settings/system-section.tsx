@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Callout, Card, CardTitle, DataRow, RowCell, RowGrid, RowHeader } from "@sage/ui";
 import { getSystemStatus } from "@/lib/api";
@@ -103,22 +104,43 @@ export function SystemSection() {
     staleTime: 60_000,
   });
 
+  // The WHOLE panel is withheld until after mount, not just the uptime figure.
+  //
+  // This section is a client component with no server prefetch, so during SSR
+  // the query has nothing and it renders the "Reading system status…" line. On
+  // the client's first render the query may already be resolved — whether it is
+  // depends on what the router had prefetched — and it renders a `Callout`
+  // instead. That is not a text difference React can reconcile: it is a <div>
+  // where the server put a <p>, and it threw "Hydration failed… this tree will
+  // be regenerated on the client" on /settings.
+  //
+  // An earlier pass gated only `uptime` on mount, which fixed the `meta` prop
+  // and left the larger mismatch in place — the error kept firing, just from a
+  // different node. Gating the data itself removes the race for every consumer
+  // of it at once, which is the only version of this fix that stays fixed.
+  //
+  // A server prefetch would also work and would avoid the brief loading line,
+  // but this is a read-only diagnostics panel below the fold on Settings, and
+  // it is not worth a blocking round-trip on every load of that page.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  const status = mounted ? data : undefined;
+  const uptime = status ? `${formatUptime(status.environment.uptimeSeconds)} uptime` : undefined;
+
   return (
     <div className="mt-8">
       <Card className="space-y-5">
-        <CardTitle
-          meta={data ? formatUptime(data.environment.uptimeSeconds) + " uptime" : undefined}
-        >
-          System
-        </CardTitle>
+        <CardTitle meta={uptime}>System</CardTitle>
 
-        {isLoading && <p className="text-xs text-muted-foreground">Reading system status…</p>}
+        {(!mounted || isLoading) && (
+          <p className="text-xs text-muted-foreground">Reading system status…</p>
+        )}
 
         {/* Registration stays open after the owner signs up, because closing it
             takes an env change and a restart that nothing prompts for. As a
             plain row next to "Node version" it read as trivia; anyone who can
             reach the port can still create an account. */}
-        {data?.environment.signups === "open" && (
+        {status?.environment.signups === "open" && (
           <Callout>
             <p className="font-medium">This instance is accepting new accounts.</p>
             <p className="mt-1 text-muted-foreground">
@@ -131,30 +153,30 @@ export function SystemSection() {
           </Callout>
         )}
 
-        {data && (
+        {status && (
           <>
             <div className="grid gap-5 sm:grid-cols-2">
               <InfoGroup
                 label="Environment"
                 rows={[
-                  ["Mode", data.environment.nodeEnv],
-                  ["Node", data.environment.nodeVersion],
-                  ["Signups", data.environment.signups],
+                  ["Mode", status.environment.nodeEnv],
+                  ["Node", status.environment.nodeVersion],
+                  ["Signups", status.environment.signups],
                   [
                     "Migrations",
-                    data.environment.schemaMigrations == null
+                    status.environment.schemaMigrations == null
                       ? "—"
-                      : String(data.environment.schemaMigrations),
+                      : String(status.environment.schemaMigrations),
                   ],
                 ]}
               />
               <InfoGroup
                 label="Providers"
                 rows={[
-                  ["Market data", data.providers.marketData],
-                  ["Enrichment", data.providers.enrichment],
-                  ["EODHD key", data.providers.keys.eodhd ? "configured" : "not set"],
-                  ...data.providers.health.map((h): [string, string] => [
+                  ["Market data", status.providers.marketData],
+                  ["Enrichment", status.providers.enrichment],
+                  ["EODHD key", status.providers.keys.eodhd ? "configured" : "not set"],
+                  ...status.providers.health.map((h): [string, string] => [
                     providerLabel(h.name),
                     healthValue(h),
                   ]),
@@ -177,22 +199,22 @@ export function SystemSection() {
                   header all along. */}
               <div className="flex items-center justify-between gap-3">
                 <h4 className="label-caps text-muted-foreground">Exchange rates</h4>
-                <CurrencyPicker initialCurrency={data.fx.displayCurrency} />
+                <CurrencyPicker initialCurrency={status.fx.displayCurrency} />
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{fxSummary(data.fx)}</p>
-              {data.fx.coverageFrom && (
+              <p className="mt-1 text-xs text-muted-foreground">{fxSummary(status.fx)}</p>
+              {status.fx.coverageFrom && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Historical coverage from {formatAsOf(data.fx.coverageFrom)}.
+                  Historical coverage from {formatAsOf(status.fx.coverageFrom)}.
                 </p>
               )}
-              {data.fx.pairs.length > 0 && (
+              {status.fx.pairs.length > 0 && (
                 <RowGrid columns="minmax(0,1fr) minmax(0,1fr) minmax(0,10rem)" className="mt-2">
                   <RowHeader
                     cells={["Currency", "Rate", "Source"]}
                     align={["left", "right", "right"]}
                   />
-                  {data.fx.pairs.map((pair) => {
-                    const source = sourceCell(pair, data.fx.ratesAsOf);
+                  {status.fx.pairs.map((pair) => {
+                    const source = sourceCell(pair, status.fx.ratesAsOf);
                     return (
                       <DataRow key={pair.from}>
                         <RowCell variant="text" primary={`${pair.from} → ${pair.to}`} />

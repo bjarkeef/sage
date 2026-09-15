@@ -8,6 +8,33 @@ import { formatMoney } from "../../lib/format";
 import { Skeleton } from "@sage/ui";
 
 /**
+ * How much of a year the book already pays for.
+ *
+ * A percentage is a ratio, and a ratio of two six-figure numbers is hard to
+ * feel. The same fact stated as time is not: "about eight days of the year" is
+ * a thing a person can picture, and it is pure arithmetic on figures already on
+ * screen rather than a claim about the reader's life. The exploration that led
+ * here drew milestones as "groceries covered" / "rent covered", which reads
+ * better still and which Sage cannot honestly draw — it does not know what
+ * anyone's groceries cost, and inventing a number for them would be the app
+ * editorialising about the reader. A year has 365 days for everyone.
+ *
+ * Only for an income goal. Against a net-worth target the metric is a balance,
+ * and "days of the year" means nothing.
+ */
+function coverage(pct: number): string | null {
+  if (pct >= 100) return "That is the whole year — the book covers it.";
+  const days = (pct / 100) * 365;
+  if (days < 1) return `About ${days.toFixed(1)} of a day in every year, so far.`;
+  if (days < 45) {
+    const d = Math.round(days);
+    return `About ${d} day${d === 1 ? "" : "s"} of every year, so far.`;
+  }
+  const months = Math.round(days / 30.44);
+  return `About ${months} month${months === 1 ? "" : "s"} of every year, so far.`;
+}
+
+/**
  * What the book is actually for, on the page you land on.
  *
  * A dividend account is not run for its net worth, and until now nothing on the
@@ -66,6 +93,7 @@ export function GoalBand() {
   }
 
   const pct = Math.max(0, Math.min(100, result.progressPct));
+  const covers = goal.type === "passive_income" ? coverage(result.progressPct) : null;
   const current = { amount: result.currentMetric, currency: result.currency };
   // `goalAtTargetYear` is the goal inflated to the target year — the figure
   // `progressPct` is actually measured against. Printing the nominal goal
@@ -91,6 +119,7 @@ export function GoalBand() {
       >
         <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
       </div>
+      {covers && <p className="text-xs text-muted-foreground">{covers}</p>}
     </div>
   );
 }

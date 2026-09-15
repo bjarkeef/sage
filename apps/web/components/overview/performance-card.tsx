@@ -1,5 +1,4 @@
 import { Card, CardTitle } from "@sage/ui";
-import { formatMoney } from "../../lib/format";
 import { formatGapPp } from "../performance-metrics";
 import type { DashboardDTO } from "../../lib/types";
 
@@ -9,13 +8,11 @@ function pct(v: number | null): string {
 
 export function PerformanceCard({
   ytdPercent,
-  totalReturn,
   incomplete = false,
   relative,
   benchmarkYtdTwr,
 }: {
   ytdPercent: number | null;
-  totalReturn: DashboardDTO["totalReturn"];
   /** The figure was computed over price history that starts after a holding
    *  was first held. A mark, not a banner — the overview is not where this
    *  gets resolved, so it points at /performance rather than explaining. */
@@ -58,16 +55,14 @@ export function PerformanceCard({
           {formatGapPp(gapPp)} vs {relative.benchmarkName}
         </div>
       )}
-      <div className="mt-1 text-xs text-muted-foreground">
-        {totalReturn
-          ? // The book's whole life in money: what today's holdings have gained,
-            // every sale ever made, and the income banked after tax. Neither the
-            // period nor the method of the YTD rate above, and deliberately no
-            // percentage of its own — a lifetime gain has no denominator anyone
-            // agrees on, so the rate stays a time-weighted one over a window.
-            `Made since you started ${totalReturn.amount.amount.startsWith("-") ? "−" : "+"}${formatMoney(totalReturn.amount).replace(/^-/, "")}`
-          : "Made since you started —"}
-      </div>
+      {/* "Made since you started" used to sit here too. It is a lifetime gain
+          measured on money in; the YTD figure above it is time-weighted over a
+          window; and the Value card's Gain cell is a third framing of the same
+          question. Three near-synonyms for "what have I made", differing by a
+          quarter on a real book with nothing on screen reconciling them, was
+          the single biggest source of the overview reading as information
+          overload. The lifetime figure now has exactly one home: the Value
+          card, beside the line that explains it. */}
     </Card>
   );
 }

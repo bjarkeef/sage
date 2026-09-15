@@ -14,13 +14,13 @@ Live values: `packages/ui/src/styles/tokens.css` + `globals.css`.
 
 ### Container & rhythm
 
-| Token / primitive | Value                                                                                                                  |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Page container    | `max-w-page` **1120px**, centered, `px-4 sm:px-8` (16px below `sm`, 32px above — 32 each side is 17% of a 375px phone) |
-| Narrow container  | `max-w-narrow` **720px** — `<PageShell width="narrow">` (Settings; Import stays default-width for its preview tables)  |
-| Section spacing   | **56px** vertical between page sections; whitespace is the separator, never a background shift                         |
-| Card padding      | **24px** (`p-6`); `<Card compact>` → **20px** (`p-5`); intra-card gaps **12–14px**                                     |
-| Row height        | **44px** (`min-h-11`) single-line rows; two-line cells (primary + secondary) grow the same row, no separate track      |
+| Token / primitive | Value                                                                                                                                                                                                                                                                                                                |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page container    | `max-w-page` **1200px**, centered, `px-4 sm:px-8` (16px below `sm`, 32px above — 32 each side is 17% of a 375px phone). Was 1120; the overview leads with a chart of discrete events, and event charts buy legibility with horizontal room. Two-column cards land at ~575px each, which is still a comfortable card. |
+| Narrow container  | `max-w-narrow` **720px** — `<PageShell width="narrow">` (Settings; Import stays default-width for its preview tables)                                                                                                                                                                                                |
+| Section spacing   | **56px** vertical between page sections; whitespace is the separator, never a background shift                                                                                                                                                                                                                       |
+| Card padding      | **24px** (`p-6`); `<Card compact>` → **20px** (`p-5`); intra-card gaps **12–14px**                                                                                                                                                                                                                                   |
+| Row height        | **44px** (`min-h-11`) single-line rows; two-line cells (primary + secondary) grow the same row, no separate track                                                                                                                                                                                                    |
 
 ### Breakpoints
 
@@ -74,18 +74,49 @@ the shell you are working around.
 
 ### Depth — wash, not borders
 
-| Token              | Value          | Use                                      |
-| ------------------ | -------------- | ---------------------------------------- |
-| `--surface-card`   | alpha **.015** | card fill                                |
-| `--surface-hover`  | alpha **.04**  | row/nav hover                            |
-| `--surface-active` | alpha **.07**  | inputs, active chips                     |
-| `--surface-focus`  | alpha **.09**  | focus state                              |
-| `--hairline`       | alpha **.07**  | card border (1px), section rules         |
-| `--hairline-faint` | alpha **.05**  | dividers inside cards (e.g. `StatStrip`) |
+| Token              | Value          | Use                                              |
+| ------------------ | -------------- | ------------------------------------------------ |
+| `--surface-card`   | alpha **.035** | card / callout / empty-state fill — and its edge |
+| `--surface-hover`  | alpha **.04**  | row/nav hover                                    |
+| `--surface-active` | alpha **.07**  | **input fill**, active nav, active chips         |
+| `--surface-focus`  | alpha **.09**  | focus state                                      |
+| `--hairline`       | alpha **.07**  | section rules, floating-overlay edges            |
+| `--hairline-faint` | alpha **.05**  | dividers inside cards (e.g. `StatStrip`)         |
 
 Alphas are white-on-dark (`.dark`) / near-black-on-light (`:root`) — same
-ladder, themed values. **No visible borders inside a card** (internal
-structure = faint hairlines + whitespace). **No shadows on dark surfaces.**
+ladder, themed values. **No shadows on dark surfaces.**
+
+#### A surface in the page flow has no border. Only floating things do.
+
+This is the rule the codebase got backwards for months, so it is stated as a
+line you can check rather than a principle you can interpret:
+
+- **In the flow → wash, no border.** `Card`, `Callout`, `ErrorState`, `Input`,
+  and anything you build that behaves like them. The fill _is_ the edge.
+- **Floating over arbitrary content → border allowed.** `Popover`, `Dialog`,
+  `Toast`. These land on top of whatever happens to be beneath them, so they
+  need an edge that does not depend on contrast with it.
+- **Inside a card → neither.** Internal structure is whitespace and
+  `--hairline-faint`, never a box.
+- **One narrow exception: a border that denotes a _state_, not a surface.** A
+  dashed outline marking an empty slot or a file drop target (`/import`,
+  `/goal`'s empty projection) says "nothing here yet, put something here"; the
+  destructive outline on Settings' danger zone says "this one bites". These are
+  signals, and they stay. The test is whether removing the border would lose
+  information: on a `Card` it loses nothing, on a drop zone it loses the
+  affordance.
+
+**Why it is written this way.** `--surface-card` was `.015` while `--hairline`
+was `.07`: the outline was **4.7× stronger than the fill it enclosed**, so every
+card read as an empty box ruled onto the ground — the exact inverse of "depth
+from washes, not borders", shipped under that heading. `Input` had the same
+inversion (`bg-background` inside `border-input`, while `--surface-active` sat
+there documented as the input fill and unused), and the asset page's position
+grid faked a full table ruling with `gap-px` over `bg-hairline-faint`.
+
+`Card` and `Callout` have tests asserting the **absence** of a border. If you
+find yourself re-adding one because two surfaces are hard to tell apart, the
+answer is a bigger gap, not a line.
 
 ### Radii
 
@@ -106,6 +137,7 @@ Geist + Geist Mono. Mono is demoted to data only — the core fix over the old
 | Role                   | Class / utility                                                                        | Spec                                                                                                                                                                                                |
 | ---------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hero numeral           | `hero-num`                                                                             | Geist 300, 44px, `-0.02em`, tabular-nums                                                                                                                                                            |
+| Overview figure        | `horizon-num`                                                                          | Geist 200, `clamp(38px, 4vw, 56px)`, `-0.035em`, tabular-nums — the one page-leading figure. **56px is a ceiling, not a starting point**; see below                                                 |
 | Stat numeral           | `stat-num`                                                                             | Geist 300, 32px, `-0.02em`, tabular-nums                                                                                                                                                            |
 | Small stat numeral     | `<Stat size="sm">` (`font-display text-xl font-light tracking-[-0.01em] tabular-nums`) | Geist 300, 20px — for dense strips beneath a hero/md stat                                                                                                                                           |
 | Page title             | `<PageHeader>` h1 (`font-display text-title font-semibold tracking-[-0.03em]`)         | Geist 600, 28px, `-0.03em`                                                                                                                                                                          |
@@ -119,6 +151,60 @@ Geist + Geist Mono. Mono is demoted to data only — the core fix over the old
 Dates are always human (`May 11, 2026`) via the shared `formatDate` helper —
 ISO strings never render in the UI.
 
+#### A figure is sized by what has to live under it
+
+`horizon-num` shipped at `clamp(48px, 8vw, 108px)`, which resolved to **108px**
+on a 1440 screen. That number came from a misreading: `SAGE_vision.md` cites
+48–54px "from Fey's dashboard", but those measurements were taken from
+**fey.com, the marketing site**, not the app. Measured on the shipped apps this
+design is held against — Fey ~18px, Monarch ~28px, shadcn dashboard-01 ~30px.
+
+The cost was structural rather than aesthetic. Once the lead is 108px the next
+tier has to be set at 32px to register beside it, and 32px is card-headline
+size — so the overview's footnote row rendered at the same weight as its cards
+and **nothing on the page read as secondary**. Fey's calm comes from restraint
+at small sizes plus density; copying the scale copies the opposite of the thing.
+
+The rule: pick the lead figure's size from the quietest thing that must sit
+under it, not from how important the figure feels. If a 13px supporting line
+cannot read as supporting, the figure is too big.
+
+#### One page, one question
+
+A page leads with **one** figure and does not restate it in another framing.
+The overview shipped with four ways of saying "what have I made" — a lifetime
+gain on money in, a one-year gain on money in, a YTD time-weighted rate, and a
+lifetime total return — differing by a quarter on a real book with nothing on
+screen reconciling them. All four were individually correct and individually
+defensible, which is exactly why they accumulated.
+
+Before adding a figure, name the question it answers and check no figure on the
+page already answers it. If two figures answer the same question by different
+methods, they do not belong on the same screen: the one with a home elsewhere
+goes there, and the survivor names its own basis in words
+("YTD, time-weighted", "+13.01% on money in").
+
+### The certainty ramp is the app's signature
+
+`--certainty-paid` / `--certainty-confirmed` / `--certainty-estimated` are not
+three decorative golds. They are the three arrays the dividend income view
+already separates — `retroactive`, `announced`, `projected` — and the ramp is
+**ordinal**, stepping in lightness rather than hue: on dark `paid` is the
+lightest step, on light it is the darkest, because "most certain" must read as
+"most solid" against whichever ground it sits on. Both ramps are
+contrast-validated in `tokens.css`; read the comments there before touching a
+value.
+
+Any surface that mixes what has happened with what is forecast should use it,
+and should use nothing else to say the same thing. Sage is the only app in its
+benchmark set that knows the difference between a declared dividend and a
+predicted one; drawing that difference is the most distinctive thing the design
+system owns. The overview's income stream and the /dividends bars are the same
+vocabulary at two scales.
+
+Never encode certainty as opacity alone — a 40%-alpha bar on a busy ground
+reads as a rendering artefact, not as a forecast.
+
 ### Color
 
 - Ground, sage ramp, brand indirection (`--brand-100…800` → `--sage-*`):
@@ -130,9 +216,62 @@ ISO strings never render in the UI.
   data only, never chrome. `AllocationBars` uses it for every segmented bar
   (allocation/diversification, income composition); there is no separate
   allocation or category palette.
-- Accent discipline: sage never colors chrome. `<Button>` default variant is
-  `bg-foreground text-background` (a white/near-black pill), not
-  `bg-primary` — CTAs stay neutral pills, not brand-colored buttons.
+- **Gold is income, and it has two tokens because one cannot do both jobs on a
+  light ground.** `--income` is the TEXT value and must clear 4.5:1 against the
+  card, which on white pushes gold down to a brown. `--income-fill` is for
+  AREAS — progress bars, dots, legend swatches — which only need 3:1 and can
+  therefore sit where gold still looks like gold. Use `text-income` for
+  figures and `bg-income-fill` for anything with area. In dark they resolve to
+  the same value; reach for the right one anyway, or light theme silently
+  regresses. The same constraint shapes the `--certainty-*` bar ramp, which is
+  inverted between themes (darkest = most certain on light, lightest on dark)
+  and documented at length in `tokens.css`.
+- **The shell has its own ground, `--sidebar`.** In dark it equals
+  `--background` — Fey's one-flat-ground rule. In light it steps down a shade,
+  because two near-whites separated by a hairline do not read as two regions.
+- **Light sits on warm paper; dark sits on neutral near-black.** The two themes
+  use different ground families on purpose. `--paper-50/100/200` + `--ink-900`
+  are the light ground and are gently warm; the `--gray-*` ramp is and must
+  stay true neutral (R≈G≈B), because it carries dark and was made neutral to
+  fix a green cast there. **The alpha ladder is warm in light too** — every
+  `--surface-*` and `--hairline*` composites `48 38 22`, not the old neutral
+  `20 20 19`. A cool-grey alpha over a warm ground reads as a faint film, and
+  that mismatch is most of what made the old light theme look washed out. If
+  you add a light-theme surface, take its alpha from the same warm base.
+
+#### Accent discipline — the accent has an allowlist, not a banlist
+
+"Sage never colors chrome" was in this file twice and was still being broken in
+a dozen places, because nobody agreed on what counted as chrome. So the rule is
+inverted: **`--primary` / `--accent` may appear in these places and nowhere
+else.**
+
+| Allowed               | Example                                           |
+| --------------------- | ------------------------------------------------- |
+| The chart line        | `--chart-line` is `--primary` by definition       |
+| Data marks on a chart | the invested overlay, a weight bar, an `avg` rule |
+| The focus ring        | `--ring`                                          |
+| Text links in prose   | `text-primary hover:underline`                    |
+| The brand mark        | `SageMark`                                        |
+
+Everything else is chrome and takes `--foreground`, `--muted-foreground`, or a
+`--surface-*` wash. **Emphasis is carried by weight, not by hue:** `Chip`'s
+`primary` tone is a brighter wash plus full-strength text against `neutral`'s
+muted pair; `Switch`'s "on" is `bg-foreground`, matching `Button`'s default
+variant so both read as the same kind of affordance.
+
+This is not an aesthetic preference. The accent is the only colour in the app
+with no other job, so every place it appears that _isn't_ carrying meaning
+spends the one signal it has. Nine sage switches down the Settings page and a
+sage nav pill are why the dark theme kept getting reported as "green" and
+"terminal" — a complaint twice misdiagnosed as a tinted grey ramp.
+
+Specifically banned, all of which shipped and have since been removed: the
+active sidebar and bottom-bar nav item, `Switch`'s checked track, the account
+avatar, status chips (`In portfolio`, `Corrected`), the dividend calendar's
+today marker, and the goal page's Insight callout.
+
+`Chip` and `Switch` have tests asserting they do not reach for it.
 
 ### Delta grammar
 
@@ -302,8 +441,10 @@ eyebrow names the figure and nothing else.
 <div className="label-caps">Annual income · forward · after tax</div>
 ```
 
-**No borders inside cards; no shadows on dark surfaces** — internal structure
-is whitespace + `--hairline-faint`, depth is the wash ladder.
+**No borders on a surface in the page flow, none inside a card, no shadows on
+dark surfaces** — the wash is the edge, internal structure is whitespace +
+`--hairline-faint`, and only floating overlays (`Popover`, `Dialog`, `Toast`)
+get a line. See §1 "A surface in the page flow has no border".
 
 ```tsx
 // Do
@@ -321,15 +462,21 @@ is whitespace + `--hairline-faint`, depth is the wash ladder.
 </Card>
 ```
 
-**Accent never colors chrome** — no sage-filled buttons or nav; sage stays
-data/brand-mark only.
+**Accent never colors chrome** — see the allowlist in §1. Sage is the chart
+line, data marks, the focus ring, prose links and the brand mark. Nav states,
+switches, status chips and "today" markers are chrome: they take a wash and a
+foreground, and emphasis comes from weight.
 
 ```tsx
 // Do
 <Button>Add transaction</Button>
+<Chip tone="primary">In portfolio</Chip>          {/* brighter wash, foreground text */}
+<Link className={active ? "bg-surface-active text-foreground" : "text-muted-foreground"} />
 
 // Don't
 <Button className="bg-primary text-primary-foreground">Add transaction</Button>
+<span className="bg-primary/10 text-primary">In portfolio</span>
+<Link className={active ? "bg-accent text-primary" : "text-muted-foreground"} />
 ```
 
 **Human dates always** — never ISO in the UI.

@@ -611,13 +611,12 @@ export function PortfolioChart({
       <div
         className={`relative ${
           horizon
-            ? // Out to the full width of the content area, not merely through
-              // the column's gutters: the column caps at 1120px, so on a wide
-              // screen the plot still sat in a margin. `100cqw` measures the
-              // `@container/main` wrapper, which is the scroll area minus the
-              // sidebar — the one measurement that is right at every width and
-              // cannot put a scrollbar on the page the way `100vw` would.
-              "h-65 w-[100cqw] ml-[calc((100cqw-100%)/-2)]"
+            ? // Wider than the reading column, but capped — see `horizon-bleed`
+              // in globals.css. This used to be a bare `w-[100cqw]`, which
+              // bleeds without a ceiling: past ~1500px the plot outgrew every
+              // other element on the page and the range control below, which
+              // centres on the reading column, sat marooned in the middle of it.
+              "h-65 horizon-bleed"
             : ambient
               ? "h-50"
               : "h-60"
@@ -689,7 +688,12 @@ export function PortfolioChart({
               // of one another rather than wrapping. The dividers turn with the
               // flow so the rule always separates, never underlines.
               "grid-flow-row divide-x-0 divide-y pt-1 [&>*]:px-0 [&>*]:py-3 sm:grid-flow-col sm:divide-x sm:divide-y-0 sm:[&>*]:px-6 sm:[&>*]:py-1 sm:[&>*:first-child]:pl-0"
-            : "sm:auto-cols-max sm:justify-start"
+            : // Stacked below `sm` for the same reason the horizon variant is:
+              // three equal columns of a 390px card is ~110px each, and a Gain
+              // cell reads "+DKK 19,441.53 (+13.01%)" — 230px of unbreakable
+              // figure. It pushed 108px past the card on a phone once this
+              // chart moved into one.
+              "grid-flow-row divide-x-0 divide-y [&>*]:px-0 [&>*]:py-2.5 sm:grid-flow-col sm:auto-cols-max sm:justify-start sm:divide-x sm:divide-y-0 sm:[&>*]:px-6 sm:[&>*]:py-1 sm:[&>*:first-child]:pl-0"
         }
       >
         <Stat

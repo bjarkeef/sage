@@ -509,6 +509,22 @@ export interface DashboardIncomeDTO {
   dividendTaxRate: number | null;
 }
 
+/** How sure Sage is that a payment happens for the amount shown — the three
+ *  arrays the income view already separates, named. Drives the overview
+ *  stream's tone ramp; see `--certainty-*` in tokens.css. */
+export type PaymentCertainty = "paid" | "confirmed" | "estimated";
+
+export interface IncomeStreamPointDTO {
+  /** Payment date, or the ex-date when the payer named none. */
+  date: string;
+  /** Display currency, GROSS — the client nets it by `dividendTaxRate`, as
+   *  every other income surface does. */
+  amount: string;
+  currency: string;
+  symbol: string;
+  certainty: PaymentCertainty;
+}
+
 export interface UpcomingRow {
   symbol: string;
   name: string;
@@ -557,6 +573,11 @@ export interface DashboardDTO {
    *  returns, so the comparison the card actually makes needs this separately. */
   benchmarkYtdTwr: number | null;
   income: DashboardIncomeDTO;
+  /** Every payment twelve months back and twelve forward, one point each,
+   *  ascending. The forward half is the span `income.projectedTwelveMonth`
+   *  names, which is why the overview can show the figure and its own
+   *  territory in one object. */
+  incomeStream: IncomeStreamPointDTO[];
   /** Announced and projected rows within the next 30 days, ascending on the
    *  date each row displays, capped at 5, floored at 3 (reaches past the
    *  window rather than render fewer). */

@@ -3,18 +3,20 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { PageShell, EmptyState } from "@sage/ui";
+import { Card, CardTitle, PageShell, EmptyState } from "@sage/ui";
 import { getDashboard, getUserSettings } from "../../lib/api";
 import { qk } from "../../lib/query/keys";
-import type { PortfolioHistoryPoint } from "../../lib/types";
+import type { IncomeStreamPointDTO } from "../../lib/types";
 import { composeColorLine } from "../../lib/brief";
 import { toBriefInput } from "../../lib/brief-input";
+import { formatMoney } from "../../lib/format";
 import { BriefHeader } from "../../components/brief-header";
 import { CurrencyPicker } from "../../components/currency-picker";
 import { useDisplayCurrency } from "../../components/display-currency-context";
 import { PortfolioChart } from "../../components/portfolio-chart-lazy";
 import { TransactionDialog } from "../../components/transaction-dialog";
 import { OverviewHero } from "../../components/overview/hero";
+import { IncomeStream } from "../../components/overview/income-stream";
 import { OverviewStatStrip } from "../../components/overview/stat-strip";
 import { GoalBand } from "../../components/overview/goal-band";
 import { MarketEyebrow } from "../../components/overview/market-eyebrow";
@@ -23,6 +25,34 @@ import { IncomeCard } from "../../components/overview/income-card";
 import { PortfolioCard } from "../../components/overview/portfolio-card";
 import { UpcomingCard } from "../../components/overview/upcoming-card";
 import { NewsCard } from "../../components/overview/news-card";
+
+/** The stream's key. Three swatches and three words — the ramp is ordinal, and
+ *  a reader who does not know that `paid` is the lightest tone in dark and the
+ *  darkest in light has no way to read the picture without it. */
+function StreamLegend() {
+  return (
+    <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+      {(
+        [
+          ["Paid", "var(--certainty-paid)"],
+          ["Confirmed", "var(--certainty-confirmed)"],
+          ["Estimated", "var(--certainty-estimated)"],
+        ] as const
+      ).map(([word, tone]) => (
+        <span key={word} className="label-caps flex items-center gap-2 text-muted-foreground">
+          {/* Shaped like the marks it names — a short stadium bar, not a
+              square chip — so the key and the chart read as one object. */}
+          <i
+            aria-hidden
+            className="h-3 w-1.5 flex-none rounded-full"
+            style={{ background: tone }}
+          />
+          {word}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function OverviewClient() {
   const currency = useDisplayCurrency();
@@ -36,15 +66,15 @@ export function OverviewClient() {
     staleTime: 300_000,
   });
 
-  // Lifted here rather than kept inside the chart: the hero numeral is a
-  // sibling, and the point of the redesign is that dragging the chart rewrites
-  // it. Null whenever the pointer is off the plot.
+  // Lifted here rather than kept inside the stream: the figure is a sibling,
+  // and the point of the composition is that pointing at a payment rewrites it.
+  // Null whenever the pointer is off the plot.
   //
   // Above the `if (!dashboard || !settings) return null` below, and it has to
   // stay there: a hook after an early return runs in a different order on the
   // renders that bail out, which is the one React rule that breaks silently at
   // runtime rather than loudly at build time.
-  const [scrubbed, setScrubbed] = React.useState<PortfolioHistoryPoint | null>(null);
+  const [hovered, setHovered] = React.useState<IncomeStreamPointDTO | null>(null);
 
   if (!dashboard || !settings) return null; // hydrated on first paint; guards SSR fallback
 
@@ -53,32 +83,28 @@ export function OverviewClient() {
   const now = new Date();
   const todayISO = now.toISOString().slice(0, 10);
 
-  const points = dashboard.history.points;
-  // The hero reads the last point of the value series, which is empty until a
-  // portfolio has a day of price history behind it. Someone whose only
-  // transaction is dated today therefore saw the largest number on the page
-  // render as "—" while the change beside it read "+$51.20 (+1.63%) today" and
-  // the Portfolio card below showed the value in full. Fall back to the
-  // subtotal, which the dashboard already carries.
-  //
-  // Only when the book is in one currency. Summing across currencies is the
-  // thing this app refuses to do anywhere else, and a wrong total is worse than
-  // no total — with more than one, "—" is the correct answer, not a stopgap.
-  const lastValue =
-    points.at(-1)?.value ??
-    (dashboard.subtotalsByCurrency.length === 1
-      ? dashboard.subtotalsByCurrency[0]!.marketValue
-      : null);
   const ytdPercent = dashboard.ytdTwr != null ? dashboard.ytdTwr * 100 : null;
   const colorSegments = prefs.brief ? composeColorLine(toBriefInput(dashboard, prefs, now)) : [];
+
+  const stream = dashboard.incomeStream;
+  const paymentsAhead = stream.filter((p) => p.date > todayISO).length;
+
+  // The book's worth, kept on the page but no longer leading it. Only when the
+  // book is in one currency: summing across currencies is the thing this app
+  // refuses to do everywhere else, and a wrong total is worse than no total.
+  // Across currencies the label still renders, against a dash — silently
+  // dropping the row would hide that Sage declined to guess rather than
+  // saying so.
+  const bookValue =
+    dashboard.subtotalsByCurrency.length === 1
+      ? dashboard.subtotalsByCurrency[0]!.marketValue
+      : null;
+
   return (
     <PageShell>
-      {/* The page opens with the day and the two settings, both quiet: the
-          eyebrow is one glance and the controls fade until pointed at. What
-          used to live here — a greeting, a ticker comment and a market-hours
-          note stacked in a 60px band — now sits under the figure as one
-          sentence, which is the order a person actually reads them in. */}
-      <header className="mb-12 flex flex-wrap items-center justify-between gap-4 pt-6 sm:mb-16 sm:pt-12">
+      {/* The day and the two settings, both quiet: the eyebrow is one glance
+          and the controls fade until pointed at. */}
+      <header className="mb-14 flex flex-wrap items-center justify-between gap-4 pt-6 sm:mb-20 sm:pt-12">
         <MarketEyebrow />
         <div className="flex flex-wrap items-center gap-3 opacity-45 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100 sm:shrink-0">
           <CurrencyPicker initialCurrency={currency} />
@@ -91,37 +117,73 @@ export function OverviewClient() {
         </div>
       </header>
 
-      <section className="mb-14 sm:mb-20">
-        {/* No card. The figure, the line it stands on and the three numbers
-            under it are one object, and at this size a surface around them only
-            says they are separate from a page that has nothing else on it. The
-            plot runs out through the column's gutters — see the `horizon`
-            variant — so the chart is the ground rather than a picture. */}
-        <PortfolioChart
-          variant="horizon"
-          initialHistory={dashboard.history}
-          displayCurrency={dashboard.displayCurrency}
-          todayChange={dashboard.todayChange}
-          onScrub={setScrubbed}
-          header={
-            <OverviewHero
-              value={lastValue}
-              todayChange={dashboard.todayChange}
-              scrubbed={scrubbed}
-              brief={
-                prefs.brief ? (
-                  <BriefHeader
-                    layout="inline"
-                    segments={colorSegments}
-                    marketStateEnabled={false}
-                    todayChangePercent={dashboard.todayChange?.percent ?? null}
-                  />
-                ) : null
-              }
-            />
+      {/* No card. The figure, the stream under it and the goal line beneath
+          that are one object, and at this size a surface around them only says
+          they are separate from a page that has nothing else on it. The stream
+          runs out through the column's gutters — see `horizon-bleed` — so it is
+          the ground rather than a picture. */}
+      <section className="mb-20 sm:mb-28">
+        <OverviewHero
+          income={dashboard.income.projectedTwelveMonth}
+          trailing={dashboard.income.trailingTwelveMonth}
+          taxRate={dashboard.income.dividendTaxRate}
+          paymentsAhead={paymentsAhead}
+          hovered={hovered}
+          brief={
+            prefs.brief ? (
+              <BriefHeader
+                layout="inline"
+                segments={colorSegments}
+                marketStateEnabled={false}
+                todayChangePercent={dashboard.todayChange?.percent ?? null}
+              />
+            ) : null
           }
         />
+
+        {stream.length > 0 && (
+          <>
+            <IncomeStream
+              className="horizon-bleed mt-10"
+              points={stream}
+              todayISO={todayISO}
+              taxRate={dashboard.income.dividendTaxRate}
+              onHover={setHovered}
+            />
+            <StreamLegend />
+          </>
+        )}
+
         {prefs.goalBand && <GoalBand />}
+
+        {/* What the book is worth, and what it did today — present, small, and
+            out of the lead. This is the whole demotion: two facts on one line
+            instead of a 108px numeral and three 32px figures under it. */}
+        <div className="mt-8 flex flex-wrap items-baseline gap-x-8 gap-y-2 text-sm text-muted-foreground">
+          <span>
+            Book value{" "}
+            <b className="font-medium tabular-nums text-foreground">
+              {bookValue ? formatMoney(bookValue) : "—"}
+            </b>
+          </span>
+          {dashboard.todayChange && (
+            <span>
+              Today{" "}
+              <b
+                className={`font-medium tabular-nums ${
+                  Number(dashboard.todayChange.amount.amount) < 0 ? "text-loss" : "text-gain"
+                }`}
+              >
+                {Number(dashboard.todayChange.amount.amount) < 0 ? "−" : "+"}
+                {formatMoney(dashboard.todayChange.amount).replace(/^-/, "")}
+              </b>{" "}
+              · {dashboard.todayChange.percent >= 0 ? "+" : "−"}
+              {Math.abs(dashboard.todayChange.percent).toFixed(2)}%
+            </span>
+          )}
+          {dashboard.positions.length > 0 && <span>{dashboard.positions.length} holdings</span>}
+        </div>
+
         {prefs.statStrip && (
           <OverviewStatStrip
             ytdPercent={ytdPercent}
@@ -149,11 +211,10 @@ export function OverviewClient() {
           }
         />
       ) : (
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2">
           {prefs.performanceCard && (
             <PerformanceCard
               ytdPercent={ytdPercent}
-              totalReturn={dashboard.totalReturn}
               incomplete={dashboard.ytdTwrIncomplete}
               relative={dashboard.relative}
               benchmarkYtdTwr={dashboard.benchmarkYtdTwr}
@@ -174,6 +235,22 @@ export function OverviewClient() {
               taxRate={dashboard.income.dividendTaxRate}
             />
           )}
+          {/* The value story, in its own place rather than at the top of the
+              page. It keeps the one lifetime-gain figure in the app — money in,
+              and what the book made on it — beside the line that explains it,
+              which is why the Performance card above no longer repeats it.
+              Every price-staleness and FX callout rides along inside this
+              component, so those system messages left the hero position with
+              it. */}
+          <Card className="md:col-span-2">
+            <PortfolioChart
+              variant="ambient"
+              initialHistory={dashboard.history}
+              displayCurrency={dashboard.displayCurrency}
+              todayChange={dashboard.todayChange}
+              header={<CardTitle meta="Net worth over time">Value</CardTitle>}
+            />
+          </Card>
           {/* Portfolio headlines — self-loading and absent until the cache
               warms, so it needs no pref gate the way the always-present
               figure cards do. Spans the row as a quiet footer strip. */}
