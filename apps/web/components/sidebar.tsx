@@ -25,7 +25,13 @@ export function Sidebar() {
       <CommandPalette />
       {/* 220px of a 375px phone leaves a 155px content column, so below md the
           sidebar leaves the flow entirely and MobileNav takes over. */}
-      <aside className="hidden h-screen w-55 flex-col border-r border-border bg-background md:flex">
+      {/* `bg-sidebar`, not `bg-background`. Fey sits its sidebar on the same
+          ground as the page and gets away with it because on near-black a
+          1px hairline is a visible edge. In light the two were both near-white
+          and the hairline was all that separated them, so the shell stopped
+          reading as a shell. The token is the page ground in dark (Fey's
+          behaviour, unchanged) and a half-step down from it in light. */}
+      <aside className="hidden h-screen w-55 flex-col border-r border-border bg-sidebar md:flex">
         <div className="flex items-center gap-2 px-4 pb-5 pt-6">
           <SageMark size={19} color="var(--foreground)" accent="var(--primary)" />
           <span className="font-display text-sm font-medium tracking-tight">Sage</span>
@@ -62,8 +68,8 @@ export function Sidebar() {
                     aria-current={active ? "page" : undefined}
                     className={`flex items-center gap-2.5 rounded-control px-2.5 py-1.5 text-sm transition-colors ${
                       active
-                        ? "bg-accent font-medium text-primary"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "bg-surface-active font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
                     }`}
                   >
                     <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
@@ -80,9 +86,9 @@ export function Sidebar() {
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-control px-1.5 py-1.5 text-left transition-colors hover:bg-accent/50"
+                className="flex w-full items-center gap-2 rounded-control px-1.5 py-1.5 text-left transition-colors hover:bg-surface-hover"
               >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent font-mono text-xs font-medium text-primary">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-active font-mono text-xs font-medium text-foreground">
                   {email ? email[0]?.toUpperCase() : "?"}
                 </span>
                 <span className="flex-1 truncate text-xs text-foreground">{email}</span>
@@ -100,7 +106,7 @@ export function Sidebar() {
               <div className="my-1 border-t border-border" />
               <SignOutButton />
               <div className="mt-1 flex items-center gap-1.5 border-t border-border px-1.5 pt-2 font-mono text-xs text-muted-foreground/50">
-                <span className="h-1 w-1 rounded-full bg-primary/60" />
+                <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
                 v0.1
               </div>
             </PopoverContent>

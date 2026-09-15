@@ -22,12 +22,16 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-sidebar: var(--sidebar);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-gain: var(--gain);
   --color-gain-foreground: var(--gain-foreground);
   --color-income: var(--income);
+  /* `bg-income-fill` — areas (bars, dots, swatches). `text-income` stays the
+     contrast-tuned text value. See tokens.css for why they differ in light. */
+  --color-income-fill: var(--income-fill);
   --color-income-muted: var(--income-muted);
   --color-loss: var(--loss);
   --color-loss-foreground: var(--loss-foreground);
@@ -67,7 +71,13 @@
   --text-title--line-height: 1.2;
   --text-hero: 44px;
   --text-hero--line-height: 1.1;
-  --container-page: 1120px;
+  /* 1120 -> 1200. The page leads with a chart of discrete events rather than
+     a single line, and event charts buy legibility with horizontal room: at
+     1120 a book of monthly payers put two years of marks 3px apart. The cards
+     below stay comfortable — two columns of ~575px each — and the `horizon-bleed`
+     cap at 1440 is still 240px wider, so the bleed still reads as a bleed
+     rather than collapsing into the column. */
+  --container-page: 1200px;
   --container-narrow: 720px;
 }
 
@@ -88,17 +98,25 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The overview's figure. Not a bigger `hero-num`: at this size 300 reads heavy
-   and -0.02em reads loose, so the weight drops to 100 and the tracking tightens
-   — the display face already goes this light and the app had never asked it to.
-   Fluid rather than a breakpoint step, because the number is the composition
-   and it should own the same share of the column at every width. */
+/* The overview's figure.
+   Was clamp(48px, 8vw, 108px) at weight 100, which resolved to 108px on a
+   1440 screen. None of the apps this design is measured against ships a
+   numeral anywhere near that: Fey's is ~18px, Monarch's ~28px, shadcn's ~30px,
+   and the 48-54px `SAGE_vision.md` cites was measured off Fey's MARKETING
+   site, not its app.
+   The cost was structural rather than aesthetic. At 108px the next tier has to
+   be set at 32px to register at all, so the overview's footnotes ended up the
+   same size as its cards and nothing on the page read as secondary. At 56 the
+   figure is still comfortably the largest thing on the page and a 20px
+   supporting line now reads as supporting.
+   Weight rises 100 -> 200 with the size drop: at 56px the thinnest cut of the
+   display face goes wiry, and the tracking loosens for the same reason. */
 @utility horizon-num {
   font-family: var(--ff-display);
-  font-size: clamp(48px, 8vw, 108px);
-  line-height: 0.94;
-  font-weight: 100;
-  letter-spacing: -0.045em;
+  font-size: clamp(38px, 4vw, 56px);
+  line-height: 1;
+  font-weight: 200;
+  letter-spacing: -0.035em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -142,6 +160,30 @@
       animation: none;
     }
   }
+}
+
+/** The overview chart's bleed — wider than the reading column, but capped.
+ *
+ *  The plot runs past the column on purpose: on that page the chart IS the
+ *  composition, and boxed into 1120px it read as an illustration of the number
+ *  above it rather than the ground beneath it.
+ *
+ *  The cap is the part that was missing. At `100cqw` the bleed tracked the
+ *  whole content area with no ceiling, so on a 2560px screen the plot was
+ *  2325px against a 1120px column — twice the width of every other element on
+ *  the page, including this chart's own range control, which centres on the
+ *  reading column and so ended up floating in the middle of the plot. 1440px
+ *  is the ceiling: at the 1440px design width `100cqw` already resolves
+ *  narrower than that, so nothing moves there, and above it the plot stops
+ *  growing and the page holds one composition at every width.
+ *
+ *  `cqw` rather than `vw` because it measures the scroll area minus the
+ *  sidebar, so it can never put a scrollbar on the page. Needs the
+ *  `@container/main` wrapper to resolve against. */
+@utility horizon-bleed {
+  --horizon-w: min(100cqw, 1440px);
+  width: var(--horizon-w);
+  margin-left: calc((var(--horizon-w) - 100%) / -2);
 }
 
 @utility fade-up {

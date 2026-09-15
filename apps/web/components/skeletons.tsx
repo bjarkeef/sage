@@ -59,7 +59,7 @@ export function CardGridSkeleton({
 export function CalendarSkeleton() {
   return (
     <div role="status" aria-label="Loading calendar" className="overflow-x-auto">
-      <div className="min-w-[36rem] overflow-hidden rounded-card border border-border">
+      <div className="min-w-[36rem] overflow-hidden rounded-card">
         <div className="grid grid-cols-7 gap-px bg-border">
           {Array.from({ length: 7 }, (_, i) => (
             <div key={i} className="bg-background p-2">

@@ -14,8 +14,13 @@ function ParamChips({ s, currency }: { s: GoalScenarioDTO; currency: string }) {
   const chip = (label: string, value: string, changed: boolean) => (
     <span
       key={label}
-      className={`inline-flex items-center gap-1 rounded-badge border px-2 py-0.5 text-xs ${
-        changed ? "border-primary/50 text-foreground" : "border-hairline text-muted-foreground"
+      // A changed assumption is emphasised by weight, not by the accent: these
+      // are chrome, and the accent has an allowlist (DESIGN.md §1). The filled
+      // wash also reads as "this one moved" faster than a tinted outline did.
+      className={`inline-flex items-center gap-1 rounded-badge px-2 py-0.5 text-xs ${
+        changed
+          ? "bg-foreground/10 font-medium text-foreground"
+          : "border border-hairline text-muted-foreground"
       }`}
     >
       {label}: <span className="font-mono tabular-nums">{value}</span>
@@ -46,7 +51,7 @@ export function GoalCallouts({ result }: { result: GoalResultDTO }) {
   return (
     <div className="flex flex-col gap-3">
       {result.achievedInYears == null ? (
-        <div className="rounded-card border border-loss/30 bg-loss/5 p-4 text-sm">
+        <div className="rounded-card bg-loss/10 p-4 text-sm">
           <span className="label-caps text-loss">Risk</span>
           <p className="mt-1">
             This goal isn&apos;t reachable within 50 years with the current parameters.
@@ -54,7 +59,7 @@ export function GoalCallouts({ result }: { result: GoalResultDTO }) {
           <ParamChips s={portfolio} currency={result.currency} />
         </div>
       ) : late != null ? (
-        <div className="rounded-card border border-loss/30 bg-loss/5 p-4 text-sm">
+        <div className="rounded-card bg-loss/10 p-4 text-sm">
           <span className="label-caps text-loss">Risk</span>
           <p className="mt-1">
             Your goal can be achieved in {result.achievedInYears} years (by {result.achievedYear}
@@ -63,7 +68,7 @@ export function GoalCallouts({ result }: { result: GoalResultDTO }) {
           <ParamChips s={portfolio} currency={result.currency} />
         </div>
       ) : (
-        <div className="rounded-card border border-gain/30 bg-gain/5 p-4 text-sm">
+        <div className="rounded-card bg-gain/10 p-4 text-sm">
           <span className="label-caps text-gain">On track</span>
           <p className="mt-1">
             Your goal is achievable in {result.achievedInYears} years (by {result.achievedYear}) —
@@ -74,8 +79,8 @@ export function GoalCallouts({ result }: { result: GoalResultDTO }) {
       )}
 
       {alternative && (
-        <div className="rounded-card border border-primary/30 bg-primary/5 p-4 text-sm">
-          <span className="label-caps text-primary">Insight</span>
+        <div className="rounded-card bg-surface-card p-4 text-sm">
+          <span className="label-caps">Insight</span>
           <p className="mt-1">
             Your goal can be achieved{" "}
             {alternative.achievedInYears != null

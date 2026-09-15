@@ -174,7 +174,7 @@ export function DividendCalendarGrid({
         {(monthTotal ? monthTotal.total > 0 : monthEvents.length > 0) && (
           <span
             data-testid="calendar-header-total"
-            className="rounded-full bg-primary/10 px-3 py-1 font-mono text-sm font-medium text-primary"
+            className="rounded-full bg-surface-active px-3 py-1 font-mono text-sm font-medium text-foreground"
           >
             {monthTotal && monthTotal.currency
               ? `+${formatMoney({ amount: monthTotal.total.toFixed(2), currency: monthTotal.currency })}`
@@ -192,7 +192,7 @@ export function DividendCalendarGrid({
             used to round and border itself independently, which left the
             grid's own square-cornered cells unclipped past the border radius
             at all four corners. */}
-        <div className="min-w-[36rem] overflow-hidden rounded-card border border-border">
+        <div className="min-w-[36rem] overflow-hidden rounded-card">
           {/* Day headers */}
           <div className="grid grid-cols-7 gap-px bg-border">
             {DAY_LABELS.map((d) => (
@@ -225,12 +225,19 @@ export function DividendCalendarGrid({
               );
 
               return (
-                <div key={i} className={`min-h-40 bg-card p-2 ${isToday ? "bg-primary/5" : ""}`}>
+                <div
+                  key={i}
+                  className={`min-h-40 bg-card p-2 ${isToday ? "bg-surface-hover" : ""}`}
+                >
                   <div className="mb-1 flex items-center justify-between">
+                    {/* Today is structure, not data — which day it is says
+                        nothing about the money — so the marker is a foreground
+                        pill rather than a sage one (DESIGN.md §1). */}
                     <span
+                      data-today={isToday ? "" : undefined}
                       className={`font-mono text-sm ${
                         isToday
-                          ? "flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                          ? "flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background"
                           : "text-muted-foreground"
                       }`}
                     >

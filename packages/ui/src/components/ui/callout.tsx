@@ -1,10 +1,14 @@
 import * as React from "react";
 import { cn } from "../../lib/utils";
 
+/** No borders: a callout sits IN the page flow, so it is a surface like any
+ *  other and takes its edge from its wash (DESIGN.md §1). Borders are for
+ *  things that float over arbitrary content — `Popover`, `Dialog`, `Toast`.
+ *  The tinted tones already carry a 10% fill, which reads on its own. */
 const toneClass = {
-  info: "border-hairline bg-surface-card text-foreground",
-  error: "border-destructive/30 bg-destructive/10 text-destructive",
-  success: "border-gain/30 bg-gain/10 text-gain",
+  info: "bg-surface-card text-foreground",
+  error: "bg-destructive/10 text-destructive",
+  success: "bg-gain/10 text-gain",
 } as const;
 
 export interface CalloutProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -17,7 +21,7 @@ export function Callout({ tone = "info", className, ...props }: CalloutProps) {
   return (
     <div
       role={tone === "error" ? "alert" : undefined}
-      className={cn("rounded-card border px-4 py-3 text-sm", toneClass[tone], className)}
+      className={cn("rounded-card px-4 py-3 text-sm", toneClass[tone], className)}
       {...props}
     />
   );

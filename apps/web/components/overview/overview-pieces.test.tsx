@@ -5,19 +5,28 @@ import { OverviewHero } from "./hero";
 import { OverviewStatStrip } from "./stat-strip";
 
 describe("OverviewHero", () => {
-  it("shows the value and a today delta", () => {
+  it("shows the income figure and a year-on-year delta", () => {
     render(
       <OverviewHero
-        value={{ amount: "7451.39", currency: "USD" }}
-        todayChange={{ amount: { amount: "-65.18", currency: "USD" }, percent: -0.87 }}
+        income={{ amount: "7451.39", currency: "USD" }}
+        trailing={{ amount: "7516.57", currency: "USD" }}
+        taxRate={null}
+        paymentsAhead={3}
       />,
     );
     expect(getByMoney("$7,451.39")).toBeInTheDocument();
-    expect(screen.getByText(/-0\.87%|−0\.87%/)).toBeInTheDocument();
+    expect(screen.getByText("on last year")).toBeInTheDocument();
   });
-  it("omits the delta when todayChange is null", () => {
-    render(<OverviewHero value={{ amount: "7451.39", currency: "USD" }} todayChange={null} />);
-    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+  it("omits the count when nothing is ahead", () => {
+    render(
+      <OverviewHero
+        income={{ amount: "7451.39", currency: "USD" }}
+        trailing={null}
+        taxRate={null}
+        paymentsAhead={0}
+      />,
+    );
+    expect(screen.queryByText(/payments? ahead/)).not.toBeInTheDocument();
   });
 });
 

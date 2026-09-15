@@ -23,14 +23,21 @@ arithmetic is tested, not that nothing will change: read
 the default price source is an unofficial one that can break without warning.
 
 <p align="center">
-  <img alt="The Sage overview page: portfolio value, allocation and upcoming dividends" src="docs/assets/shot-overview.png" width="880">
+  <img alt="The Sage overview page: forward twelve-month income over a stream of every dividend paid and expected, shaded by how certain each one is" src="docs/assets/shot-overview.png" width="880">
 </p>
 
 ## What you get
 
 ### Dividends
 
-Sage starts with dividends. The calendar shows one year at a time, with
+Sage starts with dividends, and so does its front page. A dividend account
+isn't run for its net worth, so the overview leads with what the book pays over
+the next twelve months, over a stream of every payment it has made and expects
+— solid where the money has landed, lighter where the payment is merely
+declared, lighter still where Sage is forecasting it. Your balance is on that
+page too, as a supporting figure, which is the job it actually does here.
+
+The calendar shows one year at a time, with
 payments you've already received and predicted ones in the same grid. The year
 picker, the bars and the list all follow a single selection, so the three
 layers can't disagree about which year is on screen. A total that would span
@@ -53,11 +60,12 @@ shouldn't disappear just because you exited.
 ### Performance
 
 Time-weighted return, chained daily over the range you pick, and annualized
-once that range is longer than a year. Beside it a money-weighted XIRR, so a
-deposit made in the middle of a good month doesn't read as skill. Then
-volatility, maximum drawdown, best and worst day, and a benchmark line to
-measure against. Prices are read from your own Postgres, so the chart is
-exactly as long as the history you have stored.
+once that range is longer than a year — so a deposit made in the middle of a
+good month doesn't read as skill. Then volatility, maximum drawdown, best and
+worst day, and a benchmark line to measure against. Benchmarks are total-return
+series, not price indices, so the comparison isn't quietly flattered by the
+dividends the index paid. Prices are read from your own Postgres, so the chart
+is exactly as long as the history you have stored.
 
 <p align="center">
   <img alt="The performance page: return over time against a benchmark, with risk metrics" src="docs/assets/shot-performance.png" width="880">
@@ -136,7 +144,7 @@ offline cache, because stale figures are worse than none in an app whose whole
 value is that its numbers are current.
 
 <p align="center">
-  <img alt="The Sage overview page on a phone" src="docs/assets/shot-overview-mobile.png" width="240">
+  <img alt="The Sage overview page on a phone: the income figure and payment stream, with a bottom tab bar" src="docs/assets/shot-overview-mobile.png" width="240">
 </p>
 
 ## Quick start
