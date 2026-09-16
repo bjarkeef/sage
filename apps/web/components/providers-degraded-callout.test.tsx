@@ -8,7 +8,12 @@ import type { SystemDTO } from "../lib/types";
 
 function systemWith(
   health: SystemDTO["providers"]["health"],
-  prices: { pricesAgeSeconds: number | null; pricesStale: boolean; pricesMissing: number },
+  prices: {
+    pricesAgeSeconds: number | null;
+    pricesStale: boolean;
+    pricesMissing: number;
+    pricesPending?: number;
+  },
 ): SystemDTO {
   return {
     environment: {
@@ -117,12 +122,27 @@ describe("ProvidersDegradedCallout", () => {
   });
 
   // Found on a fresh install: straight after an import, the new holdings have
-  // no stored price YET while the provider is answering fine. "Prices are
-  // unavailable" greeted a first-time user at the moment their book arrived.
-  it("says prices are on their way when a healthy provider has nothing stored yet", async () => {
-    render(systemWith(healthy, MISSING));
+  // no stored price YET. "Prices are unavailable" greeted a first-time user at
+  // the moment their book arrived. Health cannot tell the two apart — before
+  // the first provider call it reads `unknown` — so the server says which
+  // missing prices belong to holdings that only just arrived.
+  it("says prices are on their way when every missing price belongs to a new holding", async () => {
+    const notCalledYet = [
+      { ...healthy[0]!, state: "unknown" as const, lastSuccessSecondsAgo: null },
+    ];
+    render(systemWith(notCalledYet, { ...MISSING, pricesPending: 2 }));
     expect(await screen.findByText(/Fetching prices for 2 holdings/i)).toBeInTheDocument();
     expect(screen.queryByText(/unavailable/i)).not.toBeInTheDocument();
+  });
+
+  it("still reports an outage for a new holding when a provider is failing", async () => {
+    render(systemWith(degraded, { ...MISSING, pricesPending: 2 }));
+    expect(await screen.findByText(/Prices are unavailable/i)).toBeInTheDocument();
+  });
+
+  it("keeps the unavailable copy when a healthy provider has left old holdings unpriced", async () => {
+    render(systemWith(healthy, MISSING));
+    expect(await screen.findByText(/Prices are unavailable/i)).toBeInTheDocument();
   });
 
   // Missing beats stale: the reader is looking at empty rows, not old numbers.

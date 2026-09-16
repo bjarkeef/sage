@@ -956,6 +956,10 @@ export interface SystemProvidersDTO {
    *  outage has nothing stored, so it is not STALE — there is no age to be old
    *  — but nothing can be priced either, and that needs its own notice. */
   pricesMissing: number;
+  /** The part of `pricesMissing` added in the last few minutes — an import's
+   *  new holdings, whose first fetch may not have landed yet. Optional: older
+   *  API builds do not send it. */
+  pricesPending?: number;
 }
 
 export interface SystemDTO {
