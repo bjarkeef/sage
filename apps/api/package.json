@@ -23,6 +23,7 @@
     "@sage/provider-ecb": "workspace:*",
     "@sage/provider-eodhd": "workspace:*",
     "@sage/provider-interface": "workspace:*",
+    "@sage/provider-twelvedata": "workspace:*",
     "@sage/provider-yahoo-finance": "workspace:*",
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",

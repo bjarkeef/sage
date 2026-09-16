@@ -11,7 +11,7 @@ const PLACEHOLDER_SECRETS = new Set([
 const EnvSchema = z
   .object({
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-    MARKET_DATA_PROVIDER: z.enum(["yahoo", "eodhd"]).default("yahoo"),
+    MARKET_DATA_PROVIDER: z.enum(["yahoo", "eodhd", "twelvedata"]).default("yahoo"),
     /**
      * Fills in sector, country, industry and the real company name.
      *
@@ -25,6 +25,13 @@ const EnvSchema = z
      */
     ENRICHMENT_PROVIDER: z.enum(["yahoo", "none"]).default("yahoo"),
     EODHD_API_TOKEN: z.string().optional(),
+    TWELVEDATA_API_KEY: z.string().optional(),
+    /**
+     * The Twelve Data plan's per-minute credit allowance. Requests beyond it
+     * are never sent; they fall straight to Yahoo. Default 8 is the free plan's
+     * — set it to the plan you pay for (Grow 55, Pro 610, Venture 610).
+     */
+    TWELVEDATA_CREDITS_PER_MINUTE: z.coerce.number().int().positive().default(8),
     BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
     AUTH_BASE_URL: z.string().url().default("http://localhost:3001"),
     WEB_ORIGIN: z.string().default("http://localhost:3000"),
@@ -65,6 +72,13 @@ const EnvSchema = z
         code: z.ZodIssueCode.custom,
         path: ["EODHD_API_TOKEN"],
         message: "EODHD_API_TOKEN is required when MARKET_DATA_PROVIDER is 'eodhd'",
+      });
+    }
+    if (data.MARKET_DATA_PROVIDER === "twelvedata" && !data.TWELVEDATA_API_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["TWELVEDATA_API_KEY"],
+        message: "TWELVEDATA_API_KEY is required when MARKET_DATA_PROVIDER is 'twelvedata'",
       });
     }
   });

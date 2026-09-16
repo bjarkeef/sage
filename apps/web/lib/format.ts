@@ -132,6 +132,7 @@ export function formatCompactMoney(amount: string, currency: string): string {
 const PROVIDER_LABELS: Record<string, string> = {
   yahoo: "Yahoo",
   eodhd: "EODHD",
+  twelvedata: "Twelve Data",
 };
 
 /** Display-only: human name for a provider key, e.g. "eodhd" -> "EODHD".
