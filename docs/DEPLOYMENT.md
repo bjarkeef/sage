@@ -248,11 +248,17 @@ detail behind the summary in the README; read that first if you have not.
 
 ### The providers
 
-| `MARKET_DATA_PROVIDER`     | Key      | Free tier          | Official?                  |
-| -------------------------- | -------- | ------------------ | -------------------------- |
-| `yahoo` (default)          | none     | no published limit | **No** — unofficial client |
-| `eodhd`                    | required | 20 API calls/day   | Yes                        |
-| ECB (FX, not configurable) | none     | unrationed         | Yes                        |
+| `MARKET_DATA_PROVIDER`     | Key      | Free tier              | Official?                  |
+| -------------------------- | -------- | ---------------------- | -------------------------- |
+| `yahoo` (default)          | none     | no published limit     | **No** — unofficial client |
+| `eodhd`                    | required | 20 API calls/day       | Yes                        |
+| `twelvedata`               | required | 8 credits/min, 800/day | Yes                        |
+| ECB (FX, not configurable) | none     | unrationed             | Yes                        |
+
+`twelvedata` reads its key from `TWELVEDATA_API_KEY`, and
+`TWELVEDATA_CREDITS_PER_MINUTE` (default `8`, the free plan's) should be set to
+your plan's allowance. What each plan covers, and what falls back to Yahoo, is
+in [Twelve Data](./MARKET-DATA.md#twelve-data).
 
 EODHD **weights its endpoints**: an end-of-day price costs 1 call, news 5, and
 fundamentals 10. On the **free** tier the fundamentals endpoint is paywalled
@@ -262,10 +268,10 @@ already degrades around this: `EodhdProvider.getDividendHistory` only reaches fo
 fundamentals when a dividend row omits its currency, and swallows the failure so
 a 403 there cannot lose otherwise-good dividend data.
 
-`ENRICHMENT_PROVIDER` accepts `yahoo` or `none` (the default) — **not `eodhd`**;
-the env schema rejects it and the API will not boot. `yahoo` is the useful
-setting when prices come from EODHD, because it fills the fundamentals that a
-free EODHD key cannot serve.
+`ENRICHMENT_PROVIDER` accepts `yahoo` (the default) or `none` — **not `eodhd`**;
+the env schema rejects it and the API will not boot. Keep `yahoo` when prices
+come from EODHD or Twelve Data: it fills the fundamentals and ETF composition
+those providers do not serve.
 
 An Alpha Vantage adapter shipped until 2026-08-17 and was removed: its free tier
 capped at 5 calls a minute, which a cold portfolio load blows through instantly,

@@ -40,6 +40,11 @@ export interface TwelveDataListing {
 }
 
 export function appSymbolToTwelveData(appSymbol: string): TwelveDataListing {
+  // Yahoo-style indices (`^GSPC`) and FX pairs (`EURUSD=X`) have no Twelve Data
+  // listing; refusing them here keeps them from spending a credit.
+  if (appSymbol.startsWith("^") || appSymbol.includes("=")) {
+    throw new SymbolNotFoundError(appSymbol);
+  }
   const at = appSymbol.lastIndexOf(".");
   if (at === -1) return { symbol: appSymbol.replace(/-/g, "."), micCode: null };
   const mic = SUFFIX_TO_MIC[appSymbol.slice(at + 1)];

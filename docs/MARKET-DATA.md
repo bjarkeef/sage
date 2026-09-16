@@ -49,7 +49,7 @@ authority.
 
 | Data                                                                      | Individual plan needed | Business plan needed |
 | ------------------------------------------------------------------------- | ---------------------- | -------------------- |
-| US quotes and daily history                                               | Basic (free)           | Basic                |
+| US quotes and daily history                                               | Basic (free)           | Venture              |
 | Dividends, company profile                                                | Grow                   | Venture              |
 | Germany, London, Euronext (Paris, Amsterdam, Brussels, Lisbon), Toronto   | Grow                   | Venture              |
 | Copenhagen, Stockholm, Oslo, Helsinki, Milan, Madrid, SIX, ASX, Hong Kong | Pro                    | Venture              |

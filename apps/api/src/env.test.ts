@@ -161,4 +161,15 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "0" })).toThrow();
     expect(() => parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "-5" })).toThrow();
   });
+
+  it("treats a blank TWELVEDATA_CREDITS_PER_MINUTE as unset, so it cannot stop startup", () => {
+    // `TWELVEDATA_CREDITS_PER_MINUTE=` left in a .env reaches the schema as "",
+    // which a plain coerce turns into 0 and refuses — even on a yahoo install.
+    expect(
+      parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "" }).TWELVEDATA_CREDITS_PER_MINUTE,
+    ).toBe(8);
+    expect(
+      parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "  " }).TWELVEDATA_CREDITS_PER_MINUTE,
+    ).toBe(8);
+  });
 });
