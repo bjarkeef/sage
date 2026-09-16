@@ -151,6 +151,7 @@ describeDb("GET /system/fx", () => {
       pricesAgeSeconds: null,
       pricesStale: false,
       pricesMissing: 1,
+      pricesPending: 1,
     });
   });
 
@@ -318,6 +319,33 @@ describeDb("GET /system price age", () => {
     expect(providers.pricesMissing).toBe(1);
     expect(providers.pricesStale).toBe(false);
     expect(providers.pricesAgeSeconds).toBeNull();
+    // Added moments ago, so its first fetch may simply not have landed yet.
+    expect(providers.pricesPending).toBe(1);
+  });
+
+  /** Found on a fresh install: straight after an import every new holding is
+   *  "missing", and the shell announced an outage at the moment the book
+   *  arrived. Pending separates that from a real gap. Health cannot: after a
+   *  restart, or before the first provider call, it reads `unknown` either way. */
+  it("does not call a long-held symbol with no stored quote pending", async () => {
+    const cookie = await signUpTestUser(app, "price-age-old-gap@example.com");
+    await tdb.db.insert(instrument).values({
+      symbol: "OLDGAP",
+      name: "Old gap",
+      exchange: "XNAS",
+      currency: "USD",
+      assetType: "stock",
+    });
+    await buy(cookie, "price-age-old-gap@example.com", "OLDGAP");
+    await tdb.db
+      .update(transaction)
+      .set({ createdAt: new Date(Date.now() - 60 * 60 * 1000) })
+      .where(eq(transaction.instrumentSymbol, "OLDGAP"));
+
+    const providers = await priceStatus(cookie);
+
+    expect(providers.pricesMissing).toBe(1);
+    expect(providers.pricesPending).toBe(0);
   });
 
   // A custom instrument is priced by ManualPriceProvider out of `manual_price`.

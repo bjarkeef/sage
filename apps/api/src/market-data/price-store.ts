@@ -200,13 +200,19 @@ export class PriceStore {
    * empty list short-circuits: `IN ()` is a SQL error.
    */
   async countMissingQuotes(symbols: string[]): Promise<number> {
+    return (await this.missingQuoteSymbols(symbols)).length;
+  }
+
+  /** The given symbols that have no stored quote at all. */
+  async missingQuoteSymbols(symbols: string[]): Promise<string[]> {
     const unique = [...new Set(symbols)];
-    if (unique.length === 0) return 0;
+    if (unique.length === 0) return [];
     const rows = await this.db
       .select({ symbol: priceQuote.symbol })
       .from(priceQuote)
       .where(inArray(priceQuote.symbol, unique));
-    return unique.length - rows.length;
+    const stored = new Set(rows.map((r) => r.symbol));
+    return unique.filter((s) => !stored.has(s));
   }
 
   /** Oldest successful fetch across the given symbols — the age the user is

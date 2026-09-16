@@ -113,6 +113,11 @@ export interface ProvidersBody {
    *  so `pricesStale` is correctly false while every position is unpriceable.
    *  Without this the dashboard would be blank with nothing explaining it. */
   pricesMissing: number;
+  /** The part of `pricesMissing` whose holding arrived in the last few
+   *  minutes, so its first fetch may simply not have landed — every holding an
+   *  import just created. Lets the UI say "fetching" instead of announcing an
+   *  outage at the moment a new book arrives. */
+  pricesPending: number;
 }
 
 export interface SystemBody {
@@ -240,19 +245,48 @@ async function buildPriceAge(
   db: Database,
   book: PortfolioBook,
   now: number,
-): Promise<{ pricesAgeSeconds: number | null; pricesStale: boolean; pricesMissing: number }> {
+): Promise<{
+  pricesAgeSeconds: number | null;
+  pricesStale: boolean;
+  pricesMissing: number;
+  pricesPending: number;
+}> {
   const symbols = await pricedSymbols(db, book);
   const store = new PriceStore(db);
-  const [oldest, pricesMissing] = await Promise.all([
+  const [oldest, missing] = await Promise.all([
     store.oldestQuoteFetch(symbols),
-    store.countMissingQuotes(symbols),
+    store.missingQuoteSymbols(symbols),
   ]);
-  if (oldest === null) return { pricesAgeSeconds: null, pricesStale: false, pricesMissing };
+  const pricesMissing = missing.length;
+  const pricesPending = countPending(book, missing, now);
+  if (oldest === null) {
+    return { pricesAgeSeconds: null, pricesStale: false, pricesMissing, pricesPending };
+  }
   return {
     pricesAgeSeconds: Math.max(0, Math.round((now - oldest.getTime()) / 1000)),
     pricesStale: arePricesStale(oldest, now),
     pricesMissing,
+    pricesPending,
   };
+}
+
+/** How recently a holding must have arrived for its missing price to count as
+ *  still on its way rather than absent. */
+const PENDING_WINDOW_MS = 10 * 60 * 1000;
+
+/** Missing symbols whose first transaction was recorded inside
+ *  {@link PENDING_WINDOW_MS} — every holding an import just created. */
+function countPending(book: PortfolioBook, missing: string[], now: number): number {
+  const firstRecorded = new Map<string, number>();
+  for (const row of book.rows) {
+    const at = row.createdAt.getTime();
+    const seen = firstRecorded.get(row.instrumentSymbol);
+    if (seen === undefined || at < seen) firstRecorded.set(row.instrumentSymbol, at);
+  }
+  return missing.filter((s) => {
+    const at = firstRecorded.get(s);
+    return at !== undefined && now - at < PENDING_WINDOW_MS;
+  }).length;
 }
 
 /** Snapshot → wire shape: absolute millis become elapsed whole seconds. */

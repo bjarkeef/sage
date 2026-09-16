@@ -7,9 +7,6 @@ import { formatSecondsAgo, providerLabel } from "../lib/format";
 import { qk } from "../lib/query/keys";
 import type { ProviderHealthDTO } from "../lib/types";
 
-/** A provider that answered within this long is taken to be mid-fetch, not down. */
-const RECENT_SUCCESS_SECONDS = 600;
-
 /** Plain-language cause, phrased as something the reader can act on. */
 function reasonPhrase(health: ProviderHealthDTO): string {
   switch (health.lastFailureReason) {
@@ -58,21 +55,17 @@ export function ProvidersDegradedCallout() {
 
   const degraded = providers.health.filter((h) => h.state === "degraded");
 
-  // Nothing stored YET, from a provider that is answering: new holdings whose
-  // first fetch is still under way, which is every import. Saying "unavailable"
-  // there greeted a first-time user with an outage at the moment their book
-  // arrived. Needs a recent success, not just the absence of failure — after an
-  // API restart health reads `unknown` and the real warning below must stand.
+  // Nothing stored YET because the holdings only just arrived: every import.
+  // Saying "unavailable" there greeted a first-time user with an outage at the
+  // moment their book did. Decided by the server's `pricesPending`, not by
+  // provider health — before the first provider call, and after a restart,
+  // health reads `unknown` in both the harmless case and the real one. A
+  // failing provider still wins: then the prices are not on their way.
   const fetching =
     missing &&
     !providers.pricesStale &&
     degraded.length === 0 &&
-    providers.health.some(
-      (h) =>
-        h.state === "healthy" &&
-        h.lastSuccessSecondsAgo !== null &&
-        h.lastSuccessSecondsAgo < RECENT_SUCCESS_SECONDS,
-    );
+    (providers.pricesPending ?? 0) >= providers.pricesMissing;
   if (fetching) {
     const n = providers.pricesMissing;
     return (
