@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { compress } from "hono/compress";
+import { HTTPException } from "hono/http-exception";
 import { sql } from "drizzle-orm";
+import { ZodError } from "zod";
 import type { Database } from "./db/client";
 import type {
   IMarketDataProvider,
@@ -87,6 +89,20 @@ export function createApp(
   // the whole cost, and it buys not having to reason about which routes are
   // small enough to exempt.
   app.use("*", compress());
+
+  // A schema that rejects a query parameter is the caller's mistake. Several
+  // routes `parse` their input rather than `safeParse` it, and an uncaught
+  // ZodError otherwise reaches Hono's default handler as a 500 — so
+  // `/performance?range=6M` read as a server fault. Anything else still is one.
+  app.onError((err, c) => {
+    if (err instanceof ZodError) {
+      return c.json({ error: err.issues.map((i) => i.message).join("; ") }, 400);
+    }
+    // Everything else keeps Hono's default behaviour exactly.
+    if (err instanceof HTTPException) return err.getResponse();
+    console.error(err);
+    return c.text("Internal Server Error", 500);
+  });
 
   app.use("*", cors({ origin: origins, credentials: true }));
 
