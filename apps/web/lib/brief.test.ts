@@ -63,7 +63,7 @@ describe("composeBrief", () => {
     ]);
   });
 
-  it("3. mover threshold: ≥ +0.5 → lifting, ≤ −0.5 → dragging, 0.49 → quiet", () => {
+  it("3. mover threshold: ≥ +0.5 → rose most, ≤ −0.5 → fell most, 0.49 → quiet", () => {
     // Positive mover >= 0.5
     const resultPositive = composeBrief({
       totalValue: "1000 kr",
@@ -80,7 +80,7 @@ describe("composeBrief", () => {
       { kind: "text", text: " — " },
       { kind: "value", text: "+100 kr (+10.00%)", tone: "gain" },
       { kind: "text", text: " today." },
-      { kind: "text", text: " NORDA-B is doing most of the lifting." },
+      { kind: "text", text: " NORDA-B rose most today." },
     ]);
 
     // Negative mover <= -0.5
@@ -99,7 +99,7 @@ describe("composeBrief", () => {
       { kind: "text", text: " — " },
       { kind: "value", text: "−100 kr (−10.00%)", tone: "loss" },
       { kind: "text", text: " today." },
-      { kind: "text", text: " NORDA-B is dragging today." },
+      { kind: "text", text: " NORDA-B fell most today." },
     ]);
 
     // Mover at |0.49| -> quiet clause
@@ -160,7 +160,7 @@ describe("composeBrief", () => {
       { kind: "text", text: " — " },
       { kind: "value", text: "+10 kr (+1.00%)", tone: "gain" },
       { kind: "text", text: " today." },
-      { kind: "text", text: " NORDA-B is doing most of the lifting." },
+      { kind: "text", text: " NORDA-B rose most today." },
       { kind: "text", text: " MPAY pays out today, around " },
       { kind: "value", text: "312 kr", tone: "income" },
       { kind: "text", text: "." },
@@ -370,7 +370,7 @@ describe("composeColorLine", () => {
     const text = composeColorLine(base)
       .map((s) => s.text)
       .join("");
-    expect(text).toContain("MSFT is dragging today.");
+    expect(text).toContain("MSFT fell most today.");
   });
 
   it("returns the welcome line for an empty portfolio", () => {

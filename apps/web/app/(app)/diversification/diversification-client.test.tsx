@@ -195,17 +195,21 @@ describe("DiversificationClient query gating", () => {
 });
 
 describe("DiversificationClient toggles", () => {
-  it("X-Ray splits funds into sectors and reveals the remainder constituent, without refetching", async () => {
+  /** On by default: a fund is a basket of sectors, and "Funds" as one slice
+   *  answers "how is my money spread" with the wrapper instead of what is in it.
+   *  Where a fund has no composition data it still reads as "Funds". */
+  it("X-Ray is on by default, and switching it off folds funds back into one slice, without refetching", async () => {
     const diversificationSpy = vi.spyOn(api, "getDiversification");
     seedAndRender();
-    await waitFor(() => expect(screen.getByText("Funds")).toBeInTheDocument());
-    expect(screen.queryByText("Financial Services")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Financial Services")).toBeInTheDocument());
+    expect(screen.getByRole("switch", { name: "X-Ray funds" })).toBeChecked();
+    expect(screen.queryByText("Funds")).not.toBeInTheDocument();
+    expect(screen.getByText("VOO — other holdings")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("switch", { name: "X-Ray funds" }));
 
-    expect(screen.getByText("Financial Services")).toBeInTheDocument();
-    expect(screen.queryByText("Funds")).not.toBeInTheDocument();
-    expect(screen.getByText("VOO — other holdings")).toBeInTheDocument();
+    expect(screen.getByText("Funds")).toBeInTheDocument();
+    expect(screen.queryByText("Financial Services")).not.toBeInTheDocument();
     expect(diversificationSpy).not.toHaveBeenCalled();
   });
 
@@ -225,10 +229,9 @@ describe("DiversificationClient toggles", () => {
   it("Show holdings expands buckets into member rows (x-ray slices labeled with fund weight), without refetching", async () => {
     const diversificationSpy = vi.spyOn(api, "getDiversification");
     seedAndRender();
-    await waitFor(() => expect(screen.getByText("Funds")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Financial Services")).toBeInTheDocument());
     expect(screen.queryByText("VOO (37.00%)")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("switch", { name: "X-Ray funds" }));
     fireEvent.click(screen.getByRole("switch", { name: "Show holdings" }));
 
     expect(screen.getByText("VOO (37.00%)")).toBeInTheDocument();
@@ -237,7 +240,7 @@ describe("DiversificationClient toggles", () => {
 
   it("shows the FX-unavailable footnote only when fxIncomplete is set", async () => {
     seedAndRender();
-    await waitFor(() => expect(screen.getByText("Funds")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Financial Services")).toBeInTheDocument());
     expect(screen.queryByText(/Exchange rates are currently unavailable/)).not.toBeInTheDocument();
     cleanup();
     seedAndRender({ ...FIXTURE, fxIncomplete: true });

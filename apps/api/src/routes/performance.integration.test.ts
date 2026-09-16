@@ -175,6 +175,16 @@ describeDb("GET /performance", () => {
     expect(body.multiCurrency).toBe(false);
   });
 
+  // A range the schema does not know is the caller's mistake, not the server's.
+  // It used to escape as an uncaught ZodError, which Hono answers with a 500.
+  it("rejects an unknown range with a 400, not a 500", async () => {
+    const res = await app.request("/performance?range=6M", { headers: { cookie } });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    // Names the value it refused, so the caller can see which input was wrong.
+    expect(body.error).toMatch(/6M/);
+  });
+
   it("includes benchmark TWR over the same window", async () => {
     const res = await app.request("/performance?range=ALL&benchmarks=sp500", {
       headers: { cookie },

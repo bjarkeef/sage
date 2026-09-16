@@ -36,6 +36,8 @@ describe("invalidateFor", () => {
         // The System card reports the pairs the book converts, which the
         // display currency defines outright.
         "system-status",
+        // Goal refuses a multi-currency book with no display currency.
+        "goal",
       ].sort(),
     );
   });
