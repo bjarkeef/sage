@@ -287,14 +287,12 @@ describeDb("planImport / executeImport", () => {
         source: "custom-income",
       })
       .returning({ id: transaction.id });
-    await tdb.db
-      .insert(customIncome)
-      .values({
-        portfolioId,
-        symbol: "SAVINGS_ACC",
-        payDate: "2026-07-30",
-        transactionId: generated!.id,
-      });
+    await tdb.db.insert(customIncome).values({
+      portfolioId,
+      symbol: "SAVINGS_ACC",
+      payDate: "2026-07-30",
+      transactionId: generated!.id,
+    });
 
     const brokerRow = tx({
       symbol: "SAVINGS_ACC",
