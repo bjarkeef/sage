@@ -20,6 +20,18 @@ import { getUserPortfolio } from "../auth";
 export const RECONCILE_TTL_MS = 24 * 3600 * 1000;
 
 /**
+ * Release the 24h claim, so the next dividend-relevant read reconciles again.
+ *
+ * For whoever just wrote dividend history for newly held symbols. A new user's
+ * first page load reconciles an EMPTY book and claims the slot; the import that
+ * follows fetches the history, and without this nothing reconciled it for a day,
+ * so a freshly imported book showed none of the dividends it had received.
+ */
+export async function invalidateReconciliation(db: Database, portfolioId: string): Promise<void> {
+  await db.update(portfolio).set({ lastReconciledAt: null }).where(eq(portfolio.id, portfolioId));
+}
+
+/**
  * Lazy dividend auto-reconciliation (spec 2026-07-16). Called at the top of
  * dividend-relevant GETs; exits in one indexed read unless 24h have passed.
  * Reads dividend_history as-is — freshness is the existing stale-sync's job.

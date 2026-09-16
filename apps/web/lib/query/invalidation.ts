@@ -49,6 +49,9 @@ const MAP: Record<MutationKind, readonly string[]> = {
     "user-settings",
     "categories",
     "system-status",
+    // Goal refuses a multi-currency book with no display currency, so setting
+    // one changes its answer outright.
+    "goal",
   ],
   "overview-prefs": ["user-settings", "dashboard"],
   "dividend-tax-rate": ["user-settings", "dividend-income"],

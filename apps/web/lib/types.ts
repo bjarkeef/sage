@@ -418,6 +418,9 @@ export interface ImportPreviewDTO {
 }
 
 export interface ImportResultDTO {
+  /** The display currency this import set for a user who had none, else null.
+   *  Optional: older API builds do not send it. */
+  displayCurrencySet?: string | null;
   inserted: number;
   restored: number;
   claimedExisting: number;
@@ -626,6 +629,8 @@ export interface StalePriceDTO {
   symbol: string;
   /** Date of the oldest close the holding is still being valued from. */
   asOf: string;
+  /** Today's figure values it at a current quote; only the chart history is old. */
+  quotedToday: boolean;
 }
 
 export interface PerformanceDTO {
@@ -951,6 +956,10 @@ export interface SystemProvidersDTO {
    *  outage has nothing stored, so it is not STALE — there is no age to be old
    *  — but nothing can be priced either, and that needs its own notice. */
   pricesMissing: number;
+  /** The part of `pricesMissing` added in the last few minutes — an import's
+   *  new holdings, whose first fetch may not have landed yet. Optional: older
+   *  API builds do not send it. */
+  pricesPending?: number;
 }
 
 export interface SystemDTO {

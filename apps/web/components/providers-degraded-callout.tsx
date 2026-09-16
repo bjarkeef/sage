@@ -54,6 +54,27 @@ export function ProvidersDegradedCallout() {
   if (!missing && !providers.pricesStale) return null;
 
   const degraded = providers.health.filter((h) => h.state === "degraded");
+
+  // Nothing stored YET because the holdings only just arrived: every import.
+  // Saying "unavailable" there greeted a first-time user with an outage at the
+  // moment their book did. Decided by the server's `pricesPending`, not by
+  // provider health — before the first provider call, and after a restart,
+  // health reads `unknown` in both the harmless case and the real one. A
+  // failing provider still wins: then the prices are not on their way.
+  const fetching =
+    missing &&
+    !providers.pricesStale &&
+    degraded.length === 0 &&
+    (providers.pricesPending ?? 0) >= providers.pricesMissing;
+  if (fetching) {
+    const n = providers.pricesMissing;
+    return (
+      <Callout tone="info" className="mb-4">
+        {`Fetching prices for ${n} ${n === 1 ? "holding" : "holdings"}.`}
+      </Callout>
+    );
+  }
+
   const causes = degraded.map((h) => `${providerLabel(h.name)} ${reasonPhrase(h)}`).join(" and ");
 
   const lead = missing

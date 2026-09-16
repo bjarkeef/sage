@@ -14,6 +14,7 @@ import type { Database } from "../db/client";
 import { instrument, portfolio, transaction } from "../db/schema";
 import { getUserPortfolio } from "../auth";
 import { syncDividends } from "../market-data/dividend-sync";
+import { invalidateReconciliation } from "../services/dividend-reconciliation";
 import { toPositionTransaction } from "../lib/to-position-transaction";
 import { ensureInstrument } from "../lib/ensure-instrument";
 import { backfillProfiles } from "../market-data/asset-profile-cache";
@@ -301,12 +302,20 @@ export function transactionsRoutes(db: Database, provider?: IMarketDataProvider)
     }
 
     if (provider && body.type === "buy") {
-      syncDividends(db, [provider], body.instrument.symbol).catch((err) => {
-        console.warn(
-          `dividend sync failed for ${body.instrument.symbol}:`,
-          err instanceof Error ? err.message : err,
-        );
-      });
+      // Then release the reconciliation claim, or the history just fetched is
+      // not turned into received dividends for up to a day — see
+      // `invalidateReconciliation`.
+      syncDividends(db, [provider], body.instrument.symbol)
+        .catch((err) => {
+          console.warn(
+            `dividend sync failed for ${body.instrument.symbol}:`,
+            err instanceof Error ? err.message : err,
+          );
+        })
+        .then(() => invalidateReconciliation(db, portfolioId))
+        .catch((err: unknown) => {
+          console.warn("reconciliation reset failed:", err instanceof Error ? err.message : err);
+        });
 
       // Same reasoning as the import path: sector and country come from
       // `asset_profile`, and nothing wrote that table until someone opened the

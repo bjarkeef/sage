@@ -34,11 +34,13 @@ function variantClauses(input: BriefInput): BriefSegment[] {
     return out; // payday suppresses the next-payout clause
   }
   if (input.mover && Math.abs(input.mover.percent) >= MOVER_THRESHOLD) {
+    // Says what moved, in price, today. "Doing most of the lifting" sat under
+    // the income figure and read as a claim about the income.
     out.push(
       t(
         input.mover.percent > 0
-          ? `${input.mover.symbol} is doing most of the lifting.`
-          : `${input.mover.symbol} is dragging today.`,
+          ? `${input.mover.symbol} rose most today.`
+          : `${input.mover.symbol} fell most today.`,
       ),
     );
   } else {
