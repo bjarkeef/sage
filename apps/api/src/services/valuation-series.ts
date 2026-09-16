@@ -149,8 +149,10 @@ export interface ValuationSeries {
   historyIncomplete: string[];
   /** Holdings carried on a close older than {@link STALE_PRICE_DAYS}, with the
    *  date of the oldest such close. They ARE in the totals — at a price that may
-   *  be weeks old — which is exactly why it has to be said out loud. Sorted. */
-  stalePrices: { symbol: string; asOf: string }[];
+   *  be weeks old — which is exactly why it has to be said out loud. Sorted.
+   *  `quotedToday`: the newest point values it at a current quote anyway, so
+   *  only the chart history is old, not today's figure. */
+  stalePrices: { symbol: string; asOf: string; quotedToday: boolean }[];
   rows: TransactionRow[];
 }
 
@@ -681,6 +683,10 @@ export async function buildValuationSeries(
   // manual mark, which is the same number the series forward-filled — so they
   // are untouched rather than mixed.
   const newest = points[points.length - 1];
+  // Symbols whose newest value came from a current quote rather than a carried
+  // close — for a stale holding, the difference between "valued at an old
+  // price" and "only the chart history behind it is old".
+  const quotedToday = new Set<string>();
   if (newest !== undefined) {
     const snap = timeline.asOf(newest.date);
     let total = newest.marketValue;
@@ -699,6 +705,7 @@ export async function buildValuationSeries(
         const was = close.close.dividedBy(closeConversion.divisor).times(qty);
         const now = quote.price.toDecimal().dividedBy(conversion.divisor).times(qty);
         total = total.minus(was).plus(now);
+        quotedToday.add(symbol);
       } catch {
         // No quote for this symbol: it keeps the close, exactly as before.
       }
@@ -764,7 +771,7 @@ export async function buildValuationSeries(
     fxRatesAsOf,
     historyIncomplete: [...heldUnpriced].sort(),
     stalePrices: [...stalePricedAsOf.entries()]
-      .map(([symbol, asOf]) => ({ symbol, asOf }))
+      .map(([symbol, asOf]) => ({ symbol, asOf, quotedToday: quotedToday.has(symbol) }))
       .sort((a, b) => (a.symbol < b.symbol ? -1 : 1)),
     rows,
   };

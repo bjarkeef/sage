@@ -626,6 +626,8 @@ export interface StalePriceDTO {
   symbol: string;
   /** Date of the oldest close the holding is still being valued from. */
   asOf: string;
+  /** Today's figure values it at a current quote; only the chart history is old. */
+  quotedToday: boolean;
 }
 
 export interface PerformanceDTO {
