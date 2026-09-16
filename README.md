@@ -17,7 +17,7 @@ tracker. You run it on your own machine, so tracking your holdings, your
 dividend income and your performance doesn't mean handing your financial life
 to somebody else's SaaS.
 
-**Status:** public beta — `v1.0.0-beta.1`. Portfolio, dividends, performance,
+**Status:** public beta — `v1.0.0-beta.2`. Portfolio, dividends, performance,
 diversification, categories and custom holdings are all built and in daily use
 on the maintainer's own instance. Beta means the shape is settled and the
 arithmetic is tested, not that nothing will change: read
