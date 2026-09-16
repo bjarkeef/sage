@@ -99,9 +99,30 @@ describe("ProvidersDegradedCallout", () => {
     expect(screen.queryByText(/last updated/i)).not.toBeInTheDocument();
   });
 
-  it("still names the outage when nothing is stored and no provider is marked degraded", async () => {
-    render(systemWith(healthy, MISSING));
+  // After an API restart health resets to `unknown`, while Postgres still shows
+  // nothing stored: the notice must stand, without a cause.
+  it("still names the outage when nothing is stored and no provider has answered", async () => {
+    const restarted = [
+      {
+        name: "yahoo",
+        state: "unknown" as const,
+        lastSuccessSecondsAgo: null,
+        lastFailureSecondsAgo: null,
+        lastFailureReason: null,
+        consecutiveFailures: 0,
+      },
+    ];
+    render(systemWith(restarted, MISSING));
     expect(await screen.findByText(/Prices are unavailable/i)).toBeInTheDocument();
+  });
+
+  // Found on a fresh install: straight after an import, the new holdings have
+  // no stored price YET while the provider is answering fine. "Prices are
+  // unavailable" greeted a first-time user at the moment their book arrived.
+  it("says prices are on their way when a healthy provider has nothing stored yet", async () => {
+    render(systemWith(healthy, MISSING));
+    expect(await screen.findByText(/Fetching prices for 2 holdings/i)).toBeInTheDocument();
+    expect(screen.queryByText(/unavailable/i)).not.toBeInTheDocument();
   });
 
   // Missing beats stale: the reader is looking at empty rows, not old numbers.
