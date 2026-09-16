@@ -8,6 +8,68 @@ Sage was developed in private and its history was rewritten before publication,
 so there is no commit-by-commit record from before this release. The log starts
 here.
 
+## [1.0.0-beta.2] - 2026-09-16
+
+A walkthrough of a clean install, and a second pass over the numbers against a
+real book. If you installed beta.1, this is the release to be on.
+
+### Your first import
+
+- A freshly imported book shows the dividends it has received straight away.
+  Before, the first page you opened spent the once-a-day dividend
+  reconciliation on an empty book, so an import showed almost no received
+  income for a day, and the overview printed a full forward year against that
+  as growth.
+- The first import sets your display currency to the one most of your book is
+  in, and says so. A mixed-currency book with none set used to disagree with
+  itself: one page guessed USD, others showed dashes.
+- New holdings say "Fetching prices" while their first prices arrive, instead
+  of announcing that prices are unavailable.
+- Sector and country data heal on their own. A profile that failed to load at
+  import, or has gone a week without refreshing, is fetched again in the
+  background, so an `Unknown` slice no longer stays forever.
+- A broker's interest row now replaces the payment Sage generated for the same
+  custom holding and date, instead of landing next to it and counting twice.
+
+### The front page leads with income
+
+- The overview opens with what the book will pay over the next twelve months,
+  and every payment it has received or expects on one axis: paid, confirmed and
+  estimated, fading as it moves into the future. Portfolio value moved below it.
+- The monthly rhythm is a ring against an even-year reference, so a lumpy year
+  is something you see.
+
+### Numbers
+
+- Benchmarks are total-return indexes. Comparing a portfolio that includes
+  dividends against price-only indexes flattered every book: by 1.4 percentage
+  points against the S&P 500 over the year it was measured.
+- Trading fees are part of cost basis. They were recorded and never used.
+- Realised gains from sales are computed, and total return covers the whole
+  life of the book, not only what is still held.
+- A reconciled dividend carries withholding tax like an imported one.
+- A settled close beats an intraday print from the same session, so the total
+  stops moving while the market is shut.
+- A chart window no longer opens on a day nothing traded, which had left most
+  holdings unpriced on its first point for YTD and 3M.
+- A holding whose price history stopped is still counted, at its last price,
+  and the page names it and the date. The notice now says when only the chart
+  history is old and today's value uses a current price.
+- Gains read in both money and percent.
+
+### Removed
+
+- The money-weighted return. Its arithmetic was right, but without a cash
+  account it reads moving money between holdings as withdrawals and deposits,
+  which can put it far from the time-weighted return for no real reason. It can
+  come back if Sage gets a cash model.
+
+### Smaller
+
+- Diversification opens with funds x-rayed into their sectors.
+- An invalid query parameter is a 400 error, not a 500.
+- Labels on Diversification are no longer clipped to a few characters.
+
 ## [1.0.0-beta.1] - 2026-09-10
 
 First public release.
@@ -98,4 +160,5 @@ First public release.
 - Sage records and measures; it does not advise. See
   [`docs/DISCLAIMER.md`](./docs/DISCLAIMER.md).
 
+[1.0.0-beta.2]: https://github.com/bjarkeef/sage/releases/tag/v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/bjarkeef/sage/releases/tag/v1.0.0-beta.1
