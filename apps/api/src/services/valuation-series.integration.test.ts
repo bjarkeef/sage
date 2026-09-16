@@ -952,7 +952,35 @@ describeDb("portfolio history — prices carried too far", () => {
     const series = await buildValuationSeries({ db: tdb.db, provider }, userId, { range: "ALL" });
     if ("empty" in series) throw new Error("expected a non-empty series");
 
-    expect(series.stalePrices).toEqual([{ symbol: "STALECO", asOf: STOPPED }]);
+    expect(series.stalePrices).toEqual([{ symbol: "STALECO", asOf: STOPPED, quotedToday: false }]);
+  });
+
+  /** The newest point is repriced from the quote, so a holding whose BARS
+   *  stopped can still be valued at today's price. Saying it "is priced from"
+   *  the old date would then be false about the figure on screen: only the
+   *  chart behind it is old. */
+  it("says when a holding with old bars is still valued at a current quote", async () => {
+    const quoted = new FakeMarketDataProvider({
+      history: {
+        STALECO: [bar(BUY, "100"), bar(STOPPED, "100")],
+        FRESHCO: [bar(BUY, "50"), bar(STOPPED, "50"), bar(TODAY, "50")],
+      },
+      quotes: {
+        STALECO: {
+          symbol: "STALECO",
+          price: Money.of("120", "USD"),
+          asOf: new Date(),
+          previousClose: null,
+        },
+      },
+    });
+
+    const series = await buildValuationSeries({ db: tdb.db, provider: quoted }, userId, {
+      range: "ALL",
+    });
+    if ("empty" in series) throw new Error("expected a non-empty series");
+
+    expect(series.stalePrices).toEqual([{ symbol: "STALECO", asOf: STOPPED, quotedToday: true }]);
   });
 
   it("still counts it, because dropping it would draw a loss that did not happen", async () => {
