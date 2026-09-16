@@ -2,6 +2,11 @@ import { it, expect, beforeAll, afterAll } from "vitest";
 import { FakeMarketDataProvider } from "@sage/provider-interface/testing";
 import { Money, Decimal } from "@sage/core";
 import type { Quote, IFxRateService } from "@sage/provider-interface";
+import { eq } from "drizzle-orm";
+import {
+  drainProfileRefreshesForTests,
+  resetProfileAttemptsForTests,
+} from "../market-data/asset-profile-cache";
 import { EcbFxRateService } from "../market-data/ecb-fx-rate-service";
 import { STALE_AFTER_DAYS } from "../market-data/fx-provenance";
 import { describeDb, withTestDb, testEnv, signUpTestUser, type TestDb } from "../testing";
@@ -401,5 +406,57 @@ describeDb("GET /portfolio/diversification", () => {
     // A stale rate still prices USD — the total is approximate, not missing.
     expect(body.fxIncomplete).toBe(false);
     expect(body.totals.marketValue).toEqual({ amount: "2350.00", currency: "EUR" });
+  });
+
+  /** Last in the suite on purpose: it teaches the shared provider NODATA's
+   *  profile, which the opaque-fund case above depends on not existing. */
+  it("fetches a missing profile in the background, and never asks about a custom holding", async () => {
+    resetProfileAttemptsForTests();
+    const asked: string[] = [];
+    provider.getAssetProfile = (symbol: string) => {
+      asked.push(symbol);
+      if (symbol !== "NODATA") return Promise.reject(new Error(`no profile for ${symbol}`));
+      return Promise.resolve({
+        symbol: "NODATA",
+        name: "Mystery ETF",
+        exchange: "XNYS",
+        currency: "USD",
+        assetType: "etf",
+        sector: null,
+        industry: null,
+        marketCap: null,
+        peRatio: null,
+        beta: null,
+        fiftyTwoWeekHigh: null,
+        fiftyTwoWeekLow: null,
+        dividendYield: null,
+        payoutRatio: null,
+        trailingAnnualDividend: null,
+        website: null,
+        description: null,
+        ceo: null,
+        fullTimeEmployees: null,
+        ipoDate: null,
+        country: null,
+        countryIso: null,
+        fund: {
+          expenseRatio: null,
+          totalAssets: null,
+          family: "Mystery",
+          category: null,
+          legalType: null,
+          holdings: [],
+          sectorWeightings: [],
+        },
+      });
+    };
+
+    await app.request("/portfolio/diversification", { headers: { cookie: cookie2 } });
+    await app.request("/portfolio/diversification", { headers: { cookie } });
+    await drainProfileRefreshesForTests();
+
+    const [row] = await tdb.db.select().from(assetProfile).where(eq(assetProfile.symbol, "NODATA"));
+    expect(row?.fundFamily).toBe("Mystery");
+    expect(asked).not.toContain("MY_SAVINGS");
   });
 });

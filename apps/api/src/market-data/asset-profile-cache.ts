@@ -10,7 +10,7 @@
  * `backfillProfiles` is the other half of the fix: the paths that introduce
  * held symbols call it, so the data is there before anyone looks.
  */
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { Decimal, Money } from "@sage/core";
 import type {
   IMarketDataProvider,
@@ -191,4 +191,82 @@ export async function backfillProfiles(
     }
   }
   return { fetched, failed };
+}
+
+/** How old a held symbol's profile may get before a read asks for it again.
+ *  Sector and country barely move, so a week, not the 24h read cache: a
+ *  background pass that re-fetched a whole book daily would spend a keyed
+ *  provider's quota on data that has not changed. */
+export const PROFILE_REFRESH_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** How long a symbol is left alone after any attempt, successful or not. Every
+ *  page load that reads profiles calls the refresh, and a ticker the provider
+ *  does not know must not be asked about on each of them. */
+const ATTEMPT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+/** In-memory, like the price refreshers' attempt maps: a restart costs at most
+ *  one extra request per symbol. */
+const lastProfileAttempt = new Map<string, number>();
+
+export function resetProfileAttemptsForTests(): void {
+  lastProfileAttempt.clear();
+}
+
+/** Background refreshes still running, so a test can wait for the write it
+ *  asserts on instead of sleeping. */
+const inFlightProfileRefreshes = new Set<Promise<void>>();
+
+export async function drainProfileRefreshesForTests(): Promise<void> {
+  while (inFlightProfileRefreshes.size > 0) {
+    await Promise.allSettled([...inFlightProfileRefreshes]);
+  }
+}
+
+/** Fire-and-forget {@link refreshHeldProfiles} for a read path: never awaited,
+ *  never throws into the request that started it. */
+export function refreshHeldProfilesInBackground(
+  db: Database,
+  provider: IMarketDataProvider,
+  symbols: readonly string[],
+): void {
+  const p = refreshHeldProfiles(db, provider, symbols).catch((err: unknown) => {
+    console.warn("profile refresh failed:", err instanceof Error ? err.message : err);
+  });
+  inFlightProfileRefreshes.add(p);
+  void p.finally(() => inFlightProfileRefreshes.delete(p));
+}
+
+/**
+ * Fetch profiles for held symbols that have none, or one older than
+ * {@link PROFILE_REFRESH_MS}.
+ *
+ * `backfillProfiles` at import time is a single chance. A throttled request, a
+ * book imported before backfill existed, or a row written before the
+ * country-code fix all stayed wrong for good, because nothing but opening an
+ * asset page ever fetched a profile again — so a third of a real book read
+ * "Unknown" on Diversification. Readers call this fire-and-forget; the next
+ * load shows the result.
+ */
+export async function refreshHeldProfiles(
+  db: Database,
+  provider: IMarketDataProvider,
+  symbols: readonly string[],
+): Promise<void> {
+  if (symbols.length === 0) return;
+  const now = Date.now();
+  const rows = await db
+    .select({ symbol: assetProfile.symbol, fetchedAt: assetProfile.fetchedAt })
+    .from(assetProfile)
+    .where(inArray(assetProfile.symbol, [...symbols]));
+  const fetchedAt = new Map(rows.map((r) => [r.symbol, r.fetchedAt.getTime()]));
+
+  const due = symbols.filter((symbol) => {
+    const at = fetchedAt.get(symbol);
+    if (at !== undefined && now - at < PROFILE_REFRESH_MS) return false;
+    const attempted = lastProfileAttempt.get(symbol);
+    return attempted === undefined || now - attempted >= ATTEMPT_COOLDOWN_MS;
+  });
+  for (const symbol of due) lastProfileAttempt.set(symbol, now);
+
+  await backfillProfiles(db, provider, due);
 }
