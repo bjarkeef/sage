@@ -8,16 +8,22 @@ import { TwelveDataProvider } from "./provider";
  *
  *   TWELVEDATA_API_KEY=… pnpm --filter @sage/provider-twelvedata test:live
  *
+ * On a paid key, also set TWELVEDATA_PLAN to anything other than `free` (e.g.
+ * `TWELVEDATA_PLAN=grow`); it defaults to `free`.
+ *
  * Written against a free key: US prices must work, and anything the free plan
  * excludes must surface as ProviderPlanLimitError — the class that keeps the
- * degraded-prices banner off and hands the request to Yahoo. On a paid key the
- * two plan assertions are skipped by the `plan` guard below.
+ * degraded-prices banner off and hands the request to Yahoo. When
+ * TWELVEDATA_PLAN is not `free`, the two free-plan assertions are skipped (the
+ * `freePlan` guard below), since a paid plan serves those requests.
  */
 const apiKey = process.env.TWELVEDATA_API_KEY;
 const freePlan = (process.env.TWELVEDATA_PLAN ?? "free") === "free";
 
 describe.skipIf(!apiKey)("Twelve Data (live)", () => {
-  // A generous budget: this suite makes five calls and must not trip itself.
+  // The free plan's per-minute cap, the smallest any key has. This suite makes
+  // five calls (search is free), so it fits under that cap without tripping its
+  // own budget guard.
   const provider = new TwelveDataProvider({ apiKey: apiKey ?? "", creditsPerMinute: 8 });
 
   it("returns a US quote", async () => {

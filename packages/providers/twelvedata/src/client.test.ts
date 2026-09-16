@@ -249,6 +249,53 @@ describe("TwelveDataClient: remembering plan refusals", () => {
     expect(seen.calls).toBe(2);
   });
 
+  it("blocks the endpoint for every symbol when a 403 refusal names that endpoint", async () => {
+    const seen = countCalls("dividends", () =>
+      HttpResponse.json(ERROR_ENDPOINT_PLAN, { status: 403 }),
+    );
+    const client = clientAt({ t: T0 });
+    await expect(
+      client.request("dividends", { symbol: "VOO" }, { listingKey: "VOO" }),
+    ).rejects.toBeInstanceOf(ProviderPlanLimitError);
+    await expect(
+      client.request("dividends", { symbol: "KO" }, { listingKey: "KO" }),
+    ).rejects.toBeInstanceOf(ProviderPlanLimitError);
+    expect(seen.calls).toBe(1);
+  });
+
+  it("blocks only the listing when a 403 plan refusal does not name the endpoint", async () => {
+    const seen = countCalls("quote", () =>
+      HttpResponse.json({ ...ERROR_SYMBOL_PLAN, code: 403 }, { status: 403 }),
+    );
+    const client = clientAt({ t: T0 });
+    await expect(
+      client.request("quote", { symbol: "EUDIV" }, { listingKey: "EUDIV@XETR" }),
+    ).rejects.toBeInstanceOf(ProviderPlanLimitError);
+    await expect(
+      client.request("quote", { symbol: "EUDIV" }, { listingKey: "EUDIV@XETR" }),
+    ).rejects.toBeInstanceOf(ProviderPlanLimitError);
+    expect(seen.calls).toBe(1);
+
+    await expect(
+      client.request("quote", { symbol: "THAMES" }, { listingKey: "THAMES@XLON" }),
+    ).rejects.toBeInstanceOf(ProviderPlanLimitError);
+    expect(seen.calls).toBe(2);
+  });
+
+  it("remembers nothing when a 403 plan refusal names neither the endpoint nor a listing", async () => {
+    const seen = countCalls("quote", () =>
+      HttpResponse.json({ ...ERROR_SYMBOL_PLAN, code: 403 }, { status: 403 }),
+    );
+    const client = clientAt({ t: T0 });
+    await expect(client.request("quote", { symbol: "AAPL" })).rejects.toBeInstanceOf(
+      ProviderPlanLimitError,
+    );
+    await expect(client.request("quote", { symbol: "AAPL" })).rejects.toBeInstanceOf(
+      ProviderPlanLimitError,
+    );
+    expect(seen.calls).toBe(2);
+  });
+
   it("stops asking about a refused listing on any endpoint, and still asks about others", async () => {
     const quotes = countCalls("quote", () => HttpResponse.json(ERROR_SYMBOL_PLAN, { status: 404 }));
     const series = countCalls("time_series", () =>

@@ -31,7 +31,12 @@ const EnvSchema = z
      * are never sent; they fall straight to Yahoo. Default 8 is the free plan's
      * — set it to the plan you pay for (Grow 55, Pro 610, Venture 610).
      */
-    TWELVEDATA_CREDITS_PER_MINUTE: z.coerce.number().int().positive().default(8),
+    TWELVEDATA_CREDITS_PER_MINUTE: z.preprocess(
+      // A blank `TWELVEDATA_CREDITS_PER_MINUTE=` means unset, not zero — coerced
+      // as-is it would fail startup even on an install that never uses Twelve Data.
+      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+      z.coerce.number().int().positive().default(8),
+    ),
     BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
     AUTH_BASE_URL: z.string().url().default("http://localhost:3001"),
     WEB_ORIGIN: z.string().default("http://localhost:3000"),

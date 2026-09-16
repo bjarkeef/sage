@@ -44,6 +44,13 @@ describe("appSymbolToTwelveData", () => {
   it("refuses a suffix it cannot place, so the fallback serves it", () => {
     expect(() => appSymbolToTwelveData("FOO.WAR")).toThrow(SymbolNotFoundError);
   });
+
+  it.each(["^GSPC", "EURUSD=X"])(
+    "refuses %s, an index or FX symbol Twelve Data never serves, before any request",
+    (app) => {
+      expect(() => appSymbolToTwelveData(app)).toThrow(SymbolNotFoundError);
+    },
+  );
 });
 
 describe("twelveDataToAppSymbol", () => {

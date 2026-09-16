@@ -140,7 +140,12 @@ export class TwelveDataClient {
         throw new ProviderRateLimitError(Math.ceil((this.pausedUntil - now) / 1000));
       }
       case code === 403 && /plan/i.test(message):
-        this.remember(endpointKey, now);
+        // Only a refusal that names the endpoint ("/dividends is available
+        // exclusively with…") closes it for every symbol. Any other plan
+        // refusal is taken to be about this listing, so one out-of-plan symbol
+        // never silently disables an endpoint the plan does include.
+        if (namesEndpoint(message, endpoint)) this.remember(endpointKey, now);
+        else if (listingKey) this.remember(listingKey, now);
         this.refund(cost, chargedWindow);
         throw new ProviderPlanLimitError(`Twelve Data: ${endpoint} is not on this plan`);
       case code === 403:
@@ -181,6 +186,11 @@ export class TwelveDataClient {
       this.spent = Math.max(0, this.spent - cost);
     }
   }
+}
+
+/** True when a refusal message names the endpoint as a path, e.g. `/dividends`. */
+function namesEndpoint(message: string, endpoint: TwelveDataEndpoint): boolean {
+  return new RegExp(`(^|[^\\w/.])/${endpoint}\\b`).test(message);
 }
 
 function errorEnvelope(body: unknown): { code: number; message: string } | null {
