@@ -388,6 +388,28 @@ importers:
         specifier: 'catalog:'
         version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(msw@2.15.0(@types/node@26.4.0)(typescript@5.9.3))(tsx@4.23.12)(yaml@2.9.0)
 
+  packages/providers/twelvedata:
+    dependencies:
+      '@sage/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@sage/provider-interface':
+        specifier: workspace:*
+        version: link:../_interface
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@sage/tsconfig':
+        specifier: workspace:*
+        version: link:../../../tooling/tsconfig
+      msw:
+        specifier: 'catalog:'
+        version: 2.15.0(@types/node@26.4.0)(typescript@5.9.3)
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.7(@types/node@26.4.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(msw@2.15.0(@types/node@26.4.0)(typescript@5.9.3))(tsx@4.23.12)(yaml@2.9.0)
+
   packages/providers/yahoo-finance:
     dependencies:
       '@sage/core':
