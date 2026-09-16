@@ -5,7 +5,7 @@ import { FakeMarketDataProvider } from "@sage/provider-interface/testing";
 import { describeDb, withTestDb, testEnv, signUpTestUser, type TestDb } from "../testing";
 import { createApp } from "../app";
 import { createAuth } from "../auth";
-import { autoDividend, portfolio } from "../db/schema";
+import { autoDividend, portfolio, user } from "../db/schema";
 
 function daysAgo(n: number): string {
   const d = new Date();
@@ -86,7 +86,11 @@ describeDb("dividend reconciliation after an import", () => {
     });
     expect(res.status).toBe(200);
 
-    const [pf] = await tdb.db.select({ id: portfolio.id }).from(portfolio).limit(1);
+    const [pf] = await tdb.db
+      .select({ id: portfolio.id })
+      .from(portfolio)
+      .innerJoin(user, eq(user.id, portfolio.userId))
+      .where(eq(user.email, "recon-after-import@example.com"));
     await vi.waitFor(
       async () => {
         await app.request("/dividends/income", { headers: { cookie } });
@@ -123,13 +127,19 @@ describeDb("dividend reconciliation after an import", () => {
     });
     expect(res.status).toBe(201);
 
-    const portfolios = await tdb.db.select({ id: portfolio.id }).from(portfolio);
+    const [pf] = await tdb.db
+      .select({ id: portfolio.id })
+      .from(portfolio)
+      .innerJoin(user, eq(user.id, portfolio.userId))
+      .where(eq(user.email, "recon-after-buy@example.com"));
     await vi.waitFor(
       async () => {
         await app.request("/dividends/income", { headers: { cookie: handCookie } });
-        const rows = await tdb.db.select().from(autoDividend);
-        const theirs = rows.filter((r) => r.portfolioId !== portfolios[0]!.id);
-        expect(theirs).toHaveLength(1);
+        const rows = await tdb.db
+          .select()
+          .from(autoDividend)
+          .where(eq(autoDividend.portfolioId, pf!.id));
+        expect(rows).toHaveLength(1);
       },
       { timeout: 5_000, interval: 100 },
     );
