@@ -7,6 +7,7 @@ import type { PortfolioViewDeps } from "./portfolio-view";
 import { loadPortfolioBook, type PortfolioBook } from "./portfolio-book";
 import type { MoneyDTO } from "../dto";
 import { getRatesWithProvenance } from "../market-data/fx-provenance";
+import { refreshHeldProfilesInBackground } from "../market-data/asset-profile-cache";
 
 export interface DimRowDTO {
   symbol: string;
@@ -119,6 +120,15 @@ export async function buildDiversificationView(
     .from(customHolding)
     .where(and(eq(customHolding.portfolioId, portfolioId), inArray(customHolding.symbol, symbols)));
   const customMap = new Map(customRows.map((c) => [c.symbol, c]));
+
+  // This view is what reads the profiles, so it is what notices they are
+  // missing or old. The fetch lands for the next load, not this one. Custom
+  // holdings are classified by their owner, and no provider knows them.
+  refreshHeldProfilesInBackground(
+    db,
+    provider,
+    symbols.filter((s) => !customMap.has(s)),
+  );
 
   const marketRaw = new Map<string, Decimal>();
   await Promise.all(
