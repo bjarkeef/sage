@@ -1,5 +1,6 @@
 import {
   ProviderAuthError,
+  ProviderPlanLimitError,
   ProviderRateLimitError,
   SymbolNotFoundError,
 } from "@sage/provider-interface";
@@ -32,6 +33,7 @@ export interface ProviderHealth {
  */
 export function classifyFailure(error: unknown): ProviderFailureReason | null {
   if (error instanceof SymbolNotFoundError) return null;
+  if (error instanceof ProviderPlanLimitError) return null;
   if (error instanceof ProviderRateLimitError) return "rate-limited";
   if (error instanceof ProviderAuthError) return "auth";
   return "unavailable";
