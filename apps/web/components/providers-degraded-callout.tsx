@@ -7,6 +7,9 @@ import { formatSecondsAgo, providerLabel } from "../lib/format";
 import { qk } from "../lib/query/keys";
 import type { ProviderHealthDTO } from "../lib/types";
 
+/** A provider that answered within this long is taken to be mid-fetch, not down. */
+const RECENT_SUCCESS_SECONDS = 600;
+
 /** Plain-language cause, phrased as something the reader can act on. */
 function reasonPhrase(health: ProviderHealthDTO): string {
   switch (health.lastFailureReason) {
@@ -54,6 +57,31 @@ export function ProvidersDegradedCallout() {
   if (!missing && !providers.pricesStale) return null;
 
   const degraded = providers.health.filter((h) => h.state === "degraded");
+
+  // Nothing stored YET, from a provider that is answering: new holdings whose
+  // first fetch is still under way, which is every import. Saying "unavailable"
+  // there greeted a first-time user with an outage at the moment their book
+  // arrived. Needs a recent success, not just the absence of failure — after an
+  // API restart health reads `unknown` and the real warning below must stand.
+  const fetching =
+    missing &&
+    !providers.pricesStale &&
+    degraded.length === 0 &&
+    providers.health.some(
+      (h) =>
+        h.state === "healthy" &&
+        h.lastSuccessSecondsAgo !== null &&
+        h.lastSuccessSecondsAgo < RECENT_SUCCESS_SECONDS,
+    );
+  if (fetching) {
+    const n = providers.pricesMissing;
+    return (
+      <Callout tone="info" className="mb-4">
+        {`Fetching prices for ${n} ${n === 1 ? "holding" : "holdings"}.`}
+      </Callout>
+    );
+  }
+
   const causes = degraded.map((h) => `${providerLabel(h.name)} ${reasonPhrase(h)}`).join(" and ");
 
   const lead = missing
