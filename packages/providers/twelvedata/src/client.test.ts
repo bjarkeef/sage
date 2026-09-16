@@ -181,6 +181,50 @@ describe("TwelveDataClient: the per-minute budget", () => {
       client.request("quote", { symbol: "AAPL" }, { listingKey: "AAPL" }),
     ).resolves.toBeTruthy();
   });
+
+  it("does not refund a credit into a window the charge was not made in", async () => {
+    let resolveFirst: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    let calls = 0;
+    server.use(
+      http.get(`${BASE}/quote`, () => {
+        calls += 1;
+        return calls === 1 ? firstResponse : HttpResponse.json(AAPL_QUOTE);
+      }),
+    );
+    // Mid the 12:00 window, one second before it rolls over.
+    const clock = { t: Date.UTC(2026, 8, 16, 12, 0, 59) };
+    const client = clientAt(clock, 8);
+
+    // Charge request A in the 12:00 window; its response will not resolve yet.
+    const pending = client.request(
+      "quote",
+      { symbol: "EUDIV", mic_code: "XETR" },
+      { listingKey: "EUDIV@XETR" },
+    );
+
+    // The window rolls over before A's response arrives, and the new window's
+    // whole budget is spent by other calls.
+    clock.t = Date.UTC(2026, 8, 16, 12, 1, 0);
+    for (let i = 0; i < 8; i++) {
+      await client.request("quote", { symbol: "AAPL" });
+    }
+    expect(calls).toBe(9);
+
+    // A now comes back as a plan refusal. It was charged in the 12:00 window,
+    // which is long gone, so it must not refund a credit into 12:01.
+    resolveFirst!(HttpResponse.json(ERROR_SYMBOL_PLAN, { status: 404 }));
+    await expect(pending).rejects.toBeInstanceOf(ProviderPlanLimitError);
+
+    // The 12:01 budget is still fully spent: the next call is refused locally,
+    // with no network request.
+    await expect(client.request("quote", { symbol: "KO" })).rejects.toBeInstanceOf(
+      ProviderPlanLimitError,
+    );
+    expect(calls).toBe(9);
+  });
 });
 
 describe("TwelveDataClient: remembering plan refusals", () => {

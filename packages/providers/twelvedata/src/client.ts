@@ -88,6 +88,10 @@ export class TwelveDataClient {
       throw new ProviderRateLimitError(Math.ceil((this.pausedUntil - now) / 1000));
     }
     const cost = CREDIT_COST[endpoint];
+    // The window this call was charged in, so a refund below (which may land
+    // after other calls have rolled the window over) only credits the window
+    // it actually took the credit from.
+    let chargedWindow = this.windowStart;
     if (cost > 0) {
       const window = Math.floor(now / MINUTE_MS) * MINUTE_MS;
       if (window !== this.windowStart) {
@@ -98,6 +102,7 @@ export class TwelveDataClient {
         throw new ProviderPlanLimitError("Twelve Data: this minute's credit budget is spent");
       }
       this.spent += cost;
+      chargedWindow = this.windowStart;
     }
 
     const url = new URL(`${this.baseUrl}/${endpoint}`);
@@ -136,13 +141,13 @@ export class TwelveDataClient {
       }
       case code === 403 && /plan/i.test(message):
         this.remember(endpointKey, now);
-        this.spent -= cost;
+        this.refund(cost, chargedWindow);
         throw new ProviderPlanLimitError(`Twelve Data: ${endpoint} is not on this plan`);
       case code === 403:
         throw new ProviderAuthError("Twelve Data refused the request");
       case code === 404 && /plan|upgrad/i.test(message):
         if (listingKey) this.remember(listingKey, now);
-        this.spent -= cost;
+        this.refund(cost, chargedWindow);
         throw new ProviderPlanLimitError("Twelve Data: this listing is not on this plan");
       case code === 400 && /no data/i.test(message) && options.allowNoData === true:
         return null;
@@ -163,6 +168,18 @@ export class TwelveDataClient {
 
   private remember(key: string, now: number): void {
     this.refused.set(key, now + PLAN_MEMORY_MS);
+  }
+
+  /**
+   * Gives back a credit a plan refusal did not actually spend — but only into
+   * the window it was charged from. A response can arrive after the minute
+   * window has rolled over (and been fully spent by other calls in between),
+   * so crediting the *current* window instead could push it over the cap.
+   */
+  private refund(cost: number, chargedWindow: number): void {
+    if (cost > 0 && this.windowStart === chargedWindow) {
+      this.spent = Math.max(0, this.spent - cost);
+    }
   }
 }
 
