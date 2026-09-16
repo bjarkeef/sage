@@ -183,6 +183,9 @@ importers:
       '@sage/provider-interface':
         specifier: workspace:*
         version: link:../../packages/providers/_interface
+      '@sage/provider-twelvedata':
+        specifier: workspace:*
+        version: link:../../packages/providers/twelvedata
       '@sage/provider-yahoo-finance':
         specifier: workspace:*
         version: link:../../packages/providers/yahoo-finance

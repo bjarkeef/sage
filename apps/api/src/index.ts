@@ -10,6 +10,7 @@ import { createAuth } from "./auth";
 import type { IMarketDataProvider } from "@sage/provider-interface";
 import { YahooFinanceProvider } from "@sage/provider-yahoo-finance";
 import { EodhdProvider } from "@sage/provider-eodhd";
+import { TwelveDataProvider } from "@sage/provider-twelvedata";
 import { EcbFxFeed } from "@sage/provider-ecb";
 import { CachingMarketDataProvider } from "./market-data/caching-provider";
 import { EnrichingProvider } from "./market-data/enriching-provider";
@@ -45,6 +46,15 @@ function createMarketDataProvider(env: Env, health: ProviderHealthRegistry): IMa
       new EodhdProvider({ apiToken: env.EODHD_API_TOKEN! }),
       health,
     );
+  const twelvedata = () =>
+    new HealthTrackingProvider(
+      "twelvedata",
+      new TwelveDataProvider({
+        apiKey: env.TWELVEDATA_API_KEY!,
+        creditsPerMinute: env.TWELVEDATA_CREDITS_PER_MINUTE,
+      }),
+      health,
+    );
   let primary: IMarketDataProvider;
   switch (env.MARKET_DATA_PROVIDER) {
     case "yahoo":
@@ -52,6 +62,9 @@ function createMarketDataProvider(env: Env, health: ProviderHealthRegistry): IMa
       break;
     case "eodhd":
       primary = eodhd();
+      break;
+    case "twelvedata":
+      primary = twelvedata();
       break;
   }
 
@@ -141,7 +154,10 @@ async function main() {
           signupsOpen: env.ALLOW_SIGNUP,
           marketData: env.MARKET_DATA_PROVIDER,
           enrichment: env.ENRICHMENT_PROVIDER,
-          keys: { eodhd: Boolean(env.EODHD_API_TOKEN) },
+          keys: {
+            eodhd: Boolean(env.EODHD_API_TOKEN),
+            twelvedata: Boolean(env.TWELVEDATA_API_KEY),
+          },
         },
         providerHealth,
       },
