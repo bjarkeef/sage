@@ -107,7 +107,8 @@ function duplicateSkipsOf(plan: PlannedRow[]) {
       (r) =>
         r.disposition === "already-imported" ||
         r.disposition === "claim-existing" ||
-        r.disposition === "adopt-auto",
+        r.disposition === "adopt-auto" ||
+        r.disposition === "adopt-custom-income",
     )
     .map((r) => ({
       row: r.tx.rowNumber,
@@ -118,7 +119,9 @@ function duplicateSkipsOf(plan: PlannedRow[]) {
           ? "Already imported"
           : r.disposition === "adopt-auto"
             ? "Updates an auto-added dividend"
-            : "Matches existing transaction",
+            : r.disposition === "adopt-custom-income"
+              ? "Updates a generated income payment"
+              : "Matches existing transaction",
     }));
 }
 

@@ -1,7 +1,7 @@
 import { it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { describeDb, withTestDb, type TestDb } from "../testing";
-import { user, portfolio, instrument, transaction, importRow } from "../db/schema";
+import { user, portfolio, instrument, transaction, importRow, customIncome } from "../db/schema";
 import { planImport, executeImport } from "./dedupe";
 import type { ImportTransaction } from "./types";
 
@@ -255,5 +255,80 @@ describeDb("planImport / executeImport", () => {
     expect(
       await tdb.db.select().from(transaction).where(eq(transaction.instrumentSymbol, "AMZN")),
     ).toHaveLength(1);
+  });
+
+  /**
+   * The custom-income engine mints a savings account's interest on its pay
+   * date. If the broker export arrives AFTER that, its row for the same payment
+   * used to land beside the generated one — the credit counted twice. The
+   * quantities never match exactly (the engine keeps full precision, a broker
+   * rounds to 8dp), so content-matching could not catch it. Broker values win,
+   * as they do for auto-added dividends, and the income ledger keeps its link,
+   * so the engine never mints that pay date again.
+   */
+  it("adopts a generated custom-income credit instead of duplicating it", async () => {
+    await tdb.db.insert(instrument).values({
+      symbol: "SAVINGS_ACC",
+      name: "Savings",
+      exchange: "CUSTOM",
+      currency: "DKK",
+      assetType: "custom",
+    });
+    const [generated] = await tdb.db
+      .insert(transaction)
+      .values({
+        portfolioId,
+        instrumentSymbol: "SAVINGS_ACC",
+        type: "buy",
+        quantity: "193.8782599685499812328767123287672",
+        price: "0",
+        currency: "DKK",
+        tradeDate: "2026-07-30",
+        source: "custom-income",
+      })
+      .returning({ id: transaction.id });
+    await tdb.db
+      .insert(customIncome)
+      .values({
+        portfolioId,
+        symbol: "SAVINGS_ACC",
+        payDate: "2026-07-30",
+        transactionId: generated!.id,
+      });
+
+    const brokerRow = tx({
+      symbol: "SAVINGS_ACC",
+      type: "buy",
+      quantity: "193.87825997",
+      price: "0",
+      currency: "DKK",
+      tradeDate: "2026-07-30",
+      exchange: "CUSTOM_HOLDING",
+    });
+    const plan = await planImport(tdb.db, portfolioId, [brokerRow]);
+    expect(plan.map((r) => r.disposition)).toEqual(["adopt-custom-income"]);
+
+    const result = await executeImport(tdb.db, portfolioId, "snowball", plan, {
+      restoreDeleted: false,
+    });
+    expect(result.adopted).toBe(1);
+    expect(result.inserted).toBe(0);
+
+    const rows = await tdb.db
+      .select()
+      .from(transaction)
+      .where(eq(transaction.instrumentSymbol, "SAVINGS_ACC"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.quantity).toBe("193.87825997");
+    expect(rows[0]!.source).toBeNull();
+    const [ledger] = await tdb.db
+      .select()
+      .from(customIncome)
+      .where(eq(customIncome.symbol, "SAVINGS_ACC"));
+    expect(ledger!.transactionId).toBe(generated!.id);
+
+    // And a re-import of the same file is a no-op.
+    const again = await planImport(tdb.db, portfolioId, [brokerRow]);
+    expect(again.map((r) => r.disposition)).toEqual(["already-imported"]);
   });
 });

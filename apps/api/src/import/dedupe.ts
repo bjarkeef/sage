@@ -57,7 +57,12 @@ export function assignOccurrences(txs: ImportTransaction[]): HashedRow[] {
 }
 
 export type Disposition =
-  "insert" | "already-imported" | "tombstoned" | "claim-existing" | "adopt-auto";
+  | "insert"
+  | "already-imported"
+  | "tombstoned"
+  | "claim-existing"
+  | "adopt-auto"
+  | "adopt-custom-income";
 
 export interface PlannedRow {
   tx: ImportTransaction;
@@ -66,7 +71,8 @@ export interface PlannedRow {
   disposition: Disposition;
   /** set for "claim-existing": the unclaimed transaction to link */
   claimTransactionId?: string;
-  /** set for "adopt-auto": the auto-created transaction to overwrite + link */
+  /** set for "adopt-auto" and "adopt-custom-income": the generated transaction
+   *  to overwrite + link */
   adoptTransactionId?: string;
   /** set for "tombstoned": the ledger row to re-link on restore */
   ledgerId?: string;
@@ -243,6 +249,52 @@ export async function planImport(
     }
   }
 
+  // Custom-income adoption: the same rule for a payment the custom-income
+  // engine minted before the broker's export arrived. Content-matching cannot
+  // see it — the engine keeps full precision where a broker rounds to 8dp — so
+  // the match is the payment's identity instead: symbol, type and pay date,
+  // exactly, one-to-one. The engine's own ledger row keeps pointing at the
+  // adopted transaction, so it never mints that pay date again.
+  const remaining = planned
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => row.disposition === "insert");
+  if (remaining.length > 0) {
+    const symbols = [...new Set(remaining.map(({ row }) => row.tx.symbol))];
+    const generated = await db
+      .select({
+        id: transaction.id,
+        symbol: transaction.instrumentSymbol,
+        type: transaction.type,
+        tradeDate: transaction.tradeDate,
+      })
+      .from(transaction)
+      .leftJoin(importRow, eq(importRow.transactionId, transaction.id))
+      .where(
+        and(
+          eq(transaction.portfolioId, portfolioId),
+          eq(transaction.source, "custom-income"),
+          isNull(importRow.id),
+          inArray(transaction.instrumentSymbol, symbols),
+        ),
+      );
+    const byIdentity = new Map<string, string[]>();
+    for (const g of generated) {
+      const key = `${g.symbol}|${g.type}|${g.tradeDate}`;
+      const list = byIdentity.get(key) ?? [];
+      list.push(g.id);
+      byIdentity.set(key, list);
+    }
+    for (const { row, index } of remaining) {
+      const queue = byIdentity.get(`${row.tx.symbol}|${row.tx.type}|${row.tx.tradeDate}`);
+      if (!queue?.length) continue;
+      planned[index] = {
+        ...row,
+        disposition: "adopt-custom-income",
+        adoptTransactionId: queue.shift()!,
+      };
+    }
+  }
+
   return planned;
 }
 
@@ -363,7 +415,8 @@ export async function executeImport(
           syncSymbols.add(row.tx.symbol);
           break;
         }
-        case "adopt-auto": {
+        case "adopt-auto":
+        case "adopt-custom-income": {
           const landed = await dbtx
             .insert(importRow)
             .values({
@@ -379,9 +432,9 @@ export async function executeImport(
             result.alreadyImported += 1;
             break;
           }
-          // Broker values win; the row stops being 'auto'. The auto_dividend
-          // ledger entry keeps its FK, so reconciliation still sees this
-          // ex-date as covered.
+          // Broker values win; the row stops being generated. The auto_dividend
+          // or custom_income ledger entry keeps its FK, so reconciliation or
+          // the income engine still sees this date as covered.
           await dbtx
             .update(transaction)
             .set({
