@@ -418,6 +418,9 @@ export interface ImportPreviewDTO {
 }
 
 export interface ImportResultDTO {
+  /** The display currency this import set for a user who had none, else null.
+   *  Optional: older API builds do not send it. */
+  displayCurrencySet?: string | null;
   inserted: number;
   restored: number;
   claimedExisting: number;

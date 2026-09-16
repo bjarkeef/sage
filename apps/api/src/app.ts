@@ -165,7 +165,7 @@ export function createApp(
   app.route("/dashboard", dashboardRoutes(db, provider, fxRateService, dividendProviders));
   app.route("/performance", performanceRoutes(db, provider, fxRateService));
   app.route("/asset", assetRoutes(db, provider, isinResolver, fxRateService));
-  app.route("/import", importRoutes(db, provider, isinResolver));
+  app.route("/import", importRoutes(db, provider, isinResolver, fxRateService));
   app.route("/user/settings", userSettingsRoutes(db));
   app.route("/goal", goalRoutes(db, provider, fxRateService, dividendProviders));
   app.route("/custom-holdings", customHoldingsRoutes(db));

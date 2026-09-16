@@ -8,13 +8,14 @@ import {
   type PositionTransaction,
 } from "@sage/core";
 import type { AppEnv } from "../middleware/session";
-import type { IMarketDataProvider } from "@sage/provider-interface";
+import type { IMarketDataProvider, IFxRateService } from "@sage/provider-interface";
 import type { Database } from "../db/client";
 import { instrument, customHolding, manualPrice, assetProfile, transaction } from "../db/schema";
 import { getUserPortfolio } from "../auth";
 import { syncAllPositionDividends } from "../market-data/dividend-sync";
 import { syncCustomIncome } from "../services/custom-income-sync";
 import { invalidateReconciliation } from "../services/dividend-reconciliation";
+import { setDefaultDisplayCurrency } from "../services/default-display-currency";
 import { parseSnowballCSV, isSnowballCsv } from "../import/snowball-parser";
 import { inspectCsv, parseGenericCsv, type ColumnMapping } from "../import/generic-csv";
 import { planImport, executeImport, type PlannedRow } from "../import/dedupe";
@@ -197,6 +198,25 @@ function detectWrongImporter(
 }
 
 /**
+ * After an import that added rows, give a user with no display currency the one
+ * most of the book is in. Never fails the import: it has already succeeded.
+ */
+async function defaultDisplayCurrencyAfter(
+  db: Database,
+  userId: string,
+  result: { inserted: number; restored: number },
+  fxRateService?: IFxRateService,
+): Promise<string | null> {
+  if (result.inserted + result.restored === 0) return null;
+  try {
+    return await setDefaultDisplayCurrency(db, userId, fxRateService);
+  } catch (err) {
+    console.warn("default display currency failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/**
  * Fetch dividend history for the symbols an import touched, then release the
  * reconciliation claim so the next read turns that history into received
  * dividends. Fire-and-forget: the import has already succeeded. The claim is
@@ -226,6 +246,7 @@ export function importRoutes(
   db: Database,
   provider?: IMarketDataProvider,
   isinResolver?: IsinResolver,
+  fxRateService?: IFxRateService,
 ) {
   const app = new Hono<AppEnv>();
 
@@ -417,7 +438,15 @@ export function importRoutes(
       }
     }
 
+    const displayCurrencySet = await defaultDisplayCurrencyAfter(
+      db,
+      c.get("user").id,
+      result,
+      fxRateService,
+    );
+
     const response = {
+      displayCurrencySet,
       inserted: result.inserted,
       restored: result.restored,
       claimedExisting: result.claimed,
@@ -583,7 +612,15 @@ export function importRoutes(
       });
     }
 
+    const displayCurrencySet = await defaultDisplayCurrencyAfter(
+      db,
+      c.get("user").id,
+      result,
+      fxRateService,
+    );
+
     return c.json({
+      displayCurrencySet,
       inserted: result.inserted,
       restored: result.restored,
       claimedExisting: result.claimed,

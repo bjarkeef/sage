@@ -127,6 +127,31 @@ describe("ImportPage restore toggle", () => {
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["transactions"] }));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["dashboard"] });
   });
+
+  /** The import chose a display currency for a user who had none. Say which,
+   *  and where to change it — a currency switching under someone unannounced
+   *  reads as a bug. Then refresh what reads the setting, Goal included. */
+  it("names the display currency the import chose, and refreshes what reads it", async () => {
+    commitMock.mockReset().mockResolvedValue({ ...result, displayCurrencySet: "EUR" });
+    const qc = makeTestQueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+    const user = await uploadFile(qc);
+    await user.click(screen.getByRole("button", { name: "Import 1 transactions" }));
+
+    expect(await screen.findByText(/Figures now show in EUR/)).toBeDefined();
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["user-settings"] }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["goal"] });
+  });
+
+  it("says nothing about currency when the import did not choose one", async () => {
+    const user = await uploadFile();
+    await user.click(screen.getByRole("button", { name: "Import 1 transactions" }));
+    expect(await screen.findByText("Import complete")).toBeDefined();
+    expect(screen.queryByText(/Figures now show in/)).toBeNull();
+  });
 });
 
 /** Snowball was the default because it was built first, so someone arriving
