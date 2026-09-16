@@ -92,13 +92,13 @@ const ALLOWED = new Set([
 /**
  * Two exemptions:
  *
- * - `yahoo.live.ts` asks the real Yahoo whether a symbol resolves, so an
- *   invented ticker would fail for the uninteresting reason that it does not
- *   exist. It is the one file where real symbols are load-bearing, and it is
- *   never part of `pnpm test`.
+ * - `yahoo.live.ts` and `twelvedata.live.ts` ask the real providers whether a
+ *   symbol resolves, so an invented ticker would fail for the uninteresting
+ *   reason that it does not exist. They are the files where real symbols are
+ *   load-bearing, and neither is ever part of `pnpm test`.
  * - This rule and its test necessarily spell symbols out to describe them.
  */
-const EXEMPT = /(?:yahoo\.live\.[cm]?tsx?|no-identifying-tickers(?:\.test)?\.js)$/;
+const EXEMPT = /(?:(?:yahoo|twelvedata)\.live\.[cm]?tsx?|no-identifying-tickers(?:\.test)?\.js)$/;
 
 /** Prose abbreviations that happen to look like a one-letter ticker with a
  *  suffix. Listed rather than excluded by length, so a genuine single-letter

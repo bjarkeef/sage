@@ -35,6 +35,7 @@ describe("no-identifying-tickers", () => {
         { code: `const s = "eudiv.de";` },
         // The live provider test needs symbols that actually exist.
         { code: `const s = "UNLISTED.ST";`, filename: "src/yahoo.live.ts" },
+        { code: `const s = "UNLISTED.ST";`, filename: "src/twelvedata.live.ts" },
       ],
       invalid: [
         // A Copenhagen listing that nobody approved.
