@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import {
@@ -184,6 +185,7 @@ export default function ImportPage() {
       setResult(data);
       setStep("done");
       await invalidateFor(queryClient, "import");
+      if (data.displayCurrencySet) await invalidateFor(queryClient, "currency");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -607,6 +609,16 @@ export default function ImportPage() {
               )}
             </ul>
           </Callout>
+          {result.displayCurrencySet && (
+            <p className="text-sm text-muted-foreground">
+              Figures now show in {result.displayCurrencySet}, the currency most of your book is in.
+              Change it in{" "}
+              <Link href="/settings" className="text-foreground underline underline-offset-4">
+                Settings
+              </Link>
+              .
+            </p>
+          )}
           <Button variant="outline" onClick={handleReset}>
             Import another file
           </Button>
