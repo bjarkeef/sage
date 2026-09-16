@@ -79,7 +79,10 @@ function HoldingRows({ buckets }: { buckets: BucketRow[] }) {
 }
 
 export function DiversificationClient() {
-  const [xray, setXray] = useState(false);
+  // On by default: a fund is a basket of sectors, and one "Funds" slice answers
+  // "how is my money spread" with the wrapper instead of what is inside it. A
+  // fund with no composition data still reads as "Funds" either way.
+  const [xray, setXray] = useState(true);
   const [buyIn, setBuyIn] = useState(false);
   const [showHoldings, setShowHoldings] = useState(false);
 
