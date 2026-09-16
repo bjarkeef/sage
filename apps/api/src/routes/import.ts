@@ -14,6 +14,7 @@ import { instrument, customHolding, manualPrice, assetProfile, transaction } fro
 import { getUserPortfolio } from "../auth";
 import { syncAllPositionDividends } from "../market-data/dividend-sync";
 import { syncCustomIncome } from "../services/custom-income-sync";
+import { invalidateReconciliation } from "../services/dividend-reconciliation";
 import { parseSnowballCSV, isSnowballCsv } from "../import/snowball-parser";
 import { inspectCsv, parseGenericCsv, type ColumnMapping } from "../import/generic-csv";
 import { planImport, executeImport, type PlannedRow } from "../import/dedupe";
@@ -190,6 +191,32 @@ function detectWrongImporter(
       "This is a Snowball Analytics export. Import it with the Snowball option, " +
       "which reads its exchange column and dividend amounts correctly.",
   };
+}
+
+/**
+ * Fetch dividend history for the symbols an import touched, then release the
+ * reconciliation claim so the next read turns that history into received
+ * dividends. Fire-and-forget: the import has already succeeded. The claim is
+ * released even when the sync fails part-way, since whatever it did write
+ * still needs reconciling.
+ */
+function syncThenReconcile(
+  db: Database,
+  provider: IMarketDataProvider,
+  portfolioId: string,
+  symbols: string[],
+): void {
+  syncAllPositionDividends(db, [provider], symbols)
+    .catch((err: unknown) => {
+      console.warn("post-import dividend sync failed:", err instanceof Error ? err.message : err);
+    })
+    .then(() => invalidateReconciliation(db, portfolioId))
+    .catch((err: unknown) => {
+      console.warn(
+        "post-import reconciliation reset failed:",
+        err instanceof Error ? err.message : err,
+      );
+    });
 }
 
 export function importRoutes(
@@ -372,9 +399,7 @@ export function importRoutes(
     const result = await executeImport(db, portfolioId, "snowball", plan, { restoreDeleted });
 
     if (provider && result.syncSymbols.length > 0) {
-      syncAllPositionDividends(db, [provider], result.syncSymbols).catch((err) => {
-        console.warn("post-import dividend sync failed:", err instanceof Error ? err.message : err);
-      });
+      syncThenReconcile(db, provider, portfolioId, result.syncSymbols);
     }
     if (isinResolver) {
       // Custom symbols have no ISIN to resolve — Snowball's own identity.
@@ -527,9 +552,7 @@ export function importRoutes(
     const result = await executeImport(db, portfolioId, "csv", plan, { restoreDeleted });
 
     if (provider && result.syncSymbols.length > 0) {
-      syncAllPositionDividends(db, [provider], result.syncSymbols).catch((err) => {
-        console.warn("post-import dividend sync failed:", err instanceof Error ? err.message : err);
-      });
+      syncThenReconcile(db, provider, portfolioId, result.syncSymbols);
     }
     if (isinResolver) {
       for (const sym of result.syncSymbols) {
