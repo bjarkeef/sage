@@ -15,7 +15,10 @@ export function EmptyState({ message, action, className }: EmptyStateProps) {
       role="status"
       className={cn("flex flex-col items-center gap-3 py-10 text-center", className)}
     >
-      <p className="text-sm text-muted-foreground">{message}</p>
+      {/* A sentence that explains the page needs a measure: unconstrained, an
+          empty state on a wide screen set one line the full width of the
+          content column, which reads as a banner rather than a note. */}
+      <p className="max-w-md text-balance text-sm text-muted-foreground">{message}</p>
       {action}
     </div>
   );

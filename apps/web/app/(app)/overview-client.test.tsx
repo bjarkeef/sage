@@ -260,7 +260,7 @@ describe("OverviewClient", () => {
         "href",
         "/import",
       );
-      expect(screen.getByRole("button", { name: /add a single transaction/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Add a single transaction/ })).toBeInTheDocument();
     });
 
     it("drops every placeholder the empty page used to print", async () => {

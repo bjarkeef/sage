@@ -73,7 +73,7 @@ function OverviewWelcome() {
           </Link>
           <TransactionDialog
             mode="add"
-            triggerLabel="or add a single transaction"
+            triggerLabel="Add a single transaction"
             triggerVariant="ghost"
             triggerSize="sm"
           />
