@@ -45,3 +45,20 @@ export class ProviderUnavailableError extends ProviderError {
     this.name = "ProviderUnavailableError";
   }
 }
+
+/**
+ * The provider could serve this, but not on the plan it is configured with —
+ * an endpoint or an exchange the plan does not include, or a local credit
+ * budget already spent this minute.
+ *
+ * Like `SymbolNotFoundError`, provider-health tracking deliberately ignores it
+ * (see `classifyFailure` in `apps/api/src/market-data/provider-health.ts`): a
+ * free plan declining a European listing is the plan working as sold, and the
+ * fallback chain serves the request from the next provider.
+ */
+export class ProviderPlanLimitError extends ProviderError {
+  constructor(message = "Not available on the configured provider plan") {
+    super(message);
+    this.name = "ProviderPlanLimitError";
+  }
+}

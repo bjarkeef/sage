@@ -176,6 +176,7 @@ export function SystemSection() {
                   ["Market data", status.providers.marketData],
                   ["Enrichment", status.providers.enrichment],
                   ["EODHD key", status.providers.keys.eodhd ? "configured" : "not set"],
+                  ["Twelve Data key", status.providers.keys.twelvedata ? "configured" : "not set"],
                   ...status.providers.health.map((h): [string, string] => [
                     providerLabel(h.name),
                     healthValue(h),

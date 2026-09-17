@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   ProviderAuthError,
+  ProviderPlanLimitError,
   ProviderRateLimitError,
   ProviderUnavailableError,
   SymbolNotFoundError,
@@ -28,6 +29,13 @@ describe("classifyFailure", () => {
 
   it("does not treat a missing symbol as a health signal", () => {
     expect(classifyFailure(new SymbolNotFoundError("NOPE"))).toBeNull();
+  });
+
+  /** A free or small plan refusing an exchange or an endpoint is the plan
+   *  working as sold, not the provider being down. Counting it would pin the
+   *  degraded-prices banner on for every free-tier install. */
+  it("does not treat a plan limit as a health signal", () => {
+    expect(classifyFailure(new ProviderPlanLimitError())).toBeNull();
   });
 });
 

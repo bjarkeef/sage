@@ -945,8 +945,9 @@ export interface ProviderHealthDTO {
 export interface SystemProvidersDTO {
   marketData: string;
   enrichment: string;
-  /** Whether each key is configured — the API never sends the values. */
-  keys: { eodhd: boolean };
+  /** Whether each key is configured — the API never sends the values.
+   *  `twelvedata` is optional: an API older than the Twelve Data adapter omits it. */
+  keys: { eodhd: boolean; twelvedata?: boolean };
   health: ProviderHealthDTO[];
   /** Elapsed seconds since the oldest successful price fetch; null when no
    *  price is stored. Server-computed, not a timestamp. */

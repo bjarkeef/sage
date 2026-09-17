@@ -5,6 +5,7 @@ import {
   ProviderRateLimitError,
   ProviderAuthError,
   ProviderUnavailableError,
+  countryNameToIso,
 } from "./index";
 import { FakeMarketDataProvider } from "./testing/index";
 
@@ -19,5 +20,11 @@ describe("@sage/provider-interface public surface", () => {
   it("exports a usable FakeMarketDataProvider from ./testing", async () => {
     const p = new FakeMarketDataProvider();
     expect(await p.searchSymbol("anything")).toEqual([]);
+  });
+});
+
+describe("shared country table", () => {
+  it("is exported from the package root for every adapter to use", () => {
+    expect(countryNameToIso("Denmark")).toBe("DK");
   });
 });

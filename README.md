@@ -233,10 +233,10 @@ unreachable.
 Sage has no licensed market-data feed. By default it reads prices through an
 unofficial Yahoo client: broad coverage, no key, and it can break without
 warning. It did on 2026-08-09, when an upstream change blanked every price in
-the app. Official providers are supported, but their free tiers are small
-enough that most setups still fall back to the unofficial path. Prices are
-stored in your own Postgres, so an outage leaves you with the last known
-values and a notice, not an empty app.
+the app. Official providers (EODHD, Twelve Data) are supported, but their free
+tiers are small enough that most setups still fall back to the unofficial
+path. Prices are stored in your own Postgres, so an outage leaves you with the
+last known values and a notice, not an empty app.
 
 **Read [`docs/MARKET-DATA.md`](./docs/MARKET-DATA.md) before you rely on it.**
 

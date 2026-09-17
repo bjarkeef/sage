@@ -135,4 +135,41 @@ describe("parseEnv", () => {
   it("parses ALLOW_SIGNUP=false", () => {
     expect(parseEnv({ ...base, ALLOW_SIGNUP: "false" }).ALLOW_SIGNUP).toBe(false);
   });
+
+  it("parses a valid environment with twelvedata", () => {
+    const env = parseEnv({
+      ...base,
+      MARKET_DATA_PROVIDER: "twelvedata",
+      TWELVEDATA_API_KEY: "test-key",
+    });
+    expect(env.MARKET_DATA_PROVIDER).toBe("twelvedata");
+    expect(env.TWELVEDATA_API_KEY).toBe("test-key");
+    // The free plan's allowance, so an unset value can never over-spend a key.
+    expect(env.TWELVEDATA_CREDITS_PER_MINUTE).toBe(8);
+  });
+
+  it("throws when TWELVEDATA_API_KEY is missing and provider is twelvedata", () => {
+    expect(() => parseEnv({ ...base, MARKET_DATA_PROVIDER: "twelvedata" })).toThrow(
+      /TWELVEDATA_API_KEY/,
+    );
+  });
+
+  it("reads TWELVEDATA_CREDITS_PER_MINUTE and refuses zero or negative", () => {
+    expect(
+      parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "610" }).TWELVEDATA_CREDITS_PER_MINUTE,
+    ).toBe(610);
+    expect(() => parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "0" })).toThrow();
+    expect(() => parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "-5" })).toThrow();
+  });
+
+  it("treats a blank TWELVEDATA_CREDITS_PER_MINUTE as unset, so it cannot stop startup", () => {
+    // `TWELVEDATA_CREDITS_PER_MINUTE=` left in a .env reaches the schema as "",
+    // which a plain coerce turns into 0 and refuses — even on a yahoo install.
+    expect(
+      parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "" }).TWELVEDATA_CREDITS_PER_MINUTE,
+    ).toBe(8);
+    expect(
+      parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "  " }).TWELVEDATA_CREDITS_PER_MINUTE,
+    ).toBe(8);
+  });
 });
