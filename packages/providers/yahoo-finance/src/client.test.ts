@@ -31,15 +31,19 @@ import {
  *   lookup falls back to a bare `Error` because it does not define a
  *   `NotFoundError` class), so message matching is the only option.
  */
-const { quoteMock, chartMock, quoteSummaryMock, searchMock } = vi.hoisted(() => ({
+const { quoteMock, chartMock, quoteSummaryMock, searchMock, constructedWith } = vi.hoisted(() => ({
   quoteMock: vi.fn(),
   chartMock: vi.fn(),
   quoteSummaryMock: vi.fn(),
   searchMock: vi.fn(),
+  constructedWith: [] as { fetch?: typeof fetch }[],
 }));
 
 vi.mock("yahoo-finance2", () => ({
   default: class FakeYahooFinance {
+    constructor(options: { fetch?: typeof fetch } = {}) {
+      constructedWith.push(options);
+    }
     quote = quoteMock;
     chart = chartMock;
     quoteSummary = quoteSummaryMock;
@@ -54,6 +58,29 @@ beforeEach(() => {
   chartMock.mockReset();
   quoteSummaryMock.mockReset();
   searchMock.mockReset();
+});
+
+describe("YahooFinanceClient: request timeout", () => {
+  it("hands yahoo-finance2 a fetch that gives up on a request that never answers", async () => {
+    constructedWith.length = 0;
+    new YahooFinanceClient({ timeoutMs: 20 });
+    const libraryFetch = constructedWith[0]?.fetch;
+    expect(libraryFetch).toBeTypeOf("function");
+
+    const original = globalThis.fetch;
+    globalThis.fetch = (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal!.reason as Error));
+      });
+    try {
+      const err = await libraryFetch!("https://query2.finance.yahoo.test/").catch(
+        (x: unknown) => x,
+      );
+      expect((err as Error).name).toBe("TimeoutError");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
 });
 
 describe("YahooFinanceClient.quote", () => {

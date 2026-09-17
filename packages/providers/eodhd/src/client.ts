@@ -3,11 +3,14 @@ import {
   ProviderRateLimitError,
   ProviderUnavailableError,
   SymbolNotFoundError,
+  timeoutFetch,
 } from "@sage/provider-interface";
 
 export interface EodhdClientConfig {
   apiToken: string;
   baseUrl?: string;
+  /** Per-request ceiling; defaults to `PROVIDER_FETCH_TIMEOUT_MS`. Tests shorten it. */
+  timeoutMs?: number;
 }
 
 const DEFAULT_BASE_URL = "https://eodhd.com/api";
@@ -16,10 +19,12 @@ const DEFAULT_BASE_URL = "https://eodhd.com/api";
 export class EodhdClient {
   private readonly apiToken: string;
   private readonly baseUrl: string;
+  private readonly fetch: typeof fetch;
 
   constructor(config: EodhdClientConfig) {
     this.apiToken = config.apiToken;
     this.baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
+    this.fetch = timeoutFetch(config.timeoutMs);
   }
 
   /**
@@ -45,7 +50,7 @@ export class EodhdClient {
 
     let response: Response;
     try {
-      response = await fetch(url);
+      response = await this.fetch(url);
     } catch (cause) {
       throw new ProviderUnavailableError("Failed to reach EODHD", { cause });
     }

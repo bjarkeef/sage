@@ -4,6 +4,7 @@ import {
   ProviderRateLimitError,
   ProviderUnavailableError,
   SymbolNotFoundError,
+  timeoutFetch,
 } from "@sage/provider-interface";
 
 export type TwelveDataEndpoint =
@@ -31,6 +32,8 @@ export interface TwelveDataClientConfig {
   creditsPerMinute?: number;
   /** Injectable clock for tests. */
   now?: () => number;
+  /** Per-request ceiling; defaults to `PROVIDER_FETCH_TIMEOUT_MS`. Tests shorten it. */
+  timeoutMs?: number;
 }
 
 interface RequestOptions {
@@ -59,6 +62,7 @@ export class TwelveDataClient {
   private readonly baseUrl: string;
   private readonly creditsPerMinute: number;
   private readonly now: () => number;
+  private readonly fetch: typeof fetch;
 
   private windowStart = -1;
   private spent = 0;
@@ -71,6 +75,7 @@ export class TwelveDataClient {
     this.baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
     this.creditsPerMinute = config.creditsPerMinute ?? 8;
     this.now = config.now ?? (() => Date.now());
+    this.fetch = timeoutFetch(config.timeoutMs);
   }
 
   async request(
@@ -110,7 +115,7 @@ export class TwelveDataClient {
 
     let response: Response;
     try {
-      response = await fetch(url, { headers: { Authorization: `apikey ${this.apiKey}` } });
+      response = await this.fetch(url, { headers: { Authorization: `apikey ${this.apiKey}` } });
     } catch (cause) {
       throw new ProviderUnavailableError("Failed to reach Twelve Data", { cause });
     }
