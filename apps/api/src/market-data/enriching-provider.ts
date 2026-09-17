@@ -9,9 +9,10 @@ import type {
 
 /**
  * Wraps a primary provider and fills null fundamental fields on
- * `getAssetProfile` from a secondary enrichment provider. All other
- * methods delegate to the primary. If the enrichment call fails,
- * the primary's result is returned as-is — enrichment is best-effort.
+ * `getAssetProfile` from a secondary enrichment provider — including an ETF's
+ * or fund's composition, which no primary serves. All other methods delegate
+ * to the primary. If the enrichment call fails, the primary's result is
+ * returned as-is — enrichment is best-effort.
  */
 export class EnrichingProvider implements IMarketDataProvider {
   constructor(
@@ -38,8 +39,12 @@ export class EnrichingProvider implements IMarketDataProvider {
   async getAssetProfile(symbol: string): Promise<AssetProfile> {
     const profile = await this.primary.getAssetProfile(symbol);
 
+    const isFund = profile.assetType === "etf" || profile.assetType === "fund";
     const needsEnrichment =
-      profile.marketCap === null || profile.peRatio === null || profile.beta === null;
+      profile.marketCap === null ||
+      profile.peRatio === null ||
+      profile.beta === null ||
+      (isFund && profile.fund === null);
 
     if (!needsEnrichment) return profile;
 
@@ -57,6 +62,12 @@ export class EnrichingProvider implements IMarketDataProvider {
         trailingAnnualDividend: profile.trailingAnnualDividend ?? enriched.trailingAnnualDividend,
         sector: profile.sector ?? enriched.sector,
         industry: profile.industry ?? enriched.industry,
+        description: profile.description ?? enriched.description,
+        country: profile.country ?? enriched.country,
+        countryIso: profile.countryIso ?? enriched.countryIso,
+        // Fund holdings and sector weights feed the asset page and the ETF
+        // look-through; no primary but Yahoo serves them today.
+        fund: profile.fund ?? enriched.fund,
       };
     } catch {
       return profile;

@@ -5,6 +5,7 @@ import {
   ProviderRateLimitError,
   ProviderAuthError,
   ProviderUnavailableError,
+  ProviderPlanLimitError,
 } from "./errors";
 
 describe("provider errors", () => {
@@ -38,5 +39,13 @@ describe("provider errors", () => {
     expect(e.cause).toBe(cause);
     expect(e.name).toBe("ProviderUnavailableError");
     expect(new ProviderUnavailableError().message).toContain("unavailable");
+  });
+
+  it("ProviderPlanLimitError extends ProviderError with a default and a custom message", () => {
+    const e = new ProviderPlanLimitError();
+    expect(e).toBeInstanceOf(ProviderError);
+    expect(e.name).toBe("ProviderPlanLimitError");
+    expect(e.message).toContain("plan");
+    expect(new ProviderPlanLimitError("budget spent").message).toBe("budget spent");
   });
 });

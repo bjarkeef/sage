@@ -16,6 +16,7 @@ export const testEnv: Env = {
   AUTH_BASE_URL: "http://localhost:3001",
   WEB_ORIGIN: "http://localhost:3000",
   ALLOW_SIGNUP: true,
+  TWELVEDATA_CREDITS_PER_MINUTE: 8,
 };
 
 /** An `Auth` stub for suites that exercise routes without a real session. */

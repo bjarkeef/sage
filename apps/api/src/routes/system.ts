@@ -61,7 +61,7 @@ export interface SystemInfo {
   marketData: string;
   enrichment: string;
   /** Whether each API key is configured — never the value. */
-  keys: { eodhd: boolean };
+  keys: { eodhd: boolean; twelvedata: boolean };
 }
 
 export interface EnvironmentBody {
@@ -94,7 +94,7 @@ export interface ProviderHealthStatus {
 export interface ProvidersBody {
   marketData: string;
   enrichment: string;
-  keys: { eodhd: boolean };
+  keys: { eodhd: boolean; twelvedata: boolean };
   /** One row per provider the composition root wired; empty when no registry
    *  was supplied (tests, and any embedder that skips it). */
   health: ProviderHealthStatus[];
@@ -153,7 +153,7 @@ const DEFAULT_INFO: SystemInfo = {
   signupsOpen: true,
   marketData: "yahoo",
   enrichment: "none",
-  keys: { eodhd: false },
+  keys: { eodhd: false, twelvedata: false },
 };
 
 /** The FX block: which rate each held currency is converting at, and where it

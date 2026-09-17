@@ -19,7 +19,7 @@ const SYSTEM_INFO: SystemInfo = {
   signupsOpen: true,
   marketData: "yahoo",
   enrichment: "none",
-  keys: { eodhd: true },
+  keys: { eodhd: true, twelvedata: false },
 };
 
 function quote(symbol: string, price: string, ccy: string): Quote {
@@ -146,7 +146,7 @@ describeDb("GET /system/fx", () => {
     expect(body.providers).toEqual({
       marketData: "yahoo",
       enrichment: "none",
-      keys: { eodhd: true },
+      keys: { eodhd: true, twelvedata: false },
       health: [],
       pricesAgeSeconds: null,
       pricesStale: false,

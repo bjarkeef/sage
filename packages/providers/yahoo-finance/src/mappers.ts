@@ -20,8 +20,8 @@ import type {
   YfSearchNews,
   YfRatingsResult,
 } from "./client";
+import { countryNameToIso } from "@sage/provider-interface";
 import { exchangeToCurrency } from "./currency";
-import { countryNameToIso } from "./country-iso";
 
 // Yahoo reports LSE (and a few other) values in minor units like `GBp` (pence);
 // normalize every amount to the major-unit ISO currency.

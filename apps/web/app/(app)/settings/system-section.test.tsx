@@ -154,6 +154,21 @@ describe("SystemSection", () => {
     expect(screen.queryByText(/eodhd-[A-Za-z0-9]/)).not.toBeInTheDocument();
   });
 
+  it("says whether a Twelve Data key is configured", async () => {
+    getSystemStatusMock.mockResolvedValue(
+      systemDTO({
+        providers: {
+          ...systemDTO().providers,
+          keys: { eodhd: false, twelvedata: true },
+        },
+      }),
+    );
+    render(<SystemSection />);
+    expect(await screen.findByText("Twelve Data key")).toBeInTheDocument();
+    expect(screen.getByText("configured")).toBeInTheDocument(); // twelvedata
+    expect(screen.getByText("not set")).toBeInTheDocument(); // eodhd
+  });
+
   it("renders a status line per provider", async () => {
     getSystemStatusMock.mockResolvedValue(
       systemDTO({

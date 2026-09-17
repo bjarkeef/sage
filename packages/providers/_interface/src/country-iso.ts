@@ -1,8 +1,8 @@
 /**
- * Yahoo's `assetProfile` module reports a country as an English name —
- * `"Germany"`, `"United Kingdom"`, `"Taiwan"` — and never as a code. The
- * provider contract asks for `countryIso`, which EODHD supplies directly
- * (`CountryISO`), so the Yahoo mapper left it null.
+ * Providers report a country as an English name — Yahoo's `assetProfile` and
+ * Twelve Data's `/profile` both say `"Germany"`, `"United Kingdom"` — while the
+ * provider contract asks for `countryIso`. Shared here so every adapter maps
+ * names the same way.
  *
  * That single null was the whole of Sage's region gap: `countryToRegion` keys
  * on the ISO code, so on the default Yahoo path every holding resolved to
