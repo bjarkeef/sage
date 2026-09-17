@@ -163,23 +163,38 @@ describe("TwelveDataClient: the per-minute budget", () => {
     expect(seen.calls).toBe(3);
   });
 
-  it("gives back the credit a plan refusal did not use", async () => {
-    let n = 0;
-    server.use(
-      http.get(`${BASE}/quote`, () => {
-        n += 1;
-        return n === 1
-          ? HttpResponse.json(ERROR_SYMBOL_PLAN, { status: 404 })
-          : HttpResponse.json(AAPL_QUOTE);
-      }),
+  it("gives back the credit an endpoint refusal did not use", async () => {
+    // Measured 2026-09-17: a 403 "/dividends is available exclusively with…"
+    // returns no credit headers and leaves the minute's count untouched.
+    const dividends = countCalls("dividends", () =>
+      HttpResponse.json(ERROR_ENDPOINT_PLAN, { status: 403 }),
     );
+    const quotes = countCalls("quote", () => HttpResponse.json(AAPL_QUOTE));
     const client = clientAt({ t: T0 }, 1);
     await expect(
-      client.request("quote", { symbol: "EUDIV", mic_code: "XETR" }, { listingKey: "EUDIV@XETR" }),
+      client.request("dividends", { symbol: "VOO" }, { listingKey: "VOO" }),
     ).rejects.toBeInstanceOf(ProviderPlanLimitError);
     await expect(
       client.request("quote", { symbol: "AAPL" }, { listingKey: "AAPL" }),
     ).resolves.toBeTruthy();
+    expect([dividends.calls, quotes.calls]).toEqual([1, 1]);
+  });
+
+  it("keeps the credit a listing refusal spent, because Twelve Data charges it", async () => {
+    // Measured 2026-09-17: a 404 "This symbol is available starting with the
+    // Grow or Venture plan" moves api-credits-used by one, like a served quote.
+    // Refunding it let a free key overrun its minute and draw a real 429.
+    countCalls("quote", () => HttpResponse.json(ERROR_SYMBOL_PLAN, { status: 404 }));
+    const client = clientAt({ t: T0 }, 1);
+    await expect(
+      client.request("quote", { symbol: "EUDIV", mic_code: "XETR" }, { listingKey: "EUDIV@XETR" }),
+    ).rejects.toBeInstanceOf(ProviderPlanLimitError);
+    server.resetHandlers();
+    const quotes = countCalls("quote", () => HttpResponse.json(AAPL_QUOTE));
+    await expect(
+      client.request("quote", { symbol: "AAPL" }, { listingKey: "AAPL" }),
+    ).rejects.toThrow(/credit budget is spent/);
+    expect(quotes.calls).toBe(0);
   });
 
   it("does not refund a credit into a window the charge was not made in", async () => {
@@ -187,23 +202,14 @@ describe("TwelveDataClient: the per-minute budget", () => {
     const firstResponse = new Promise<Response>((resolve) => {
       resolveFirst = resolve;
     });
-    let calls = 0;
-    server.use(
-      http.get(`${BASE}/quote`, () => {
-        calls += 1;
-        return calls === 1 ? firstResponse : HttpResponse.json(AAPL_QUOTE);
-      }),
-    );
+    server.use(http.get(`${BASE}/dividends`, () => firstResponse));
+    const quotes = countCalls("quote", () => HttpResponse.json(AAPL_QUOTE));
     // Mid the 12:00 window, one second before it rolls over.
     const clock = { t: Date.UTC(2026, 8, 16, 12, 0, 59) };
     const client = clientAt(clock, 8);
 
     // Charge request A in the 12:00 window; its response will not resolve yet.
-    const pending = client.request(
-      "quote",
-      { symbol: "EUDIV", mic_code: "XETR" },
-      { listingKey: "EUDIV@XETR" },
-    );
+    const pending = client.request("dividends", { symbol: "VOO" }, { listingKey: "VOO" });
 
     // The window rolls over before A's response arrives, and the new window's
     // whole budget is spent by other calls.
@@ -211,11 +217,12 @@ describe("TwelveDataClient: the per-minute budget", () => {
     for (let i = 0; i < 8; i++) {
       await client.request("quote", { symbol: "AAPL" });
     }
-    expect(calls).toBe(9);
+    expect(quotes.calls).toBe(8);
 
-    // A now comes back as a plan refusal. It was charged in the 12:00 window,
-    // which is long gone, so it must not refund a credit into 12:01.
-    resolveFirst!(HttpResponse.json(ERROR_SYMBOL_PLAN, { status: 404 }));
+    // A now comes back as an endpoint refusal — the kind that IS refunded. It
+    // was charged in the 12:00 window, which is long gone, so it must not
+    // refund a credit into 12:01.
+    resolveFirst!(HttpResponse.json(ERROR_ENDPOINT_PLAN, { status: 403 }));
     await expect(pending).rejects.toBeInstanceOf(ProviderPlanLimitError);
 
     // The 12:01 budget is still fully spent: the next call is refused locally,
@@ -223,7 +230,7 @@ describe("TwelveDataClient: the per-minute budget", () => {
     await expect(client.request("quote", { symbol: "KO" })).rejects.toBeInstanceOf(
       ProviderPlanLimitError,
     );
-    expect(calls).toBe(9);
+    expect(quotes.calls).toBe(8);
   });
 });
 
