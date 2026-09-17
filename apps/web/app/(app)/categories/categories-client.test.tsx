@@ -278,8 +278,15 @@ describe("CategoriesClient — read mode", () => {
     expect(screen.getByText(/Exchange rates are currently unavailable/)).toBeInTheDocument();
   });
 
-  it("shows an empty state when there is nothing to show", () => {
+  it("shows an empty state that says what categories are for, and how to fill one", () => {
+    // "No holdings to show yet." alone described the absence without saying
+    // what the page would do with a holding, on a page a new account cannot
+    // learn anything else from.
     renderWithClient(<CategoriesClient />, seed(EMPTY));
-    expect(screen.getByText(/No holdings to show yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing to group yet/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Import transactions/ })).toHaveAttribute(
+      "href",
+      "/import",
+    );
   });
 });

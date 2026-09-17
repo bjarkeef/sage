@@ -5,7 +5,7 @@ import * as React from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
-import { PageShell, buttonVariants, ChartSkeleton } from "@sage/ui";
+import { PageShell, buttonVariants, ChartSkeleton, EmptyState } from "@sage/ui";
 import { AppPageHeader } from "../../../../components/app-page-header";
 import { getPortfolio } from "../../../../lib/api";
 import { qk } from "../../../../lib/query/keys";
@@ -178,6 +178,25 @@ export default function DividendAnalyticsPage() {
     return (
       <PageShell animate={false}>
         <AnalyticsPageSkeleton />
+      </PageShell>
+    );
+  }
+
+  // Four cards reading "—", a composition chart with no slices and an empty
+  // rhythm strip are a picture of the page rather than of a book. With nothing
+  // held and nothing ever paid, say what would fill it.
+  if (portfolio && portfolio.positions.length === 0 && upcoming.length === 0 && payers === 0) {
+    return (
+      <PageShell>
+        <AppPageHeader title="Dividend analytics" description={null} />
+        <EmptyState
+          message="No income to analyse yet. Once you hold something that pays, this page shows the yield, what it makes a month, and which holdings the income leans on."
+          action={
+            <Link href="/import" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+              Import transactions →
+            </Link>
+          }
+        />
       </PageShell>
     );
   }

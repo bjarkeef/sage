@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardTitle, PageShell, EmptyState } from "@sage/ui";
+import { Card, CardTitle, PageShell, EmptyState, buttonVariants } from "@sage/ui";
 import { getDashboard, getUserSettings } from "../../lib/api";
 import { qk } from "../../lib/query/keys";
 import type { IncomeStreamPointDTO } from "../../lib/types";
@@ -54,6 +54,35 @@ function StreamLegend() {
   );
 }
 
+/** The first screen after sign-up, and the only thing on it: what this page
+ *  will become, and the two ways to get there. Import leads — anyone arriving
+ *  with a book already has it in a broker CSV, and typing it in one row at a
+ *  time is the fallback, not the invitation. */
+function OverviewWelcome() {
+  return (
+    <PageShell>
+      <section className="mx-auto max-w-xl py-24 text-center sm:py-32">
+        <h1 className="text-2xl font-normal tracking-tight sm:text-3xl">Welcome to Sage.</h1>
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+          Bring in your transactions and this page leads with what your book pays you — the next
+          twelve months of dividends, what has already landed, and what is still an estimate.
+        </p>
+        <div className="mt-10 flex flex-col items-center gap-3">
+          <Link href="/import" className={buttonVariants({ size: "lg" })}>
+            Import from a broker CSV
+          </Link>
+          <TransactionDialog
+            mode="add"
+            triggerLabel="or add a single transaction"
+            triggerVariant="ghost"
+            triggerSize="sm"
+          />
+        </div>
+      </section>
+    </PageShell>
+  );
+}
+
 export function OverviewClient() {
   const currency = useDisplayCurrency();
   const { data: dashboard } = useQuery({
@@ -95,6 +124,21 @@ export function OverviewClient() {
   // Across currencies the label still renders, against a dash — silently
   // dropping the row would hide that Sage declined to guess rather than
   // saying so.
+  // Nothing has ever been entered: no holdings, no income behind or ahead, no
+  // value. Every block below this point would then render its own placeholder
+  // — a dash under INCOME · NEXT TWELVE MONTHS, "Book value —", an invitation
+  // to set a goal that cannot be projected yet, and an empty-state box — four
+  // separate ways of saying the same thing on the first screen after sign-up.
+  // One welcome replaces them. A book that has been fully sold keeps the real
+  // page: it has history to show.
+  const neverUsed =
+    dashboard.positions.length === 0 &&
+    dashboard.incomeStream.length === 0 &&
+    dashboard.subtotalsByCurrency.length === 0 &&
+    dashboard.history.points.length === 0;
+
+  if (neverUsed) return <OverviewWelcome />;
+
   const bookValue =
     dashboard.subtotalsByCurrency.length === 1
       ? dashboard.subtotalsByCurrency[0]!.marketValue

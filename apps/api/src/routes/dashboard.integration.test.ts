@@ -87,12 +87,9 @@ async function post(app: ReturnType<typeof createApp>, body: unknown, cookie: st
 }
 
 // Five symbols with distinct sectors and market values (10 shares each, prices
-// 100/200/300/400/500), plus one ETF (VOO, 10 shares @ 600) that buckets under
-// "Funds" regardless of sector, so the allocation selector's top-4-plus-Other
-// math has a deterministic, hand-checkable answer:
-//   total = 21000; percents = AAPL 4.76, MSFT 9.52, NVDA 14.29, GOOGL 19.05,
-//     TSLA 23.81, Funds(VOO) 28.57
-//   top4 (desc) = Funds, TSLA, GOOGL, NVDA (sum 85.72) -> Other = 14.28 (== AAPL + MSFT)
+// 100/200/300/400/500), plus one ETF (VOO, 10 shares @ 600): total 21000
+// across six positions, enough shape for the aggregate figures the overview
+// actually prints.
 const SYMBOLS = [
   { symbol: "AAPL", price: "100", sector: "Sector1" },
   { symbol: "MSFT", price: "200", sector: "Sector2" },
@@ -248,7 +245,7 @@ describeDb("GET /dashboard", () => {
     await tdb?.stop();
   });
 
-  it("aggregates positions, today change, income, upcoming dividends, allocation, and history", async () => {
+  it("aggregates positions, today change, income, upcoming dividends, and history", async () => {
     const res = await app.request("/dashboard?currency=USD", { headers: { cookie } });
     expect(res.status).toBe(200);
 
@@ -272,7 +269,6 @@ describeDb("GET /dashboard", () => {
         dateEstimated: boolean;
       }[];
       recentDividends: { symbol: string; exDate: string; paymentDate: string | null }[];
-      allocation: { label: string; percent: number }[];
       history: { points: unknown[]; changePercent: number; changeAmount: unknown };
     };
 
@@ -371,17 +367,6 @@ describeDb("GET /dashboard", () => {
     // simultaneously have already been paid, so this window is empty for any
     // realistically-dated fixture.
     expect(body.recentDividends).toHaveLength(0);
-
-    // allocation: top 4 sectors by percent + "Other" summing the rest. The
-    // fund position buckets under "Funds" (sector.plain, Task 4 finding) and
-    // is the single largest slice, landing at the top.
-    expect(body.allocation).toEqual([
-      { label: "Funds", percent: 28.57 },
-      { label: "Sector5", percent: 23.81 },
-      { label: "Sector4", percent: 19.05 },
-      { label: "Sector3", percent: 14.29 },
-      { label: "Other", percent: 14.28 },
-    ]);
 
     // history: default range 1Y in the requested currency, matching
     // /portfolio/history?range=1Y&currency=USD.

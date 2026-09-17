@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Input, PageHeader, PageShell, SectionHeader, Switch } from "@sage/ui";
+import { Button, Field, Input, PageHeader, PageShell, SectionHeader, Switch } from "@sage/ui";
 import {
   deleteAllHoldings,
   getUserSettings,
@@ -234,23 +234,29 @@ export default function SettingsPage() {
           What the overview greets you by. A first name is enough.
         </p>
         <form
-          className="mt-3 flex flex-wrap items-center gap-2"
+          className="mt-3 flex flex-wrap items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             void handleSaveName();
           }}
         >
-          <Input
-            aria-label="Display name"
-            value={nameDraft}
-            disabled={settings === undefined}
-            maxLength={80}
-            onChange={(e) => {
-              setNameDraft(e.target.value);
-              setNameSaved(false);
-            }}
-            className="w-56"
-          />
+          {/* Field, not a bare Input with an aria-label: this is the only form
+              in the app where the control had no visible name of its own, and
+              the sentence above it belongs to the section rather than to the
+              box. */}
+          <Field label="Your name" htmlFor="display-name">
+            <Input
+              id="display-name"
+              value={nameDraft}
+              disabled={settings === undefined}
+              maxLength={80}
+              onChange={(e) => {
+                setNameDraft(e.target.value);
+                setNameSaved(false);
+              }}
+              className="w-56"
+            />
+          </Field>
           <Button type="submit" variant="secondary" disabled={!nameDirty || nameSaving}>
             {nameSaving ? "Saving…" : "Save"}
           </Button>
