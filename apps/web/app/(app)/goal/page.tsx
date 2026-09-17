@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, ChartSkeleton, EmptyState, PageShell } from "@sage/ui";
+import { Card, ChartSkeleton, EmptyState, PageShell, buttonVariants } from "@sage/ui";
 import { getGoal, putGoal, deleteGoal } from "../../../lib/api";
 import type { PutGoalInput } from "../../../lib/types";
 import { qk } from "../../../lib/query/keys";
@@ -57,7 +57,7 @@ export default function GoalPage() {
         <EmptyState
           message="A goal projects from what you already hold, so there is nothing to project from yet. Add a holding or import your transactions and this page will fill in."
           action={
-            <Link href="/import" className="text-sm text-primary hover:underline">
+            <Link href="/import" className={buttonVariants({ variant: "secondary", size: "sm" })}>
               Import transactions →
             </Link>
           }

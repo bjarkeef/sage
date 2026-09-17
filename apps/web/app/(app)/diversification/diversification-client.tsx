@@ -11,6 +11,7 @@ import {
   ErrorState,
   PageShell,
   Switch,
+  buttonVariants,
 } from "@sage/ui";
 import { AppPageHeader } from "../../../components/app-page-header";
 import { getDiversification, getUserSettings } from "../../../lib/api";
@@ -154,7 +155,7 @@ export function DiversificationClient() {
         <EmptyState
           message="Nothing to spread yet. Add a holding or import your transactions, and this page will break them down by sector, country, asset class and currency."
           action={
-            <Link href="/import" className="text-sm text-primary hover:underline">
+            <Link href="/import" className={buttonVariants({ variant: "secondary", size: "sm" })}>
               Import transactions →
             </Link>
           }
