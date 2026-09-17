@@ -144,15 +144,22 @@ export class TwelveDataClient {
         // exclusively with…") closes it for every symbol. Any other plan
         // refusal is taken to be about this listing, so one out-of-plan symbol
         // never silently disables an endpoint the plan does include.
-        if (namesEndpoint(message, endpoint)) this.remember(endpointKey, now);
-        else if (listingKey) this.remember(listingKey, now);
-        this.refund(cost, chargedWindow);
+        // Only the endpoint refusal is refunded: it was measured (2026-09-17)
+        // to cost nothing. Any other refusal is assumed charged, since
+        // under-spending the budget is safe and overrunning it draws a 429.
+        if (namesEndpoint(message, endpoint)) {
+          this.remember(endpointKey, now);
+          this.refund(cost, chargedWindow);
+        } else if (listingKey) {
+          this.remember(listingKey, now);
+        }
         throw new ProviderPlanLimitError(`Twelve Data: ${endpoint} is not on this plan`);
       case code === 403:
         throw new ProviderAuthError("Twelve Data refused the request");
       case code === 404 && /plan|upgrad/i.test(message):
+        // No refund: Twelve Data charges a listing refusal a credit, exactly
+        // like a served quote (measured 2026-09-17).
         if (listingKey) this.remember(listingKey, now);
-        this.refund(cost, chargedWindow);
         throw new ProviderPlanLimitError("Twelve Data: this listing is not on this plan");
       case code === 400 && /no data/i.test(message) && options.allowNoData === true:
         return null;
@@ -176,7 +183,7 @@ export class TwelveDataClient {
   }
 
   /**
-   * Gives back a credit a plan refusal did not actually spend — but only into
+   * Gives back a credit an endpoint refusal did not actually spend — but only into
    * the window it was charged from. A response can arrive after the minute
    * window has rolled over (and been fully spent by other calls in between),
    * so crediting the *current* window instead could push it over the cap.
