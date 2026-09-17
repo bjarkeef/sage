@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll } from "vitest";
 import { setupServer } from "msw/node";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import {
   ProviderAuthError,
   ProviderPlanLimitError,
@@ -124,6 +124,24 @@ describe("TwelveDataClient: classification", () => {
     server.resetHandlers();
     countCalls("quote", () => HttpResponse.text("<html>"));
     await expect(clientAt({ t: T0 }).request("quote", { symbol: "AAPL" })).rejects.toBeInstanceOf(
+      ProviderUnavailableError,
+    );
+  });
+
+  it("gives up on a request that never answers, as ProviderUnavailableError", async () => {
+    server.use(
+      http.get(`${BASE}/quote`, async () => {
+        await delay("infinite");
+        return HttpResponse.json(AAPL_QUOTE);
+      }),
+    );
+    const stalled = new TwelveDataClient({
+      apiKey: "test-key",
+      baseUrl: BASE,
+      now: () => T0,
+      timeoutMs: 20,
+    });
+    await expect(stalled.request("quote", { symbol: "AAPL" })).rejects.toBeInstanceOf(
       ProviderUnavailableError,
     );
   });

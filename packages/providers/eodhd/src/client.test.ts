@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll } from "vitest";
 import { setupServer } from "msw/node";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import {
   ProviderAuthError,
   ProviderRateLimitError,
@@ -100,6 +100,17 @@ describe("EodhdClient.request", () => {
     await expect(
       client().request("/eod/NOPE.US", { notFoundSymbol: "NOPE" }),
     ).rejects.toBeInstanceOf(SymbolNotFoundError);
+  });
+
+  it("gives up on a request that never answers, as ProviderUnavailableError", async () => {
+    server.use(
+      http.get(`${BASE}/eod/AAPL.US`, async () => {
+        await delay("infinite");
+        return HttpResponse.json([]);
+      }),
+    );
+    const stalled = new EodhdClient({ apiToken: "test-token", baseUrl: BASE, timeoutMs: 20 });
+    await expect(stalled.request("/eod/AAPL.US")).rejects.toBeInstanceOf(ProviderUnavailableError);
   });
 
   it("maps 404 to ProviderUnavailableError when no symbol is supplied", async () => {

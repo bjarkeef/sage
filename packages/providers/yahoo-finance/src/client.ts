@@ -3,6 +3,7 @@ import {
   ProviderRateLimitError,
   ProviderUnavailableError,
   SymbolNotFoundError,
+  timeoutFetch,
 } from "@sage/provider-interface";
 
 export interface YfQuote {
@@ -178,8 +179,13 @@ export interface YfSearchResult {
 export class YahooFinanceClient {
   private readonly yf: InstanceType<typeof YahooFinance>;
 
-  constructor() {
-    this.yf = new YahooFinance();
+  /**
+   * @param options.timeoutMs Per-request ceiling; defaults to
+   *   `PROVIDER_FETCH_TIMEOUT_MS`. yahoo-finance2 has no timeout of its own, but
+   *   takes a replacement `fetch` — which also covers its crumb and cookie calls.
+   */
+  constructor(options: { timeoutMs?: number } = {}) {
+    this.yf = new YahooFinance({ fetch: timeoutFetch(options.timeoutMs) });
   }
 
   async quote(symbol: string): Promise<YfQuote> {
