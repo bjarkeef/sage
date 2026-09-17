@@ -248,7 +248,7 @@ export function OverviewClient() {
           action={
             <div className="flex flex-col items-center gap-3">
               <TransactionDialog mode="add" />
-              <Link href="/import" className="text-sm text-primary hover:underline">
+              <Link href="/import" className={buttonVariants({ variant: "secondary", size: "sm" })}>
                 Import transactions →
               </Link>
             </div>
