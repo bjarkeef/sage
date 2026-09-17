@@ -100,7 +100,6 @@ const FIXTURE_DASHBOARD: DashboardDTO = {
     },
   ],
   recentDividends: [],
-  allocation: [],
   history: {
     points: [
       {
@@ -222,6 +221,77 @@ describe("OverviewClient", () => {
     // a figure already set in the largest type on the page.
     expect(document.body.textContent).not.toContain("stands at");
     expect(screen.queryByText(/Good (morning|afternoon|evening)/)).not.toBeInTheDocument();
+  });
+
+  /** A brand-new account used to meet four separate invitations at once: a
+   *  dash under INCOME · NEXT TWELVE MONTHS, a goal band it could not project
+   *  from, "Book value —", and an empty-state box. One welcome replaces them,
+   *  and Import leads because anyone with a book already has it in a CSV. */
+  describe("an account that has never been used", () => {
+    const EMPTY: DashboardDTO = {
+      ...FIXTURE_DASHBOARD,
+      positions: [],
+      subtotalsByCurrency: [],
+      incomeStream: [],
+      upcomingDividends: [],
+      recentDividends: [],
+      todayChange: null,
+      totalReturn: null,
+      ytdTwr: null,
+      history: {
+        points: [],
+        changePercent: 0,
+        changeAmount: { amount: "0", currency: "USD" },
+        stalePrices: [],
+      },
+    };
+
+    function renderEmpty(overrides: Partial<DashboardDTO> = {}) {
+      const qc = makeTestQueryClient();
+      qc.setQueryData(qk.dashboard(), { ...EMPTY, ...overrides });
+      qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+      return renderWithClient(<OverviewClient />, qc);
+    }
+
+    it("shows one welcome, with import leading", async () => {
+      renderEmpty();
+      await screen.findByText("Welcome to Sage.");
+      expect(screen.getByRole("link", { name: /Import from a broker CSV/ })).toHaveAttribute(
+        "href",
+        "/import",
+      );
+      expect(screen.getByRole("button", { name: /add a single transaction/ })).toBeInTheDocument();
+    });
+
+    it("drops every placeholder the empty page used to print", async () => {
+      renderEmpty();
+      await screen.findByText("Welcome to Sage.");
+      expect(screen.queryByText("Income · next twelve months")).not.toBeInTheDocument();
+      expect(screen.queryByText("Book value")).not.toBeInTheDocument();
+      expect(screen.queryByText("—")).not.toBeInTheDocument();
+      expect(screen.queryByText(/No holdings yet/)).not.toBeInTheDocument();
+    });
+
+    /** A book sold down to nothing still has history worth reading, so it
+     *  keeps the real page rather than being greeted as a new account. */
+    it("keeps the real page for a book that has been fully sold", async () => {
+      renderEmpty({
+        history: {
+          points: [
+            {
+              date: "2026-01-01",
+              value: { amount: "0", currency: "USD" },
+              invested: { amount: "0", currency: "USD" },
+            },
+          ],
+          changePercent: 0,
+          changeAmount: { amount: "0", currency: "USD" },
+          stalePrices: [],
+        },
+      });
+      await screen.findByText("Income · next twelve months");
+      expect(screen.queryByText("Welcome to Sage.")).not.toBeInTheDocument();
+    });
   });
 
   /** The book's worth is no longer the hero — it is one fact on the supporting

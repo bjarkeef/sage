@@ -11,6 +11,8 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
+  EmptyState,
+  buttonVariants,
 } from "@sage/ui";
 import { AppPageHeader } from "../../../components/app-page-header";
 import { getPortfolio, syncDividends } from "../../../lib/api";
@@ -192,6 +194,25 @@ export default function DividendsPage() {
     return (
       <PageShell animate={false}>
         <DividendsPageSkeleton />
+      </PageShell>
+    );
+  }
+
+  // Nothing held and nothing ever paid: the year picker, the three dashes and
+  // a month grid of empty cells describe a calendar rather than this book, so
+  // the page says what would fill it instead of drawing the furniture.
+  if (portfolio && portfolio.positions.length === 0 && events.length === 0) {
+    return (
+      <PageShell>
+        <AppPageHeader title="Dividends" description={null} />
+        <EmptyState
+          message="No dividends yet. Import your transactions and Sage fills this calendar from each holding's payment history — what has been paid, what is confirmed, and what is still an estimate."
+          action={
+            <Link href="/import" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+              Import transactions →
+            </Link>
+          }
+        />
       </PageShell>
     );
   }

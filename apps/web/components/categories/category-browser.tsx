@@ -14,6 +14,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  buttonVariants,
   cn,
 } from "@sage/ui";
 import type { CategoriesViewDTO, CategoryHoldingDTO, CategoryNodeDTO } from "../../lib/types";
@@ -118,7 +119,21 @@ export function CategoryBrowser({
   const anyTarget = rows.some((row) => donutRow(row).targetPct != null);
 
   if (rows.length === 0) {
-    return <EmptyState message={atRoot ? "No holdings to show yet." : `${node.name} is empty.`} />;
+    // At the root with nothing in the book, the page cannot explain itself
+    // from its own content, so the empty state says what categories are for
+    // and how to get something to group.
+    return atRoot ? (
+      <EmptyState
+        message="Nothing to group yet. Import your transactions or add a holding, then sort them into categories and set a target share for each."
+        action={
+          <Link href="/import" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+            Import transactions →
+          </Link>
+        }
+      />
+    ) : (
+      <EmptyState message={`${node.name} is empty.`} />
+    );
   }
 
   return (

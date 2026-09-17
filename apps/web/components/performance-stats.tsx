@@ -18,8 +18,8 @@ export function PerformanceEmptyState() {
         Not enough history
       </span>
       <p className="max-w-md text-sm text-muted-foreground">
-        Performance needs at least two days of price history. Add transactions or check back
-        tomorrow.
+        Performance needs at least two days of price history. Import or add your transactions, and
+        this page fills in from the next day&rsquo;s prices.
       </p>
     </div>
   );

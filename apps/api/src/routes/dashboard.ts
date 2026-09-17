@@ -5,7 +5,6 @@ import { Decimal } from "@sage/core";
 import type { Database } from "../db/client";
 import { buildPortfolioView } from "../services/portfolio-view";
 import { buildDividendIncomeView } from "../services/dividend-income-view";
-import { buildDiversificationView, type DimRowDTO } from "../services/diversification-view";
 import { buildPortfolioHistoryView } from "../services/portfolio-history-view";
 import { buildPerformanceView, PRIMARY_BENCHMARK_ID } from "../services/performance-view";
 import { loadPortfolioBook } from "../services/portfolio-book";
@@ -210,37 +209,6 @@ function selectThisMonth(
   };
 }
 
-/** Aggregates the per-holding sector.plain rows into bucket percents (of
- *  total market value), sorted desc. Top 4 buckets plus an "Other" bucket
- *  summing the rest — the diversification view (Task 2) now returns
- *  per-holding rows instead of pre-aggregated breakdowns, so this selector
- *  does the grouping the old service used to do. */
-function selectAllocation(
-  sectorRows: DimRowDTO[],
-  totalMarketValue: string,
-): { label: string; percent: number }[] {
-  const total = new Decimal(totalMarketValue);
-  if (total.isZero()) return [];
-
-  const grouped = new Map<string, Decimal>();
-  for (const r of sectorRows) {
-    const value = new Decimal(r.marketValue.amount);
-    grouped.set(r.bucket, (grouped.get(r.bucket) ?? new Decimal(0)).plus(value));
-  }
-  const sorted = [...grouped.entries()]
-    .map(([label, value]) => ({
-      label,
-      percent: Number(value.dividedBy(total).times(100).toFixed(2)),
-    }))
-    .sort((a, b) => b.percent - a.percent);
-
-  const top4 = sorted.slice(0, 4);
-  if (sorted.length <= 4) return top4;
-  const topSum = top4.reduce((sum, s) => sum + s.percent, 0);
-  const otherPercent = Math.max(0, Number((100 - topSum).toFixed(2)));
-  return [...top4, { label: "Other", percent: otherPercent }];
-}
-
 export function dashboardRoutes(
   db: Database,
   provider: IMarketDataProvider,
@@ -282,23 +250,21 @@ export function dashboardRoutes(
     // sequential upstream calls on a cold self-host, per fetchBenchmarkSeries'
     // symbol-variant fallback. `cacheOnly` skips straight to `relative: null`
     // instead; the page must not hang or fail because a benchmark is cold.
-    const [{ body: portfolio, todayChange }, income, diversification, history, perfYtd] =
-      await Promise.all([
-        buildPortfolioView(deps, userId, { currency: targetCurrency, book }),
-        buildDividendIncomeView(deps, userId, { currency: targetCurrency, book }),
-        buildDiversificationView(deps, userId, { currency: targetCurrency, book }),
-        buildPortfolioHistoryView(deps, userId, { range: "1Y", currency: targetCurrency, book }),
-        buildPerformanceView(deps, userId, {
-          range: "YTD",
-          currency: targetCurrency,
-          // One benchmark, not all: the defaults track each other closely
-          // enough that a second pin would smudge, and the overview draws no
-          // chart to justify the extra series.
-          benchmarks: [PRIMARY_BENCHMARK_ID],
-          benchmarksCacheOnly: true,
-          book,
-        }),
-      ]);
+    const [{ body: portfolio, todayChange }, income, history, perfYtd] = await Promise.all([
+      buildPortfolioView(deps, userId, { currency: targetCurrency, book }),
+      buildDividendIncomeView(deps, userId, { currency: targetCurrency, book }),
+      buildPortfolioHistoryView(deps, userId, { range: "1Y", currency: targetCurrency, book }),
+      buildPerformanceView(deps, userId, {
+        range: "YTD",
+        currency: targetCurrency,
+        // One benchmark, not all: the defaults track each other closely
+        // enough that a second pin would smudge, and the overview draws no
+        // chart to justify the extra series.
+        benchmarks: [PRIMARY_BENCHMARK_ID],
+        benchmarksCacheOnly: true,
+        book,
+      }),
+    ]);
 
     const todayIso = new Date().toISOString().slice(0, 10);
     const currentMonth = todayIso.slice(0, 7);
@@ -312,10 +278,6 @@ export function dashboardRoutes(
     );
     const recentDividends = selectRecentDividends(income.announced, todayIso);
     const thisMonth = selectThisMonth(income.summary.monthlyBreakdown, currentMonth);
-    const allocation = selectAllocation(
-      diversification.dimensions.sector.plain,
-      diversification.totals.marketValue.amount,
-    );
 
     const ytdTwr = perfYtd.insufficientData || perfYtd.twr == null ? null : perfYtd.twr;
     // One boolean, not the symbol list: the overview is not where this gets
@@ -381,7 +343,6 @@ export function dashboardRoutes(
       incomeStream,
       upcomingDividends,
       recentDividends,
-      allocation,
       history,
     });
   });

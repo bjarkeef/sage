@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Delta, SegmentedControl } from "@sage/ui";
+import Link from "next/link";
+import { Delta, SegmentedControl, EmptyState, buttonVariants } from "@sage/ui";
 import type { PositionDTO, SubtotalDTO } from "../lib/types";
 import { formatMoney, moneyToNumber } from "../lib/format";
 import { HOLDING_ROW_GRID, HoldingRow } from "./holding-row";
@@ -46,8 +47,18 @@ export function HoldingsList({
   const [sort, setSort] = React.useState<SortKey>("value");
 
   if (positions.length === 0) {
+    // The same centred shape Goal and Diversification use, and the same two
+    // ways out: a bare left-aligned sentence here read as a rendering
+    // accident beside them, and named only the slower of the two routes in.
     return (
-      <p className="text-muted-foreground">No positions yet. Add a transaction to get started.</p>
+      <EmptyState
+        message="No positions yet. Bring in your whole book from a broker CSV, or add a transaction by hand."
+        action={
+          <Link href="/import" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+            Import transactions →
+          </Link>
+        }
+      />
     );
   }
 

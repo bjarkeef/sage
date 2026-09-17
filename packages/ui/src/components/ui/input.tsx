@@ -19,7 +19,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         // was a hole with a line round it while the token describing it went
         // unused. Same inversion `Card` had. Fey's inputs are a flat ~7% wash
         // with no edge; this is that.
-        "flex h-9 w-full rounded-control bg-surface-active px-3 py-1 text-sm transition-colors",
+        // 16px and a 44px box on a phone, the desktop sizes from `md` up:
+        // Safari zooms the page in on a focused field whose text is under
+        // 16px, which happened on every field in the app, and 36px is under
+        // the 44px touch target DESIGN.md sets for a row.
+        "flex h-11 w-full rounded-control bg-surface-active px-3 py-1 text-base transition-colors",
+        "md:h-9 md:text-sm",
         "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className,

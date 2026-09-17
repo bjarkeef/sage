@@ -587,7 +587,6 @@ export interface DashboardDTO {
   upcomingDividends: UpcomingRow[];
   /** Announced rows paid within [previous market day, today], ascending, capped at 3. */
   recentDividends: AnnouncedDividendDTO[];
-  allocation: { label: string; percent: number }[];
   history: PortfolioHistoryDTO;
 }
 
