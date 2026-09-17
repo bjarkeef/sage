@@ -31,12 +31,7 @@ const EnvSchema = z
      * are never sent; they fall straight to Yahoo. Default 8 is the free plan's
      * — set it to the plan you pay for (Grow 55, Pro 610, Venture 610).
      */
-    TWELVEDATA_CREDITS_PER_MINUTE: z.preprocess(
-      // A blank `TWELVEDATA_CREDITS_PER_MINUTE=` means unset, not zero — coerced
-      // as-is it would fail startup even on an install that never uses Twelve Data.
-      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
-      z.coerce.number().int().positive().default(8),
-    ),
+    TWELVEDATA_CREDITS_PER_MINUTE: z.coerce.number().int().positive().default(8),
     BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
     AUTH_BASE_URL: z.string().url().default("http://localhost:3001"),
     WEB_ORIGIN: z.string().default("http://localhost:3000"),
@@ -91,11 +86,25 @@ const EnvSchema = z
 /** Validated environment configuration for the API. */
 export type Env = z.infer<typeof EnvSchema>;
 
+/**
+ * A variable set to nothing (`PORT=` in a .env, or `PORT: ${PORT}` in a compose
+ * file with nothing exported) means "not set", never "set to empty". Validated
+ * as-is, "" is a port of 0, an unknown provider or an empty CORS origin: a boot
+ * failure, or a quietly broken app, over a line the self-hoster meant to leave
+ * alone. Dropping blanks gives every optional setting its default and leaves a
+ * required one reported as missing.
+ */
+function withoutBlanks(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(
+    Object.entries(source).filter(([, value]) => value === undefined || value.trim() !== ""),
+  );
+}
+
 /** Validate a set of environment variables, returning typed config.
  *  Throws an aggregated, readable error if validation fails. Defaults to
  *  `process.env`; pass an explicit source in tests. */
 export function parseEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const result = EnvSchema.safeParse(source);
+  const result = EnvSchema.safeParse(withoutBlanks(source));
   if (!result.success) {
     const issues = result.error.issues
       .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)

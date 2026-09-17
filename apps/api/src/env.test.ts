@@ -162,14 +162,34 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "-5" })).toThrow();
   });
 
-  it("treats a blank TWELVEDATA_CREDITS_PER_MINUTE as unset, so it cannot stop startup", () => {
-    // `TWELVEDATA_CREDITS_PER_MINUTE=` left in a .env reaches the schema as "",
-    // which a plain coerce turns into 0 and refuses — even on a yahoo install.
-    expect(
-      parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "" }).TWELVEDATA_CREDITS_PER_MINUTE,
-    ).toBe(8);
-    expect(
-      parseEnv({ ...base, TWELVEDATA_CREDITS_PER_MINUTE: "  " }).TWELVEDATA_CREDITS_PER_MINUTE,
-    ).toBe(8);
+  describe("a setting left blank", () => {
+    // `PORT=` uncommented in a .env, or `PORT: ${PORT}` in a compose file with
+    // nothing exported, reaches the schema as "". Validated as-is that is a
+    // port of 0, an unknown provider, or an empty CORS origin — a boot failure
+    // or a silently broken app over a line the self-hoster meant to leave alone.
+    const optional = {
+      PORT: "",
+      NODE_ENV: "",
+      MARKET_DATA_PROVIDER: "",
+      ENRICHMENT_PROVIDER: "",
+      TWELVEDATA_CREDITS_PER_MINUTE: "  ",
+      AUTH_BASE_URL: "",
+      WEB_ORIGIN: "",
+      ALLOW_SIGNUP: "",
+      EODHD_API_TOKEN: "",
+      TWELVEDATA_API_KEY: "",
+    };
+
+    it("takes its default, exactly as if it were not there", () => {
+      expect(parseEnv({ ...base, ...optional })).toEqual(parseEnv(base));
+    });
+
+    it("still counts as missing when the setting is required", () => {
+      expect(() => parseEnv({ ...base, DATABASE_URL: "" })).toThrow(/DATABASE_URL/);
+      expect(() => parseEnv({ ...base, BETTER_AUTH_SECRET: " " })).toThrow(/BETTER_AUTH_SECRET/);
+      expect(() =>
+        parseEnv({ ...base, MARKET_DATA_PROVIDER: "eodhd", EODHD_API_TOKEN: "" }),
+      ).toThrow(/EODHD_API_TOKEN/);
+    });
   });
 });
