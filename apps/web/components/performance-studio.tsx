@@ -195,6 +195,7 @@ export function PerformanceStudio() {
       <BasisMismatchCallout
         findings={data.basisMismatches}
         unverifiedSplits={data.unverifiedSplits}
+        fxGapSymbols={data.fxGapSymbols ?? []}
         historyIncomplete={data.historyIncomplete}
         splitSymbols={data.splitSymbols ?? []}
       />

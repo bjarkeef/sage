@@ -3,6 +3,7 @@ import {
   formatSplitRatio,
   resolveSplitBasis,
   type BasisFinding,
+  type Decimal,
   type PositionTransaction,
 } from "@sage/core";
 import type { IFxRateService } from "@sage/provider-interface";
@@ -26,6 +27,12 @@ export interface CorporateActionDTO {
    *  so backfilling price history would not change anything. Only meaningful
    *  when `verdict` is `"unverified"`. */
   fxGap: boolean;
+  /** The multiplier actually applied to quantities dated before this split:
+   *  this row's ratio compounded with every LATER split of the same symbol,
+   *  because `factorAt` multiplies all of them. `null` when this is the
+   *  symbol's last split, where the row's own ratio already is the multiplier
+   *  and the simpler sentence is the true one. */
+  cumulativeFactor: number | null;
 }
 
 export interface CorporateActionsViewDTO {
@@ -53,9 +60,29 @@ export function buildCorporateActionsView(input: CorporateActionsInput): Corpora
   const findingBySymbol = new Map(input.findings.map((f) => [f.symbol, f]));
   const fxGapSymbols = input.fxGapSymbols ?? new Set<string>();
 
+  // Every usable split per symbol, so a row can see its own siblings. The
+  // copy needs this because the multiplier for history before a given split is
+  // the product of that split and all later ones, never the row's own ratio.
+  const splitsBySymbol = new Map<string, { date: Date; ratio: Decimal }[]>();
+  for (const t of input.txs) {
+    if (t.type !== "split" || !t.quantity.greaterThan(0)) continue;
+    const list = splitsBySymbol.get(t.symbol) ?? [];
+    list.push({ date: t.tradeDate, ratio: t.quantity });
+    splitsBySymbol.set(t.symbol, list);
+  }
+
   const actions = input.txs
     .filter((t) => t.type === "split" && t.quantity.greaterThan(0))
     .map((t): CorporateActionDTO => {
+      // Strictly after, matching `factorAt`'s own boundary: a split applies ON
+      // its date, so the quantity already carries it from that day forward.
+      const later = (splitsBySymbol.get(t.symbol) ?? []).filter(
+        (s) => s.date.getTime() > t.tradeDate.getTime(),
+      );
+      const cumulativeFactor =
+        later.length === 0
+          ? null
+          : Number(later.reduce((acc, s) => acc.times(s.ratio), t.quantity).toFixed(6));
       // `formatSplitRatio` also returns `kind` ("split" | "reverse-split"),
       // discarded here: the printed ratio ("10 → 1" vs "1 → 1.7992") already
       // carries the direction unambiguously, and nothing in the UI reads
@@ -74,6 +101,7 @@ export function buildCorporateActionsView(input: CorporateActionsInput): Corpora
         checkedSamples: finding ? finding.samples : null,
         pricesFrom: input.pricesFrom.get(t.symbol) ?? null,
         fxGap: fxGapSymbols.has(t.symbol),
+        cumulativeFactor,
       };
     })
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));

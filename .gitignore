@@ -66,5 +66,6 @@ docs/superpowers/
 # tracked before that are still in history.
 SAGE_vision.md
 docs/roadmap.md
+docs/roadmap-archive-*.md
 docs/yield-calc-checkup.md
 docs/first-run-findings-*.md

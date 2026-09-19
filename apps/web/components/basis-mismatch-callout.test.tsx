@@ -241,4 +241,67 @@ describe("BasisMismatchCallout", () => {
       "/corporate-actions",
     );
   });
+  // The two ways a split ends up unverified are not interchangeable, and
+  // /corporate-actions already tells them apart (`action-row.tsx`). A symbol
+  // whose trades DO land on stored-price days but had no FX rate to convert
+  // against must not be described as having no such trades — the reader who
+  // follows "See what Sage did" would find the opposite claim waiting there.
+  it("does not claim an fx-gap split has no transaction on a day with a stored price", () => {
+    render(
+      <BasisMismatchCallout
+        findings={[]}
+        unverifiedSplits={["RATECO"]}
+        fxGapSymbols={["RATECO"]}
+        historyIncomplete={[]}
+        splitSymbols={[]}
+      />,
+    );
+    expect(screen.getByText(/RATECO/)).toBeInTheDocument();
+    expect(screen.queryByText(/falls on a day with a stored price/i)).not.toBeInTheDocument();
+  });
+
+  it("names the missing exchange rate as the reason an fx-gap split went unchecked", () => {
+    render(
+      <BasisMismatchCallout
+        findings={[]}
+        unverifiedSplits={["RATECO"]}
+        fxGapSymbols={["RATECO"]}
+        historyIncomplete={[]}
+        splitSymbols={[]}
+      />,
+    );
+    expect(screen.getByText(/exchange rate/i)).toBeInTheDocument();
+  });
+
+  it("keeps the missing-price-history wording for a split that is not an fx gap", () => {
+    render(
+      <BasisMismatchCallout
+        findings={[]}
+        unverifiedSplits={["DARKCO"]}
+        fxGapSymbols={[]}
+        historyIncomplete={[]}
+        splitSymbols={[]}
+      />,
+    );
+    expect(screen.getByText(/falls on a day with a stored price/i)).toBeInTheDocument();
+    expect(screen.queryByText(/exchange rate/i)).not.toBeInTheDocument();
+  });
+
+  it("separates the two causes when both kinds of unverified split are present", () => {
+    render(
+      <BasisMismatchCallout
+        findings={[]}
+        unverifiedSplits={["DARKCO", "RATECO"]}
+        fxGapSymbols={["RATECO"]}
+        historyIncomplete={[]}
+        splitSymbols={[]}
+      />,
+    );
+    const noPrice = screen.getByText(/falls on a day with a stored price/i);
+    expect(noPrice.textContent).toContain("DARKCO");
+    expect(noPrice.textContent).not.toContain("RATECO");
+    const fxGap = screen.getByText(/exchange rate/i);
+    expect(fxGap.textContent).toContain("RATECO");
+    expect(fxGap.textContent).not.toContain("DARKCO");
+  });
 });

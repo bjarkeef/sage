@@ -6,6 +6,7 @@ import type { CorporateActionsViewDTO } from "../../../lib/types";
 import { formatDate } from "../../../lib/format";
 import { getCorporateActions } from "../../../lib/api";
 import CorporateActionsPage from "./page";
+import { verdictCopy } from "./action-row";
 
 vi.mock("../../../lib/api", () => ({ getCorporateActions: vi.fn() }));
 
@@ -22,6 +23,7 @@ const VIEW: CorporateActionsViewDTO = {
       checkedSamples: 2,
       pricesFrom: "2024-02-29",
       fxGap: false,
+      cumulativeFactor: null,
     },
     {
       symbol: "THAMES.L",
@@ -34,6 +36,7 @@ const VIEW: CorporateActionsViewDTO = {
       checkedSamples: null,
       pricesFrom: "2023-03-02",
       fxGap: false,
+      cumulativeFactor: null,
     },
   ],
   coverage: { checked: 187, total: 254 },
@@ -185,5 +188,41 @@ describe("CorporateActionsPage", () => {
     screen.getByRole("button", { name: /try again/i }).click();
 
     await waitFor(() => expect(screen.getByText("ACME")).toBeInTheDocument());
+  });
+});
+
+// `factorAt` (split-basis.ts) multiplies every split dated after a point, so
+// on a symbol that split twice the multiplier applied to the earliest history
+// is the PRODUCT, not either row's own ratio. `split-basis.test.ts` pins that
+// arithmetic; these pin the sentence that describes it, which claimed "that
+// ratio" unconditionally and so misdescribed every row but the last.
+describe("verdictCopy — a symbol that split more than once", () => {
+  const twiceSplit = {
+    symbol: "TWICE",
+    name: null,
+    date: "2024-03-01",
+    ratio: "1 → 2",
+    verdict: "adjusted" as const,
+    detectedFactor: 5.97,
+    mismatchedSamples: 3,
+    checkedSamples: 3,
+    pricesFrom: "2023-01-02",
+    fxGap: false,
+  };
+
+  it("names this row's own ratio as the multiplier when no later split compounds it", () => {
+    const { body } = verdictCopy({ ...twiceSplit, cumulativeFactor: null });
+    expect(body).toMatch(/scaled by that ratio, not by the price gap/);
+  });
+
+  it("does not claim this row's ratio is the multiplier when a later split compounds it", () => {
+    const { body } = verdictCopy({ ...twiceSplit, cumulativeFactor: 6 });
+    expect(body).not.toMatch(/scaled by that ratio/);
+  });
+
+  it("names the compounded multiplier for history before the earlier of two splits", () => {
+    const { body } = verdictCopy({ ...twiceSplit, cumulativeFactor: 6 });
+    // 1 -> 2 here, 1 -> 3 later: quantities before this date are scaled by 6.
+    expect(body).toMatch(/6×/);
   });
 });
