@@ -194,8 +194,8 @@ pnpm test         # unit + integration (testcontainers for DB)
 </p>
 
 The web app, the API and Postgres come up together on your machine under one
-`docker compose up`. There is no Sage server, so your quantities, cost basis,
-transactions and account never leave that box. A few kinds of request do leave
+`docker compose up`. Run this way there is no server between you and your book,
+so your quantities, cost basis, transactions and account never leave that box. A few kinds of request do leave
 it, and it's worth knowing exactly which.
 
 **Symbols and date ranges go to a market-data provider.** The API sends a
