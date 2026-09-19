@@ -16,11 +16,20 @@ import { formatDate } from "../lib/format";
 export function BasisMismatchCallout({
   findings,
   unverifiedSplits,
+  fxGapSymbols = [],
   historyIncomplete,
   splitSymbols,
 }: {
   findings: BasisFindingDTO[];
   unverifiedSplits: string[];
+  /** Which of `unverifiedSplits` went unchecked because a trade's currency had
+   *  no FX rate, rather than because no trade landed on a stored-price day.
+   *  The two have opposite remedies, and /corporate-actions already states
+   *  them separately (`action-row.tsx`) — saying the wrong one here made the
+   *  banner and that page contradict each other about the same holding.
+   *  Optional, defaulting to "none of them", so a caller that has never had
+   *  to think about this keeps working. */
+  fxGapSymbols?: string[];
   historyIncomplete: string[];
   /** Every symbol in the ledger carrying a recorded split, regardless of
    *  verdict. A basis finding is split-agnostic by design (see the module
@@ -38,6 +47,9 @@ export function BasisMismatchCallout({
   // reader to a page that never mentions the holding they just read about.
   // `unverifiedSplits` always names a real split by construction; a finding
   // only counts when it lands on a symbol that also appears in `splitSymbols`.
+  const fxGapSet = new Set(fxGapSymbols);
+  const unverifiedFxGap = unverifiedSplits.filter((s) => fxGapSet.has(s));
+  const unverifiedNoPrice = unverifiedSplits.filter((s) => !fxGapSet.has(s));
   const splitSymbolSet = new Set(splitSymbols);
   const hasLinkableFinding = findings.some((f) => splitSymbolSet.has(f.symbol));
   return (
@@ -64,9 +76,17 @@ export function BasisMismatchCallout({
           </p>
         </>
       )}
-      {unverifiedSplits.length > 0 && (
+      {unverifiedNoPrice.length > 0 && (
         <p className={findings.length > 0 ? "mt-3" : undefined}>
-          {`${unverifiedSplits.join(", ")} recorded a share split whose effect on stored prices could not be checked — no transaction of ${unverifiedSplits.length === 1 ? "its" : "theirs"} falls on a day with a stored price. Nothing has been corrected for ${unverifiedSplits.length === 1 ? "it" : "them"}.`}
+          {`${unverifiedNoPrice.join(", ")} recorded a share split whose effect on stored prices could not be checked — no transaction of ${unverifiedNoPrice.length === 1 ? "its" : "theirs"} falls on a day with a stored price. Nothing has been corrected for ${unverifiedNoPrice.length === 1 ? "it" : "them"}.`}
+        </p>
+      )}
+      {/* Affirms the very thing the paragraph above denies, because for these
+       *  symbols bars DO exist on the trade dates. Backfilling price history
+       *  is deliberately not offered as a remedy: it would not change this. */}
+      {unverifiedFxGap.length > 0 && (
+        <p className={findings.length > 0 || unverifiedNoPrice.length > 0 ? "mt-3" : undefined}>
+          {`${unverifiedFxGap.join(", ")} recorded a share split whose effect on stored prices could not be checked — ${unverifiedFxGap.length === 1 ? "its" : "their"} trades do fall on days with a stored price, but at least one traded in a currency Sage has no exchange rate for, so there was nothing to compare against. Nothing has been corrected for ${unverifiedFxGap.length === 1 ? "it" : "them"}.`}
         </p>
       )}
       {/* Says only what is known: the period is short. No cause, and no

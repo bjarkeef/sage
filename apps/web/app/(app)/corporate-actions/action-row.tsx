@@ -22,6 +22,13 @@ function divergenceText(factor: number | null): string {
  * point: "corrected nothing" is a different claim from "found nothing", and a
  * reader who cannot tell them apart cannot trust either.
  */
+/** An exact applied multiplier, as opposed to `divergenceText`'s measured and
+ *  deliberately hedged one: no "about", and no trailing zeros to suggest a
+ *  precision the product does not have. */
+function factorText(factor: number): string {
+  return `${Number(factor.toFixed(4))}×`;
+}
+
 export function verdictCopy(a: CorporateActionDTO): { label: string; body: string } {
   if (a.verdict === "adjusted") {
     // `detectedFactor` is the OBSERVED PRICE DIVERGENCE between the provider's
@@ -38,12 +45,31 @@ export function verdictCopy(a: CorporateActionDTO): { label: string; body: strin
       a.mismatchedSamples != null && a.checkedSamples != null
         ? ` ${a.mismatchedSamples} of ${a.checkedSamples} checked trades disagreed.`
         : "";
+    const opening =
+      `Your price provider back-adjusted this holding's history to the post-split basis ` +
+      `while your ledger kept the as-traded prices, so the two disagree ${divergence} on ` +
+      `dates before the split.${samples} `;
+    // `factorAt` multiplies EVERY split dated after a point, so on a symbol
+    // that split more than once this row's own ratio is not the multiplier —
+    // the product is. Saying "that ratio" here was true only for a symbol's
+    // last split, and on a twice-split holding it put two different wrong
+    // numbers on two rows of the same page.
+    if (a.cumulativeFactor != null) {
+      return {
+        label: "Corrected",
+        body:
+          opening +
+          `This holding split again after ${formatDate(a.date)}, and Sage applies every ` +
+          `later split too, so quantities dated before it are scaled by ${factorText(a.cumulativeFactor)} ` +
+          `— the recorded ${a.ratio} split compounded with the ones that followed, not this ` +
+          `row's ratio alone and not by the price gap above. The ledger is unchanged.`,
+      };
+    }
     return {
       label: "Corrected",
       body:
-        `Your price provider back-adjusted this holding's history to the post-split basis ` +
-        `while your ledger kept the as-traded prices, so the two disagree ${divergence} on ` +
-        `dates before the split.${samples} Sage corrected for this using the recorded ${a.ratio} ` +
+        opening +
+        `Sage corrected for this using the recorded ${a.ratio} ` +
         `split: historical quantities are scaled by that ratio, not by the price gap above. ` +
         `The ledger is unchanged.`,
     };

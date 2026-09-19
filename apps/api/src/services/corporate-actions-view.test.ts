@@ -207,4 +207,53 @@ describe("buildCorporateActionsView", () => {
       before,
     );
   });
+  // Mirrors `split-basis.test.ts`'s "compounds multiple splits" fixture, which
+  // pins `factorAt` at 6 before both splits and 3 between them. The rows have
+  // to carry the same arithmetic or the page describes a multiplier the
+  // valuation never applied.
+  it("compounds a split with every later split of the same symbol", () => {
+    const view = buildCorporateActionsView({
+      txs: [tx("TWICE", "2024-03-01", "2"), tx("TWICE", "2024-09-01", "3")],
+      names: new Map(),
+      pricesFrom: new Map(),
+      findings: [],
+      verdictOf: () => "adjusted",
+      coverage: { checked: 4, total: 4 },
+    });
+
+    // Rows are newest-first, so the later split leads.
+    const [newest, oldest] = view.actions;
+    expect(newest!.date).toBe("2024-09-01");
+    // Nothing follows it: its own ratio already is the multiplier.
+    expect(newest!.cumulativeFactor).toBeNull();
+    expect(oldest!.date).toBe("2024-03-01");
+    // 2 x 3: what quantities dated before 2024-03-01 are actually scaled by.
+    expect(oldest!.cumulativeFactor).toBe(6);
+  });
+
+  it("leaves cumulativeFactor null for a symbol that split only once", () => {
+    const view = buildCorporateActionsView({
+      txs: [tx("ONCE", "2025-01-15", "4")],
+      names: new Map(),
+      pricesFrom: new Map(),
+      findings: [],
+      verdictOf: () => "adjusted",
+      coverage: { checked: 2, total: 2 },
+    });
+    expect(view.actions[0]!.cumulativeFactor).toBeNull();
+  });
+
+  // A split is applied ON its date, so a same-day sibling must not be counted
+  // as "later" — the same strict boundary `factorAt` uses.
+  it("does not compound a split dated the same day as another", () => {
+    const view = buildCorporateActionsView({
+      txs: [tx("SAMEDAY", "2025-05-05", "2"), tx("SAMEDAY", "2025-05-05", "3")],
+      names: new Map(),
+      pricesFrom: new Map(),
+      findings: [],
+      verdictOf: () => "adjusted",
+      coverage: { checked: 2, total: 2 },
+    });
+    expect(view.actions.every((a) => a.cumulativeFactor === null)).toBe(true);
+  });
 });
