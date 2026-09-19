@@ -125,7 +125,7 @@ export async function buildPerformanceView(
   // once and published on every return path below — including the ones that
   // give up on a return figure. A page that cannot measure performance can
   // still warn that the prices underneath it disagree with the ledger.
-  const { findings: basisFindings } = await findBasisMismatches(
+  const { findings: basisFindings, fxGapSymbols } = await findBasisMismatches(
     { db: deps.db, fxRateService: deps.fxRateService },
     userId,
   );
@@ -136,6 +136,12 @@ export async function buildPerformanceView(
   const basisMismatches = basisFindings
     .filter((f) => splitBasis.verdictOf(f.symbol) !== "adjusted")
     .map(toBasisFindingBody);
+  // Published beside `unverifiedSplits`, never merged into it: a split goes
+  // unchecked either because no trade landed on a stored-price day or because
+  // a trade's currency had no rate to convert against, and the two have
+  // opposite remedies. /corporate-actions has always told them apart
+  // (`action-row.tsx`); dropping this field here is what let /performance's
+  // banner assert the wrong one and contradict that page about one holding.
   const unverifiedSplits = splitBasis.unverified;
   // Same rule as `basisMismatches` above: a page that cannot measure
   // performance can still say its prices are short. An empty series never
@@ -171,6 +177,7 @@ export async function buildPerformanceView(
       relative: null,
       basisMismatches,
       unverifiedSplits,
+      fxGapSymbols,
       historyIncomplete,
       stalePrices: "empty" in series ? [] : series.stalePrices,
       splitSymbols,
@@ -241,6 +248,7 @@ export async function buildPerformanceView(
       relative: null,
       basisMismatches,
       unverifiedSplits,
+      fxGapSymbols,
       historyIncomplete,
       stalePrices: series.stalePrices,
       splitSymbols,
@@ -399,6 +407,7 @@ export async function buildPerformanceView(
     relative,
     basisMismatches,
     unverifiedSplits,
+    fxGapSymbols,
     historyIncomplete,
     stalePrices: series.stalePrices,
     splitSymbols,
