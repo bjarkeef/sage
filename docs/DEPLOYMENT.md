@@ -287,8 +287,8 @@ since each symbol needs its own quote. The honest consequence is that **a
 free-tier configuration still depends on the unofficial path**, and a key alone
 does not remove that dependency. Only a paid tier with enough call volume does.
 
-This is also the reason a hosted Sage is not on offer: redistributing Yahoo's
-data to paying users is not something its terms allow, so a hosted tier needs a
+It is also why this repo ships self-host only: redistributing Yahoo's data to
+paying users is not something its terms allow, so any hosted Sage needs a
 commercially licensed provider first, not merely more servers.
 
 ### What degradation actually looks like

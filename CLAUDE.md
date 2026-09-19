@@ -17,13 +17,19 @@ turn another suite red while `pnpm check` stays green; this has happened.
 
 Before a merge: `pnpm test` (whole monorepo).
 
-Also before a merge: update `docs/roadmap.md`. It is git-ignored — a working
-journal, not published documentation — but it calls itself the single source of
-truth for phase progress, so a stale entry is not a gap but a false statement.
-It drifted a week in August 2026 and ended up listing a shipped gate as still
-blocking. Move the **Now** paragraph to what actually just landed, and tick the
-boxes the work closed. A fresh clone will not have it; it lives on the
-maintainer's machine.
+Also before a merge: update `docs/roadmap.md`. It is git-ignored and stays that
+way — a working journal, not published documentation; a fresh clone will not
+have it. Move the **Now** paragraph to what actually just landed, and tick the
+boxes the work closed. A stale entry is a false statement, not a gap.
+
+**It lists open work only** (recut 2026-09-19, from 2,479 lines to ~400). Do not
+add narrative about work already merged: `git log` records that, more reliably
+and already in public. Do not restate decisions either — those live in Claude's
+memory, which loads every session without anyone opening a file. The old file
+mixed all three, and one audit pass found nine entries claiming undone things
+that had shipped weeks earlier, the repo going public among them. Size was the
+cause. The pre-cut file is archived locally at `docs/roadmap-archive-*.md`, also
+git-ignored.
 
 ## Test fixtures
 
