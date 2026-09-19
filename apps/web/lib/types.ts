@@ -668,10 +668,16 @@ export interface PerformanceDTO {
    *  book; nothing here changes any figure above. Excludes holdings whose
    *  mismatch a recorded split explained and the series corrected. */
   basisMismatches: BasisFindingDTO[];
-  /** Symbols carrying a recorded split whose share basis could not be checked,
-   *  because no transaction of theirs has a stored bar on its trade date.
-   *  Nothing was corrected for these. */
+  /** Symbols carrying a recorded split whose share basis could not be checked.
+   *  Nothing was corrected for these. The reason is NOT uniform — see
+   *  `fxGapSymbols`, which names the ones that failed for the other cause. */
   unverifiedSplits: string[];
+  /** Which of `unverifiedSplits` went unchecked because a trade's currency had
+   *  no FX rate to convert against its stored bar, rather than because no
+   *  trade landed on a stored-price day at all. Bars exist for these, so
+   *  backfilling price history would not change them. Optional so older cached
+   *  responses degrade to "cause unknown", not to a crash. */
+  fxGapSymbols?: string[];
   /** Every symbol in the ledger carrying a split transaction, regardless of
    *  its verdict. Lets a consumer tell a finding that corresponds to an
    *  actual recorded split (which /corporate-actions has a row for) apart
