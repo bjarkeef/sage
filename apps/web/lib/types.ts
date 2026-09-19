@@ -1055,6 +1055,12 @@ export interface CorporateActionDTO {
    *  already exist, so backfilling would not change anything. Only
    *  meaningful when `verdict` is `"unverified"`. */
   fxGap: boolean;
+  /** The multiplier actually applied to quantities dated before this split:
+   *  this row's ratio compounded with every LATER split of the same symbol,
+   *  because `factorAt` multiplies all of them. `null` when this is the
+   *  symbol's last split, where the row's own ratio already is the multiplier
+   *  and the simpler sentence is the true one. */
+  cumulativeFactor: number | null;
 }
 
 export interface CorporateActionsViewDTO {
