@@ -13,6 +13,7 @@ import {
 import { InstrumentPicker } from "./instrument-picker";
 import { summarize } from "./transaction-summary";
 import { formatMoney, formatDate } from "../lib/format";
+import { normalizeDecimalInput } from "../lib/decimal-input";
 import { validateTransactionForm, validateTransactionFields } from "../lib/validate-transaction";
 import type { SearchResultDTO, TransactionType } from "../lib/types";
 
@@ -119,12 +120,12 @@ export function TransactionForm({
   const priceIsMarket = Boolean(prefillPrice) && price === lastPrefill.current && price !== "";
 
   async function submit(addAnother: boolean) {
-    const effectivePrice = type === "split" ? "0" : price;
+    const effectivePrice = type === "split" ? "0" : normalizeDecimalInput(price);
     const fields: TransactionFormFields = {
       type,
-      quantity,
+      quantity: normalizeDecimalInput(quantity),
       price: effectivePrice,
-      fee: showsFee ? fee : "",
+      fee: showsFee ? normalizeDecimalInput(fee) : "",
       tradeDate,
     };
     const result =
@@ -191,6 +192,7 @@ export function TransactionForm({
         <Field label={quantityLabel} htmlFor="txn-quantity" error={errors.quantity}>
           <Input
             id="txn-quantity"
+            inputMode="decimal"
             ref={quantityRef}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
@@ -219,7 +221,12 @@ export function TransactionForm({
             }
           >
             <div className="relative">
-              <Input id="txn-price" value={price} onChange={(e) => setPrice(e.target.value)} />
+              <Input
+                id="txn-price"
+                inputMode="decimal"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+              />
               {currency && (
                 <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
                   {currency}
@@ -232,6 +239,7 @@ export function TransactionForm({
               <div className="relative">
                 <Input
                   id="txn-fee"
+                  inputMode="decimal"
                   placeholder="Optional"
                   value={fee}
                   onChange={(e) => setFee(e.target.value)}

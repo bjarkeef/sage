@@ -1,4 +1,5 @@
 import type { TransactionType } from "../lib/types";
+import { parseDecimalInput } from "../lib/decimal-input";
 
 export interface SummaryInput {
   type: TransactionType;
@@ -18,13 +19,6 @@ export interface Summary {
   breakdown: string | null;
 }
 
-function toFinite(value: string): number | null {
-  const trimmed = value.trim();
-  if (trimmed === "") return null;
-  const n = Number(trimmed);
-  return Number.isFinite(n) ? n : null;
-}
-
 /**
  * The figure shown above the dialog's footer.
  *
@@ -38,14 +32,14 @@ export function summarize({ type, quantity, price, fee }: SummaryInput): Summary
   if (type === "split") return null;
 
   const label = type === "dividend" ? "Total received" : "Total";
-  const qty = toFinite(quantity);
-  const unit = toFinite(price);
+  const qty = parseDecimalInput(quantity);
+  const unit = parseDecimalInput(price);
   if (qty === null || unit === null) return { label, amount: null, breakdown: null };
 
   const gross = qty * unit;
   // Fee only applies to trades; the field is hidden for dividends, and a value
   // left over from a previous type must not silently change the figure.
-  const feeAmount = type === "buy" || type === "sell" ? (toFinite(fee) ?? 0) : 0;
+  const feeAmount = type === "buy" || type === "sell" ? (parseDecimalInput(fee) ?? 0) : 0;
   const amount = type === "sell" ? gross - feeAmount : gross + feeAmount;
 
   return { label, amount, breakdown: `${quantity.trim()} × ${price.trim()}` };

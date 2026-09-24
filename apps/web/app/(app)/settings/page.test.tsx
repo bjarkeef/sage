@@ -254,6 +254,17 @@ describe("SettingsPage — Dividend tax rate", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["user-settings"] });
   });
 
+  it("commits a decimal-comma rate instead of silently reverting it", async () => {
+    render(<SettingsPage />);
+    const input = await screen.findByLabelText<HTMLInputElement>(/dividend tax rate/i);
+    await waitFor(() => expect(input.value).toBe(""));
+
+    fireEvent.change(input, { target: { value: "27,5" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(updateDividendTaxRateMock).toHaveBeenCalledWith(27.5));
+  });
+
   it("clears the rate back to null when the input is emptied", async () => {
     getUserSettingsMock.mockResolvedValue(settings({}, 27));
     render(<SettingsPage />);

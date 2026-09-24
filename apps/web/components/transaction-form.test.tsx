@@ -91,7 +91,24 @@ describe("TransactionForm", () => {
     const onSubmit = renderEdit(vi.fn().mockResolvedValue(true), editInitial({ quantity: "" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByText("Quantity must be a positive number.")).toBeInTheDocument();
+    expect(screen.getByText("Quantity must be a number, like 1.12 or 1,12.")).toBeInTheDocument();
+  });
+
+  it("says a grouped number is not a number, rather than calling it non-positive", () => {
+    const onSubmit = renderEdit(
+      vi.fn().mockResolvedValue(true),
+      editInitial({ quantity: "1.000,50" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText("Quantity must be a number, like 1.12 or 1,12.")).toBeInTheDocument();
+  });
+
+  it("says zero must be more than zero", () => {
+    const onSubmit = renderEdit(vi.fn().mockResolvedValue(true), editInitial({ price: "0" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText("Price must be more than zero.")).toBeInTheDocument();
   });
 
   it("submits valid fields including the fee", () => {
@@ -207,6 +224,23 @@ describe("TransactionForm", () => {
       />,
     );
     expect(screen.getByLabelText("Price / share")).toHaveValue("175");
+  });
+
+  it("accepts a decimal comma and submits it with a dot", () => {
+    const onSubmit = renderEdit(
+      vi.fn().mockResolvedValue(true),
+      editInitial({ quantity: "1,12", price: "305,93", fee: "1,5" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).toHaveBeenCalledWith(
+      { type: "buy", quantity: "1.12", price: "305.93", fee: "1.5", tradeDate: "2026-01-01" },
+      { addAnother: false },
+    );
+  });
+
+  it("totals a decimal-comma entry", async () => {
+    renderEdit(vi.fn().mockResolvedValue(true), editInitial({ quantity: "2", price: "1,25" }));
+    expect(await screen.findByText("$2.50")).toBeInTheDocument();
   });
 
   it("shows a total that includes the fee", async () => {

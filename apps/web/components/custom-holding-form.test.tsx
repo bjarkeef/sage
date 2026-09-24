@@ -42,6 +42,22 @@ describe("CustomHoldingForm", () => {
     expect(input.income?.yearlyPct).toBe("4.25");
   });
 
+  it("sends a decimal-comma yield and initial price with a dot", async () => {
+    render(withTestProviders(<CustomHoldingForm mode="create" />));
+    fireEvent.change(screen.getByLabelText(/ticker/i), { target: { value: "CASH_DKK" } });
+    fireEvent.change(screen.getByLabelText(/^name/i), { target: { value: "Cash account" } });
+    fireEvent.change(screen.getByLabelText(/currency/i), { target: { value: "DKK" } });
+    fireEvent.change(screen.getByLabelText(/initial price$/i), { target: { value: "1,05" } });
+    fireEvent.click(screen.getByLabelText(/steady income/i));
+    fireEvent.change(screen.getByLabelText(/yearly/i), { target: { value: "4,25" } });
+    fireEvent.change(screen.getByLabelText(/first payment/i), { target: { value: "2026-04-30" } });
+    fireEvent.click(screen.getByRole("button", { name: /create/i }));
+    await waitFor(() => expect(createCustomHolding).toHaveBeenCalled());
+    const input = vi.mocked(createCustomHolding).mock.calls[0]![0];
+    expect(input.income?.yearlyPct).toBe("4.25");
+    expect(input.initialPrice?.price).toBe("1.05");
+  });
+
   it("hides income fields until the toggle is on", () => {
     render(withTestProviders(<CustomHoldingForm mode="create" />));
     expect(screen.queryByLabelText(/yearly/i)).toBeNull();

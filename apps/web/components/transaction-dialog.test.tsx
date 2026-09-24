@@ -115,6 +115,17 @@ describe("TransactionDialog add mode", () => {
     await waitFor(() => expect(screen.getByLabelText("Price / share")).toHaveValue("150.00"));
   });
 
+  it("seeds the price as quoted, without float widening noise", async () => {
+    vi.mocked(api.getInstrumentQuote).mockResolvedValueOnce({
+      price: { amount: "496.2699890136719", currency: "USD" },
+      asOf: "2026-07-15",
+    });
+    renderWithClient(<TransactionDialog mode="add" />, makeTestQueryClient());
+    fireEvent.click(screen.getByRole("button", { name: "Add transaction" }));
+    fireEvent.click(await screen.findByText("pick AAPL"));
+    await waitFor(() => expect(screen.getByLabelText("Price / share")).toHaveValue("496.27"));
+  });
+
   it("leaves the price empty and shows no error when the quote is unavailable", async () => {
     vi.mocked(api.getInstrumentQuote).mockResolvedValueOnce(null);
     renderWithClient(<TransactionDialog mode="add" />, makeTestQueryClient());
