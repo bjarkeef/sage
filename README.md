@@ -46,6 +46,11 @@ layers can't disagree about which year is on screen. A total that would span
 more than one currency renders as `—` instead of a figure that's wrong in
 every currency you might read it as.
 
+The calendar runs three full years ahead. Past the next twelve months it
+assumes today's holdings, each dividend growing at its own recent rate (capped
+at 10% a year). [`docs/PROJECTIONS.md`](./docs/PROJECTIONS.md) explains the
+method and why the cap is there.
+
 <p align="center">
   <img alt="The dividends calendar: one year of received and predicted payments" src="docs/assets/shot-dividends-calendar.png" width="880">
 </p>

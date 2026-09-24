@@ -8,6 +8,7 @@ sell, or hold, and nothing it displays is a recommendation.
 not licensed advisers. Projections — the goal page, forward income, dividend
 growth — are arithmetic applied to inputs you supply. They are not forecasts,
 they carry no guarantee, and past performance does not indicate future results.
+[How Sage projects dividends](./PROJECTIONS.md) spells out that arithmetic.
 
 **Figures may be wrong.** Prices come from third-party providers, most likely
 the unofficial Yahoo path described in [Market data](./MARKET-DATA.md); they

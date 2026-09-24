@@ -144,6 +144,22 @@ describe("DividendCalendarGrid", () => {
     expect(screen.getByText(line)).toBeInTheDocument();
   });
 
+  it("says when a long-range rate was capped, and from what", async () => {
+    const user = userEvent.setup();
+    render(
+      <DividendCalendarGrid
+        longRange={[
+          { ...projectedLow, confidence: "high", growthPct: 10, growthCappedFromPct: 53.53 },
+        ]}
+        initialDate={new Date("2026-07-01T00:00:00Z")}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /HIVAR/ }));
+    expect(
+      screen.getByText("Grown 10.0%/yr from today's dividend (capped; its 5-year rate is 53.5%)"),
+    ).toBeInTheDocument();
+  });
+
   it("opens a detail popover with date chain, figures, and asset link on chip click", async () => {
     const user = userEvent.setup();
     render(
