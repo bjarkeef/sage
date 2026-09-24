@@ -16,6 +16,7 @@ import {
   longRangeThroughIso,
   classifyDividendTrend,
   clampDividendGrowth,
+  MAX_FORWARD_DIVIDEND_GROWTH,
   type DividendHistoryRow,
 } from "./dividends";
 
@@ -757,6 +758,15 @@ describe("clampDividendGrowth", () => {
   it("leaves zero unchanged either way", () => {
     expect(clampDividendGrowth(new Decimal("0"), false).toFixed(4)).toBe("0.0000");
     expect(clampDividendGrowth(new Decimal("0"), true).toFixed(4)).toBe("0.0000");
+  });
+  // A 5-year rate measured from a suspension or a post-cut trough is history,
+  // not a forward rate. See docs/PROJECTIONS.md.
+  it("caps growth at MAX_FORWARD_DIVIDEND_GROWTH either way", () => {
+    expect(MAX_FORWARD_DIVIDEND_GROWTH.toFixed(2)).toBe("0.10");
+    expect(clampDividendGrowth(new Decimal("0.5353"), true).toFixed(4)).toBe("0.1000");
+    expect(clampDividendGrowth(new Decimal("0.5353"), false).toFixed(4)).toBe("0.1000");
+    expect(clampDividendGrowth(new Decimal("0.10"), true).toFixed(4)).toBe("0.1000");
+    expect(clampDividendGrowth(new Decimal("0.0999"), true).toFixed(4)).toBe("0.0999");
   });
 });
 

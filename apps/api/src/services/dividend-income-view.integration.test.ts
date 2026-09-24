@@ -204,17 +204,28 @@ describeDb("buildDividendIncomeView — long range", () => {
     await t.db.insert(instrument).values([
       { symbol: "RISECO", name: "Rise Co", exchange: "XNYS", currency: "USD", assetType: "stock" },
       { symbol: "FALLCO", name: "Fall Co", exchange: "XNYS", currency: "USD", assetType: "stock" },
+      {
+        symbol: "SURGECO",
+        name: "Surge Co",
+        exchange: "XNYS",
+        currency: "USD",
+        assetType: "stock",
+      },
     ]);
     await t.db
       .insert(dividendHistory)
-      .values([...quarterlyHistory("RISECO", 0.5, 1.1), ...quarterlyHistory("FALLCO", 1, 0.9)]);
+      .values([
+        ...quarterlyHistory("RISECO", 0.5, 1.1),
+        ...quarterlyHistory("FALLCO", 1, 0.9),
+        ...quarterlyHistory("SURGECO", 0.1, 1.5),
+      ]);
     for (const userId of ["lr-grow", "lr-neg"]) {
       const [pf] = await t.db
         .insert(portfolio)
         .values({ userId, name: "Main" })
         .returning({ id: portfolio.id });
       await t.db.insert(transaction).values(
-        ["RISECO", "FALLCO"].map((instrumentSymbol) => ({
+        ["RISECO", "FALLCO", "SURGECO"].map((instrumentSymbol) => ({
           portfolioId: pf!.id,
           instrumentSymbol,
           type: "buy",
@@ -258,6 +269,15 @@ describeDb("buildDividendIncomeView — long range", () => {
     const fall = view.longRange.filter((r) => r.symbol === "FALLCO");
     expect(fall[0]!.growthPct).toBe(0);
     expect(new Set(fall.map((r) => r.amountPerShare)).size).toBe(1);
+  });
+
+  it("caps a 50%/yr grower at 10% and keeps the rate it was capped from", async () => {
+    const view = await build("lr-grow");
+    const surge = view.longRange.filter((r) => r.symbol === "SURGECO");
+    expect(surge[0]!.growthPct).toBe(10);
+    expect(surge[0]!.growthCappedFromPct).toBeCloseTo(50, 0);
+    const rise = view.longRange.find((r) => r.symbol === "FALLCO")!;
+    expect(rise.growthCappedFromPct).toBeNull();
   });
 
   it("lets a falling payer shrink when negatives are allowed", async () => {

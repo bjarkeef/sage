@@ -31,6 +31,7 @@ export {
   longRangeThroughIso,
   classifyDividendTrend,
   clampDividendGrowth,
+  MAX_FORWARD_DIVIDEND_GROWTH,
   FREQUENCY_INTERVAL_DAYS,
   type DividendHistoryRow,
   type DividendFrequency,
