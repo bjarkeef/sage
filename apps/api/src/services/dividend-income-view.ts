@@ -6,6 +6,8 @@ import {
   buildReceivedDividends,
   projectDividendSchedule,
   projectionHorizonIso,
+  longRangeThroughIso,
+  clampDividendGrowth,
   computeDividendCAGR,
   classifyDividendTrend,
   dedupeDividends,
@@ -188,14 +190,21 @@ function buildIncomeByGroup(
  * gap — e.g. after a missed sync — is still counted, not just one payment).
  * Skips the symbol entirely when it has no known price on or before today.
  */
+/** The end of a custom holding's 12-month window. 365 days, where market rows
+ *  use a calendar year (`projectionHorizonIso`): across a leap day the two
+ *  differ, so the long range cuts custom rows at this date, not that one. */
+function customHorizonIso(now: Date): string {
+  return new Date(now.getTime() + 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 async function buildCustomProjectedRows(
   db: Database,
   holding: typeof customHolding.$inferSelect,
   shares: Decimal,
   now: Date,
   todayIso: string,
+  horizon: string = customHorizonIso(now),
 ): Promise<ProjectedDividendRow[]> {
-  const horizon = new Date(now.getTime() + 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
   const fullSchedule = incomePaymentDates({
     firstPaymentDate: holding.firstPaymentDate!,
     lastPaymentDate: holding.lastPaymentDate,
@@ -402,26 +411,69 @@ export async function buildDividendIncomeView(
     }
   }
 
+  const scheduleInput = (p: (typeof positions)[number]) => ({
+    symbol: p.symbol,
+    quantity: p.quantity,
+    history: pastRows.filter((d) => d.symbol === p.symbol),
+    announced: (futureBySymbol.get(p.symbol) ?? []).map((d) => ({
+      exDate: d.exDate,
+      paymentDate: d.paymentDate ?? null,
+      paymentDateEstimated: d.paymentDateEstimated ?? false,
+      amountPerShare: d.amountPerShare,
+      currency: d.currency,
+    })),
+    asOf: now,
+  });
   const scheduleRows = positions
     .filter((p) => !customBySymbol.has(p.symbol))
-    .flatMap((p) =>
-      projectDividendSchedule({
-        symbol: p.symbol,
-        quantity: p.quantity,
-        history: pastRows.filter((d) => d.symbol === p.symbol),
-        announced: (futureBySymbol.get(p.symbol) ?? []).map((d) => ({
-          exDate: d.exDate,
-          paymentDate: d.paymentDate ?? null,
-          paymentDateEstimated: d.paymentDateEstimated ?? false,
-          amountPerShare: d.amountPerShare,
-          currency: d.currency,
-        })),
-        asOf: now,
-      }),
-    )
+    .flatMap((p) => projectDividendSchedule(scheduleInput(p)))
     .concat(customScheduleRows);
   const announcedScheduleRows = scheduleRows.filter((r) => r.kind === "announced");
   const projectedScheduleRows = scheduleRows.filter((r) => r.kind === "projected");
+
+  // Calendar-only: the same schedule run on to 31 December three years out,
+  // each dividend grown at the rate the Goal uses. Kept apart from `projected`
+  // so nothing that means "the next 12 months" can start summing three years.
+  const projectedThrough = projectionHorizonIso(now);
+  const longRangeThrough = longRangeThroughIso(now);
+  const growthBySymbol = new Map<string, Decimal | null>();
+  for (const p of positions) {
+    const cagr = computeDividendCAGR(
+      divHistory.filter((d) => d.symbol === p.symbol),
+      5,
+      now,
+    );
+    growthBySymbol.set(
+      p.symbol,
+      cagr ? clampDividendGrowth(cagr, allowNegativeDividendGrowth) : null,
+    );
+  }
+  const longRangeRows: ProjectedDividendRow[] = positions
+    .filter((p) => !customBySymbol.has(p.symbol))
+    .flatMap((p) =>
+      projectDividendSchedule({
+        ...scheduleInput(p),
+        through: longRangeThrough,
+        growth: growthBySymbol.get(p.symbol) ?? undefined,
+      }).filter((r) => r.exDate > projectedThrough),
+    );
+  for (const p of positions) {
+    const holding = customBySymbol.get(p.symbol);
+    if (!holding || !p.quantity.greaterThan(0)) continue;
+    try {
+      const rows = await buildCustomProjectedRows(
+        db,
+        holding,
+        p.quantity,
+        now,
+        todayIso,
+        longRangeThrough,
+      );
+      longRangeRows.push(...rows.filter((r) => r.exDate > customHorizonIso(now)));
+    } catch {
+      // Bad stored settings: already logged by the 12-month pass above.
+    }
+  }
 
   // FX conversion. `retroactive`/`scheduleRows` are both scoped to CURRENT
   // positions, so a holding sold out entirely in a currency no longer held by
@@ -552,6 +604,7 @@ export async function buildDividendIncomeView(
     const allCurrencies = new Set([
       ...retroactive.map((r) => r.currency),
       ...scheduleRows.map((r) => r.currency),
+      ...longRangeRows.map((r) => r.currency),
       ...ledgerDividendCurrencies,
       ...reinvestReceived.map((r) => r.currency),
     ]);
@@ -607,6 +660,25 @@ export async function buildDividendIncomeView(
       shares: r.shares,
       income: conv.amount,
       currency: conv.currency,
+    };
+  });
+  const longRangeDTO = longRangeRows.map((r) => {
+    const conv = convertAmount(r.income, r.currency);
+    const growth = customBySymbol.has(r.symbol) ? null : (growthBySymbol.get(r.symbol) ?? null);
+    return {
+      symbol: r.symbol,
+      name: nameBySymbol.get(r.symbol) ?? r.symbol,
+      projectedExDate: r.exDate,
+      paymentDate: r.paymentDate,
+      paymentDateEstimated: r.paymentDateEstimated,
+      confidence: r.confidence,
+      amountPerShare: convertAmount(r.amountPerShare, r.currency).amount,
+      shares: r.shares,
+      income: conv.amount,
+      currency: conv.currency,
+      /** Yearly growth applied, in percent; null when none was (a custom
+       *  holding, or too little history for a 5-year rate). */
+      growthPct: growth === null ? null : growth.times(100).toDecimalPlaces(2).toNumber(),
     };
   });
   const announcedDTO = announcedScheduleRows.map((r) => {
@@ -880,7 +952,12 @@ export async function buildDividendIncomeView(
      *  because the server owns the rule — a `+ 1 year` reimplemented in the web
      *  app would drift the moment the horizon moved, and `apps/web` deliberately
      *  does not depend on `@sage/core`, where that rule lives. */
-    projectedThrough: projectionHorizonIso(now),
+    projectedThrough,
+    /** Calendar-only forecast past `projectedThrough`, through
+     *  `longRangeThrough` (31 December three years out). Never summed into
+     *  `summary`: everything else that reads this payload means 12 months. */
+    longRange: longRangeDTO,
+    longRangeThrough,
     summary: {
       // Empty when there is no currency to state the total in, which the
       // clients already render as "—". A figure needs a unit; `0` on its own is

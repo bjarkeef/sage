@@ -10,7 +10,7 @@ import {
   monthsOfYear,
   daysInYear,
   sumIncome,
-  yearRunsPastForecast,
+  breakdownFromEvents,
 } from "./dividend-year";
 
 // Every fixture is built against an explicit `today`, never `new Date()`.
@@ -53,6 +53,11 @@ describe("paymentYearBounds", () => {
   });
 
   // A projection reaching into next year must not become the FIRST year.
+  it("runs as far as the forecast does", () => {
+    const events = [event("2029-11-02", "projected", "DUOMO", "10")];
+    expect(paymentYearBounds(events, TODAY).last).toBe(2029);
+  });
+
   it("takes the earliest bound from paid history, not from a projection", () => {
     const events = [event("2027-01-05", "projected", "DUOMO", "10")];
     expect(paymentYearBounds(events, TODAY).first).toBe(2026);
@@ -454,43 +459,38 @@ describe("yearProgress currency conflicts", () => {
   });
 });
 
-describe("yearRunsPastForecast", () => {
-  // `today` and the horizon are both arguments, so the absolute dates below are
-  // inputs rather than an implicit "now" — they cannot rot the way a fixture
-  // pinned to the real clock does.
-  const horizonFor = (iso: string) => {
-    const d = new Date(`${iso}T00:00:00Z`);
-    d.setUTCFullYear(d.getUTCFullYear() + 1);
-    return d.toISOString().slice(0, 10);
-  };
-
-  it("flags next year, whose last months lie past the forecast", () => {
-    const today = new Date("2026-09-10T00:00:00Z");
-    expect(yearRunsPastForecast(2027, today, horizonFor("2026-09-10"))).toBe(true);
+describe("breakdownFromEvents", () => {
+  it("sums each month by status and skips other years", () => {
+    const events = [
+      event("2028-01-15", "paid", "THAMES", "100"),
+      event("2028-01-20", "announced", "DUOMO", "25"),
+      event("2028-03-10", "projected", "THAMES", "70"),
+      event("2028-03-11", "projected", "DUOMO", "5.5"),
+      event("2027-03-10", "projected", "THAMES", "999"),
+    ];
+    expect(breakdownFromEvents(events, 2028)).toEqual([
+      {
+        month: "2028-01",
+        retroactive: "100.00",
+        announced: "25.00",
+        projected: "0.00",
+        currency: "DKK",
+      },
+      {
+        month: "2028-03",
+        retroactive: "0.00",
+        announced: "0.00",
+        projected: "75.50",
+        currency: "DKK",
+      },
+    ]);
   });
 
-  it("does not flag the current year, which the forecast always covers", () => {
-    const today = new Date("2026-09-10T00:00:00Z");
-    expect(yearRunsPastForecast(2026, today, horizonFor("2026-09-10"))).toBe(false);
-  });
-
-  it("does not flag a past year, whose gaps are history rather than missing forecast", () => {
-    const today = new Date("2026-09-10T00:00:00Z");
-    expect(yearRunsPastForecast(2024, today, horizonFor("2026-09-10"))).toBe(false);
-  });
-
-  it("does not flag next year on 31 December, when the forecast covers it in full", () => {
-    // The boundary the `>` comparison exists for: the horizon is next 31
-    // December, so every month of next year is forecast and the note would be
-    // a lie. A `>=` here would fire on exactly this day.
-    const today = new Date("2026-12-31T00:00:00Z");
-    expect(yearRunsPastForecast(2027, today, horizonFor("2026-12-31"))).toBe(false);
-  });
-
-  it("says nothing when the payload carries no horizon", () => {
-    // An older API, or a response that omitted it: guessing a horizon would
-    // print a date the server never promised.
-    const today = new Date("2026-09-10T00:00:00Z");
-    expect(yearRunsPastForecast(2027, today, undefined)).toBe(false);
+  it("names no currency for a month whose rows disagree", () => {
+    const events = [
+      event("2028-05-01", "projected", "THAMES", "10"),
+      { ...event("2028-05-02", "projected", "DUOMO", "10"), currency: "USD" },
+    ];
+    expect(breakdownFromEvents(events, 2028)[0]!.currency).toBe("");
   });
 });

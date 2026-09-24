@@ -276,7 +276,7 @@ export function DividendCalendarGrid({
                                 ? formatMoney({ amount: event.income, currency: event.currency })
                                 : "—"}
                             </div>
-                            {yieldBySymbol?.has(event.symbol) && (
+                            {!event.longRange && yieldBySymbol?.has(event.symbol) && (
                               <div className="font-mono text-xs text-income">
                                 {yieldBySymbol.get(event.symbol)!.toFixed(2)}%
                               </div>
@@ -295,10 +295,17 @@ export function DividendCalendarGrid({
                               ? "Paid"
                               : event.type === "announced"
                                 ? "Confirmed"
-                                : event.lowConfidence
-                                  ? "Low confidence"
-                                  : "Estimated"}
+                                : event.longRange
+                                  ? "Estimated · long range"
+                                  : event.lowConfidence
+                                    ? "Low confidence"
+                                    : "Estimated"}
                           </div>
+                          {event.longRange && (
+                            <div className="text-xs text-muted-foreground">
+                              {growthLine(event.growthPct ?? null)}
+                            </div>
+                          )}
                           <div className="mt-4 grid grid-cols-4 gap-2">
                             {(
                               [
@@ -367,4 +374,13 @@ export function DividendCalendarGrid({
       </div>
     </div>
   );
+}
+
+/** How a long-range payment's amount was reached, for its popover. */
+function growthLine(growthPct: number | null): string {
+  if (growthPct === null) return "Today's amount, no growth applied";
+  const pct = Math.abs(growthPct).toFixed(1);
+  return growthPct < 0
+    ? `Cut ${pct}%/yr from today's dividend`
+    : `Grown ${pct}%/yr from today's dividend`;
 }
