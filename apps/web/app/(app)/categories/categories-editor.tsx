@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { normalizeDecimalInput } from "@/lib/decimal-input";
 import {
   Button,
   Card,
@@ -94,6 +95,9 @@ function descendantKeys(categories: EditorCategory[], key: string): Set<string> 
   walk(key);
   return out;
 }
+
+/** A typed target percentage; "12,5" reads as 12.5. */
+const pct = (v: string): number => Number(normalizeDecimalInput(v));
 
 export function CategoriesEditor({
   data,
@@ -222,13 +226,13 @@ export function CategoriesEditor({
   // Include negative targets so a stray minus sign shows up instead of being
   // silently ignored (the server rejects them on save).
   const targetSum = [
-    ...categories.filter((c) => c.parentKey === null).map((c) => Number(c.targetPct)),
-    ...rootHoldings.map((h) => Number(h.targetPct)),
+    ...categories.filter((c) => c.parentKey === null).map((c) => pct(c.targetPct)),
+    ...rootHoldings.map((h) => pct(h.targetPct)),
   ]
     .filter((n) => Number.isFinite(n) && n !== 0)
     .reduce((s, n) => s + n, 0);
 
-  const num = (v: string): number | null => (v.trim() === "" ? null : Number(v));
+  const num = (v: string): number | null => (v.trim() === "" ? null : pct(v));
 
   function buildTree(parentKey: string | null): SaveCategoryInput[] {
     return categories
@@ -250,7 +254,7 @@ export function CategoriesEditor({
       categories: buildTree(null),
       rootHoldings: rootHoldings
         .filter((h) => h.targetPct.trim() !== "")
-        .map((h) => ({ symbol: h.symbol, targetPct: Number(h.targetPct) })),
+        .map((h) => ({ symbol: h.symbol, targetPct: pct(h.targetPct) })),
     };
     try {
       const fresh = await saveCategories(input, displayCurrency ?? undefined);

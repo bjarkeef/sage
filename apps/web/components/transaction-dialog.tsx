@@ -17,6 +17,7 @@ import { describeSavedTransaction } from "./transaction-summary";
 import { createTransaction, updateTransaction, getInstrumentQuote } from "../lib/api";
 import { invalidateFor } from "../lib/query/invalidation";
 import type { SearchResultDTO, TransactionRow } from "../lib/types";
+import { cleanQuotePrice } from "../lib/quote-price";
 
 type Props =
   | {
@@ -93,7 +94,7 @@ export function TransactionDialog(props: Props) {
     let cancelled = false;
     void getInstrumentQuote(fixedInstrument.symbol).then((quote) => {
       if (cancelled || !quote) return;
-      setPrefillPrice(quote.price.amount);
+      setPrefillPrice(cleanQuotePrice(quote.price.amount));
       setPrefillAsOf(quote.asOf);
     });
     return () => {
@@ -119,7 +120,7 @@ export function TransactionDialog(props: Props) {
     // different instrument — otherwise it lands on the new selection wearing
     // the "Market price" caption as if it were authoritative for it.
     if (quote && requestId === instrumentRequestId.current) {
-      setPrefillPrice(quote.price.amount);
+      setPrefillPrice(cleanQuotePrice(quote.price.amount));
       setPrefillAsOf(quote.asOf);
     }
   }

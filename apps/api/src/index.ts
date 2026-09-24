@@ -18,7 +18,8 @@ import { FallbackMarketDataProvider } from "./market-data/fallback-provider";
 import { EcbFxRateService } from "./market-data/ecb-fx-rate-service";
 import { ensureRatesAvailable } from "./market-data/ecb-sync";
 import { IsinResolver } from "./market-data/isin-resolver";
-import { CustomRoutingProvider } from "./market-data/custom-routing-provider";
+import { CustomRoutingProvider, isCustomSymbol } from "./market-data/custom-routing-provider";
+import { CustomIntelGuard } from "./market-data/custom-intel-guard";
 import { ManualPriceProvider } from "./market-data/manual-price-provider";
 import { ProviderHealthRegistry } from "./market-data/provider-health";
 import { HealthTrackingProvider } from "./market-data/health-tracking-provider";
@@ -134,7 +135,11 @@ async function main() {
   // News/analyst-ratings: a direct Yahoo handle, bypassing the
   // IMarketDataProvider wrapper chain (which doesn't expose these
   // capabilities). Yahoo-only for now regardless of MARKET_DATA_PROVIDER.
-  const intelProvider = new YahooFinanceProvider();
+  // The guard keeps custom holdings from ever being sent to it.
+  const intelProvider = new CustomIntelGuard(
+    (symbol) => isCustomSymbol(db, symbol),
+    new YahooFinanceProvider(),
+  );
 
   serve({
     fetch: createApp(
