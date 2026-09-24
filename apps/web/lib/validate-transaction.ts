@@ -18,9 +18,13 @@ type FieldsResult =
 type Result =
   { ok: true; value: CreateTransactionInput } | { ok: false; errors: Record<string, string> };
 
-function isPositiveDecimal(v: string): boolean {
+/** Null when `v` is a number above zero, else the message to show under the field.
+ *  "Not a number" and "not above zero" read differently: a comma-grouped entry told
+ *  it must be "positive" looks like Sage read it as negative. */
+function positiveAmountError(v: string, what: string): string | null {
   const n = Number(v);
-  return v.trim() !== "" && Number.isFinite(n) && n > 0;
+  if (v.trim() === "" || !Number.isFinite(n)) return `${what} must be a number, like 1.12 or 1,12.`;
+  return n > 0 ? null : `${what} must be more than zero.`;
 }
 
 /** Validate the shared transaction fields (no instrument). Pure — no DOM/network. */
@@ -28,12 +32,14 @@ export function validateTransactionFields(input: TransactionFields): FieldsResul
   const errors: Record<string, string> = {};
 
   if (input.type === "split") {
-    if (!isPositiveDecimal(input.quantity))
-      errors.quantity = "Split ratio must be a positive number.";
+    const ratio = positiveAmountError(input.quantity, "Split ratio");
+    if (ratio) errors.quantity = ratio;
     if (input.price !== "0") errors.price = "Price must be 0 for splits.";
   } else {
-    if (!isPositiveDecimal(input.quantity)) errors.quantity = "Quantity must be a positive number.";
-    if (!isPositiveDecimal(input.price)) errors.price = "Price must be a positive number.";
+    const quantity = positiveAmountError(input.quantity, "Quantity");
+    if (quantity) errors.quantity = quantity;
+    const price = positiveAmountError(input.price, "Price");
+    if (price) errors.price = price;
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.tradeDate)) errors.tradeDate = "Use a YYYY-MM-DD date.";

@@ -71,6 +71,26 @@ describe("GoalForm", () => {
     expect(input.divYieldPct).toBeNull(); // untouched → server uses default
   });
 
+  it("reads a decimal comma in the amount and rates", () => {
+    const onSave = vi.fn<(input: PutGoalInput) => void>();
+    render(
+      <GoalForm
+        goal={null}
+        defaults={defaults}
+        saving={false}
+        onSave={onSave}
+        onDelete={() => {}}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/goal amount/i), { target: { value: "1500,50" } });
+    fireEvent.click(screen.getByRole("button", { name: /returns & inflation/i }));
+    fireEvent.change(screen.getByLabelText(/inflation/i), { target: { value: "2,5" } });
+    fireEvent.click(screen.getByRole("button", { name: /save and calculate/i }));
+    const input = onSave.mock.calls[0]![0];
+    expect(input.amount).toBe(1500.5);
+    expect(input.inflationPct).toBe(2.5);
+  });
+
   it("does not submit when amount is empty", () => {
     const onSave = vi.fn();
     render(

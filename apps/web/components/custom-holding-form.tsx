@@ -7,6 +7,7 @@ import { createCustomHolding, getCustomHolding, updateCustomHolding } from "../l
 import { invalidateFor } from "../lib/query/invalidation";
 import { qk } from "../lib/query/keys";
 import type { CustomHoldingIncomeInput, CustomHoldingInput } from "../lib/types";
+import { normalizeDecimalInput } from "../lib/decimal-input";
 
 const HOLDING_TYPES = [
   { label: "Savings", value: "savings" },
@@ -123,7 +124,7 @@ export function CustomHoldingForm({ mode, symbol }: CustomHoldingFormProps) {
     mutationFn: async (): Promise<string> => {
       const income: CustomHoldingIncomeInput | null = incomeEnabled
         ? {
-            yearlyPct,
+            yearlyPct: normalizeDecimalInput(yearlyPct),
             frequencyUnit,
             frequencyInterval: Number(frequencyInterval) || 1,
             firstPaymentDate,
@@ -143,7 +144,9 @@ export function CustomHoldingForm({ mode, symbol }: CustomHoldingFormProps) {
           country: blankToNull(country),
           note: blankToNull(note),
           initialPrice:
-            initialPrice.trim() === "" ? null : { date: initialDate, price: initialPrice.trim() },
+            initialPrice.trim() === ""
+              ? null
+              : { date: initialDate, price: normalizeDecimalInput(initialPrice) },
           income,
         };
         const result = await createCustomHolding(input);

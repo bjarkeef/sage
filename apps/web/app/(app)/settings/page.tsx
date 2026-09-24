@@ -12,6 +12,7 @@ import {
   updateAllowNegativeDividendGrowth,
   updateDisplayName,
 } from "@/lib/api";
+import { parseDecimalInput } from "@/lib/decimal-input";
 import { invalidateFor } from "@/lib/query/invalidation";
 import { qk } from "@/lib/query/keys";
 import type { OverviewPrefs } from "@/lib/types";
@@ -158,8 +159,8 @@ export default function SettingsPage() {
       void commitTaxRate(null);
       return;
     }
-    const parsed = Number(trimmed);
-    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+    const parsed = parseDecimalInput(trimmed);
+    if (parsed === null || parsed < 0 || parsed > 100) {
       // Invalid — revert the input without saving.
       setTaxRateInput(taxRate != null ? String(taxRate) : "");
       return;
@@ -316,11 +317,7 @@ export default function SettingsPage() {
             </div>
             <Input
               id="dividend-tax-rate"
-              type="number"
               inputMode="decimal"
-              min={0}
-              max={100}
-              step="0.1"
               placeholder="—"
               value={taxRateInput}
               onChange={(e) => setTaxRateInput(e.target.value)}

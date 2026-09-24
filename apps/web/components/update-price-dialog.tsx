@@ -12,6 +12,7 @@ import {
   Input,
 } from "@sage/ui";
 import { putPriceMark } from "../lib/api";
+import { normalizeDecimalInput } from "../lib/decimal-input";
 import { qk } from "../lib/query/keys";
 
 /** Quick-action for custom holdings: record today's (or a backdated) price
@@ -25,7 +26,7 @@ export function UpdatePriceDialog({ symbol, currency }: { symbol: string; curren
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: () => putPriceMark(symbol, { date, price }),
+    mutationFn: () => putPriceMark(symbol, { date, price: normalizeDecimalInput(price) }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: qk.portfolio() });
       void queryClient.invalidateQueries({ queryKey: qk.customHolding(symbol) });
