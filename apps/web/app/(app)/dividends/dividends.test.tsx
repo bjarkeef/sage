@@ -169,20 +169,29 @@ describe("DividendsPage", () => {
     expect(portfolioSpy).not.toHaveBeenCalled();
   });
 
-  // The year picker always offers next year (`paymentYearBounds` ends at
-  // `currentYear + 1`) while projections stop one year from today, so picking
-  // next year shows a calendar whose later months are empty for want of a
-  // forecast. Without the note those months read as "this portfolio earns
-  // nothing then", which is the opposite claim.
-  describe("forecast horizon note", () => {
-    // Relative to the real clock, like every other date in this file: a pinned
-    // horizon would stop being "next year" the moment the year turned.
-    const horizon = (() => {
-      const d = new Date(today);
-      d.setUTCFullYear(d.getUTCFullYear() + 1);
-      return d.toISOString().slice(0, 10);
-    })();
-    const withHorizon: DividendIncomeDTO = { ...FIXTURE_INCOME, projectedThrough: horizon };
+  // The calendar runs three full years ahead on the API's calendar-only
+  // `longRange` rows. Before, the picker stopped at next year and next year
+  // stopped a year from today, with a note explaining the empty months.
+  describe("long-range years", () => {
+    const farYear = today.getFullYear() + 3;
+    const quarter = (month: string) => ({
+      symbol: "O",
+      name: "Realty Income",
+      projectedExDate: `${farYear}-${month}-01`,
+      paymentDate: `${farYear}-${month}-15`,
+      paymentDateEstimated: true,
+      confidence: "high" as const,
+      amountPerShare: "0.30",
+      shares: "10",
+      income: "3.00",
+      currency: "USD",
+      growthPct: 4.2,
+    });
+    const withLongRange: DividendIncomeDTO = {
+      ...FIXTURE_INCOME,
+      longRange: ["01", "04", "07", "10"].map(quarter),
+      longRangeThrough: `${farYear}-12-31`,
+    };
 
     async function renderAndPickYear(income: DividendIncomeDTO, year: number) {
       const qc = makeTestQueryClient();
@@ -193,23 +202,21 @@ describe("DividendsPage", () => {
       await userEvent.selectOptions(screen.getByLabelText("Year"), String(year));
     }
 
-    it("stays silent on the current year, which the forecast covers in full", async () => {
-      await renderAndPickYear(withHorizon, today.getFullYear());
-      expect(screen.queryByText(/only forecast to/i)).not.toBeInTheDocument();
+    it("offers the year three ahead and charts it from the long-range rows", async () => {
+      await renderAndPickYear(withLongRange, farYear);
+      expect(screen.queryByText(`No income recorded for ${farYear}.`)).not.toBeInTheDocument();
+      expect(screen.getByTestId("year-total")).toHaveTextContent("$12.00");
     });
 
-    it("explains the empty months when the picked year runs past the forecast", async () => {
-      await renderAndPickYear(withHorizon, today.getFullYear() + 1);
-      const note = await screen.findByText(/only forecast to/i);
-      expect(note).toBeInTheDocument();
-      // Names the server's own horizon rather than a date the web app invented.
-      expect(note).toHaveTextContent(String(new Date(`${horizon}T00:00:00`).getFullYear()));
+    it("says what a long-range year's amounts assume, from the first such payment", async () => {
+      await renderAndPickYear(withLongRange, farYear);
+      const note = await screen.findByText(/amounts assume today's holdings/i);
+      expect(note).toHaveTextContent(String(farYear));
     });
 
-    it("says nothing when the payload carries no horizon to name", async () => {
-      // An older API. Guessing one would print a promise the server never made.
-      await renderAndPickYear(FIXTURE_INCOME, today.getFullYear() + 1);
-      expect(screen.queryByText(/only forecast to/i)).not.toBeInTheDocument();
+    it("stays silent on a year with no long-range payments", async () => {
+      await renderAndPickYear(withLongRange, today.getFullYear());
+      expect(screen.queryByText(/amounts assume today's holdings/i)).not.toBeInTheDocument();
     });
   });
 
@@ -353,14 +360,15 @@ describe("DividendsPage", () => {
     const emptyYear = today.getFullYear() - 1;
     const income: DividendIncomeDTO = {
       ...FIXTURE_INCOME,
-      // A paid payment in the empty year, so the picker offers it — but no
-      // breakdown row for it, which is the state that used to slip through.
+      // A payment the year BEFORE the empty one, so the picker's span covers
+      // the empty year while nothing at all is paid in it. (The bars read the
+      // payments now, so a payment inside the year would rightly be charted.)
       retroactive: [
         ...FIXTURE_INCOME.retroactive,
         {
           ...FIXTURE_INCOME.retroactive[0]!,
-          exDate: `${emptyYear}-07-01`,
-          paymentDate: `${emptyYear}-07-01`,
+          exDate: `${emptyYear - 1}-07-01`,
+          paymentDate: `${emptyYear - 1}-07-01`,
         },
       ],
     };
@@ -391,28 +399,22 @@ describe("DividendsPage", () => {
     const nextYear = thisYear + 1;
     const income: DividendIncomeDTO = {
       ...FIXTURE_INCOME,
-      summary: {
-        ...FIXTURE_INCOME.summary,
-        // Both years need a bar to click; the picker's span comes from the
-        // payments, not from this.
-        monthlyBreakdown: [
-          {
-            month: `${thisYear}-01`,
-            retroactive: "2.71",
-            announced: "0",
-            projected: "0",
-            currency: "USD",
-          },
-          {
-            month: `${nextYear}-06`,
-            retroactive: "0",
-            announced: "0",
-            projected: "5.00",
-            currency: "USD",
-          },
-        ],
-        receivedByYear: [],
-      },
+      // Both years need a bar to click. This year's January comes from the
+      // fixture's paid row; next June from this projected one.
+      projected: [
+        {
+          symbol: "O",
+          name: "Realty Income",
+          projectedExDate: `${nextYear}-06-01`,
+          paymentDate: `${nextYear}-06-15`,
+          paymentDateEstimated: true,
+          confidence: "high",
+          amountPerShare: "0.50",
+          shares: "10",
+          income: "5.00",
+          currency: "USD",
+        },
+      ],
     };
 
     const qc = makeTestQueryClient();

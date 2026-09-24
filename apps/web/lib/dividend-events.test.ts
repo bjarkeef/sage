@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { buildCalendarEvents } from "./dividend-events";
-import type { RetroactiveIncomeRowDTO, AnnouncedDividendDTO, ProjectedIncomeRowDTO } from "./types";
+import type {
+  RetroactiveIncomeRowDTO,
+  AnnouncedDividendDTO,
+  ProjectedIncomeRowDTO,
+  LongRangeIncomeRowDTO,
+} from "./types";
 
 // Fixed, explicitly-passed "today". Never `new Date()` — a fixture that reads
 // the real clock rots into a red build the day the window moves past it.
@@ -80,5 +85,38 @@ describe("buildCalendarEvents", () => {
     const map = buildCalendarEvents([], [announced], [projected], TODAY);
     expect(map.get("2026-09-15")![0]!.type).toBe("announced");
     expect(map.get("2026-10-16")![0]!.type).toBe("projected");
+  });
+
+  it("brings long-range rows in as projected events that say so", () => {
+    const projected: ProjectedIncomeRowDTO = {
+      symbol: "O",
+      name: "Realty Income Corporation",
+      projectedExDate: "2026-09-30",
+      paymentDate: "2026-10-16",
+      paymentDateEstimated: true,
+      amountPerShare: "0.271",
+      shares: "20",
+      income: "5.42",
+      currency: "USD",
+      confidence: "high",
+    };
+    const longRange: LongRangeIncomeRowDTO = {
+      ...projected,
+      projectedExDate: "2028-09-29",
+      paymentDate: "2028-10-16",
+      income: "5.88",
+      growthPct: 4.2,
+    };
+
+    const map = buildCalendarEvents([], [], [projected], TODAY, [longRange]);
+    const near = map.get("2026-10-16")![0]!;
+    const far = map.get("2028-10-16")![0]!;
+    expect(near.longRange).toBeUndefined();
+    expect(far).toMatchObject({
+      type: "projected",
+      longRange: true,
+      growthPct: 4.2,
+      income: "5.88",
+    });
   });
 });

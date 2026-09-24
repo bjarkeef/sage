@@ -25,7 +25,7 @@ import {
   yearProgressFromEvents,
   paymentYearBounds,
   monthlyTotalsForYear,
-  yearRunsPastForecast,
+  breakdownFromEvents,
 } from "../../../lib/dividend-year";
 import { buildCalendarEvents } from "../../../lib/dividend-events";
 import { DividendStatusFilter } from "../../../components/dividend/dividend-status-filter";
@@ -125,6 +125,7 @@ export default function DividendsPage() {
               data.announced,
               data.projected,
               todayIso,
+              data.longRange ?? [],
             ).values(),
           ].flat()
         : [],
@@ -144,13 +145,18 @@ export default function DividendsPage() {
   );
   const selectedYear = calendarDate.getFullYear();
 
-  // The year picker offers next year in full while projections stop one year
-  // from today, so picking next year renders its later months as an empty
-  // calendar — which reads as "this portfolio earns nothing then", the opposite
-  // of what is true. Predicate and date both come from shared code so the note
-  // can never name a date the projection did not honour.
-  const horizonIso = data?.projectedThrough;
-  const yearRunsPastHorizon = yearRunsPastForecast(selectedYear, now, horizonIso);
+  // Past the 12-month forecast the amounts rest on an assumption, not on
+  // announcements or recent payments, so a year containing any says so, naming
+  // the date the assumption starts rather than a date the web app invented.
+  const firstLongRange = React.useMemo(
+    () =>
+      events
+        .filter((e) => e.longRange)
+        .map((e) => e.date)
+        .sort()[0] ?? null,
+    [events],
+  );
+  const yearHasLongRange = events.some((e) => e.longRange && e.date.startsWith(`${selectedYear}-`));
 
   const yieldMap = React.useMemo(() => {
     if (!income || !portfolio) return undefined;
@@ -181,14 +187,16 @@ export default function DividendsPage() {
       ),
     [events, selectedYear, activeStatuses],
   );
-  // The chart's own empty state, scoped to the year its copy names. Guarded on
-  // the whole payload it rendered twelve zero bars for an empty year whenever
-  // any OTHER year had income.
-  const yearHasBreakdown = React.useMemo(
-    () =>
-      (data?.summary.monthlyBreakdown ?? []).some((m) => m.month.startsWith(`${selectedYear}-`)),
-    [data?.summary.monthlyBreakdown, selectedYear],
+  // The bars read the same events as the hero, grid and list. The server's
+  // `monthlyBreakdown` covers only the 12-month forecast and drops rows FX
+  // could not convert, so bars drawn from it went empty under a long-range
+  // year and disagreed with the hero when FX was incomplete.
+  const breakdown = React.useMemo(
+    () => breakdownFromEvents(events, selectedYear),
+    [events, selectedYear],
   );
+  // The chart's own empty state, scoped to the year its copy names.
+  const yearHasBreakdown = breakdown.length > 0;
 
   if (loading && !data) {
     return (
@@ -273,7 +281,7 @@ export default function DividendsPage() {
             <Card compact>
               {yearHasBreakdown ? (
                 <DividendIncomeBars
-                  data={data.summary.monthlyBreakdown}
+                  data={breakdown}
                   year={selectedYear}
                   currentMonth={currentMonth}
                   selectedMonth={selectedMonth}
@@ -293,22 +301,19 @@ export default function DividendsPage() {
             </Card>
           </section>
 
-          {/* Directly under the monthly bars rather than at the foot of the
-              page: the empty months are visible *here*, and a calendar grid's
-              worth of scrolling between the gap and its explanation is the same
-              as having no explanation. */}
-          {yearRunsPastHorizon && (
+          {/* Directly under the bars it qualifies, not at the foot of the page. */}
+          {yearHasLongRange && firstLongRange && (
             <p className="-mt-6 mb-8 text-xs text-muted-foreground">
-              Payments are only forecast to {formatDate(horizonIso!, { year: "always" })}. Later
-              months in {selectedYear} are empty because the forecast ends there, not because
-              nothing is expected — for a longer horizon see{" "}
+              From {formatDate(firstLongRange, { year: "always" })}, amounts assume today&apos;s
+              holdings, each dividend grown at its own rate. No new buys or reinvestment; for those,
+              see{" "}
               <Link
                 href="/goal"
                 className="underline decoration-dotted underline-offset-2 hover:text-foreground"
               >
                 your goal
               </Link>
-              , which projects income across scenarios.
+              .
             </p>
           )}
 
