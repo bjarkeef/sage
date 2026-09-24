@@ -264,6 +264,28 @@ describe("DividendCalendarGrid", () => {
     currency: "DKK",
   };
 
+  // The chip's yield is today's. A long-range amount is grown, and its year's
+  // yield would depend on a price Sage has no forecast for, so under a 2028
+  // amount today's figure reads as a claim about 2028. Near-term projected
+  // payments keep it: for them, today's yield is the right one.
+  it("shows no yield % on a long-range payment", () => {
+    render(
+      <DividendCalendarGrid
+        projected={[{ ...projectedTaskThree, symbol: "NEAR", confidence: "high" }]}
+        longRange={[{ ...projectedTaskThree, paymentDate: "2026-07-30", growthPct: 4.2 }]}
+        viewDate={new Date(2026, 6, 1)}
+        yieldBySymbol={
+          new Map([
+            ["KESTRL", 5.88],
+            ["NEAR", 3.1],
+          ])
+        }
+      />,
+    );
+    expect(screen.queryByText("5.88%")).not.toBeInTheDocument();
+    expect(screen.getByText("3.10%")).toBeInTheDocument();
+  });
+
   it("shows a holding's yield % on its day card", () => {
     render(
       <DividendCalendarGrid

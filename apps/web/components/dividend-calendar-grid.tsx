@@ -276,7 +276,7 @@ export function DividendCalendarGrid({
                                 ? formatMoney({ amount: event.income, currency: event.currency })
                                 : "—"}
                             </div>
-                            {yieldBySymbol?.has(event.symbol) && (
+                            {!event.longRange && yieldBySymbol?.has(event.symbol) && (
                               <div className="font-mono text-xs text-income">
                                 {yieldBySymbol.get(event.symbol)!.toFixed(2)}%
                               </div>
