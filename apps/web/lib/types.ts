@@ -168,6 +168,13 @@ export interface ProjectedIncomeRowDTO {
   currency: string;
 }
 
+/** A calendar-only forecast row past the 12-month horizon. */
+export interface LongRangeIncomeRowDTO extends ProjectedIncomeRowDTO {
+  /** Yearly dividend growth applied, in percent; null when none was (a custom
+   *  holding, or too little history for a 5-year rate). */
+  growthPct: number | null;
+}
+
 export interface AnnouncedDividendDTO {
   symbol: string;
   name: string;
@@ -231,12 +238,15 @@ export interface DividendIncomeDTO {
   /** Single configurable dividend tax rate (0-100), null when unset. Drives
    *  the Yield card's net-after-tax headline; see `apps/web/lib/portfolio-yields.ts`. */
   dividendTaxRate: number | null;
-  /** The last date any projection in this payload reaches. The year picker
-   *  offers next year in full, so months past this date are empty for want of
-   *  a forecast rather than for want of payments — see `yearRunsPastForecast`.
-   *  Server-sent: the projection rule lives in `@sage/core`, which the web app
-   *  deliberately does not depend on. */
+  /** The last ex-date of the 12-month forecast in `projected`. Server-sent: the
+   *  projection rule lives in `@sage/core`, which the web app deliberately does
+   *  not depend on. */
   projectedThrough?: string;
+  /** Calendar-only forecast after `projectedThrough`, through
+   *  `longRangeThrough` (31 December three years out). Optional: an older API
+   *  sends neither. */
+  longRange?: LongRangeIncomeRowDTO[];
+  longRangeThrough?: string;
   /** True when a received dividend was excluded from totals for want of an FX rate. */
   fxIncomplete: boolean;
   /** True when the stored ECB rates used for conversion are older than the

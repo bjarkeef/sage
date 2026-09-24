@@ -6,6 +6,7 @@ import { buildCalendarEvents } from "../lib/dividend-events";
 import { paymentYearBounds } from "../lib/dividend-year";
 import type {
   AnnouncedDividendDTO,
+  LongRangeIncomeRowDTO,
   ProjectedIncomeRowDTO,
   RetroactiveIncomeRowDTO,
 } from "../lib/types";
@@ -67,15 +68,17 @@ function DividendCalendarGrid({
   retroactive = [],
   announced = [],
   projected = [],
+  longRange = [],
   ...rest
 }: {
   retroactive?: RetroactiveIncomeRowDTO[];
   announced?: AnnouncedDividendDTO[];
   projected?: ProjectedIncomeRowDTO[];
+  longRange?: LongRangeIncomeRowDTO[];
 } & Omit<React.ComponentProps<typeof Grid>, "events" | "bounds">) {
   const now = new Date();
   const events = [
-    ...buildCalendarEvents(retroactive, announced, projected, iso(now)).values(),
+    ...buildCalendarEvents(retroactive, announced, projected, iso(now), longRange).values(),
   ].flat();
   return <Grid events={events} bounds={paymentYearBounds(events, now)} {...rest} />;
 }
@@ -120,6 +123,25 @@ describe("DividendCalendarGrid", () => {
     expect(annChip.className).toContain("border-certainty-confirmed-border");
     expect(projChip.className).toContain("border-dashed");
     expect(projChip.className).toContain("opacity-6"); // low-confidence modifier (opacity-65)
+  });
+
+  it.each([
+    [4.2, "Grown 4.2%/yr from today's dividend"],
+    [-2, "Cut 2.0%/yr from today's dividend"],
+    [null, "Today's amount, no growth applied"],
+  ])("says how a long-range payment was grown (%s)", async (growthPct, line) => {
+    const user = userEvent.setup();
+    render(
+      <DividendCalendarGrid
+        longRange={[{ ...projectedLow, confidence: "high", growthPct }]}
+        initialDate={new Date("2026-07-01T00:00:00Z")}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /HIVAR/ }));
+    expect(
+      screen.getByText("Estimated · long range", { selector: "[data-popover-status]" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(line)).toBeInTheDocument();
   });
 
   it("opens a detail popover with date chain, figures, and asset link on chip click", async () => {

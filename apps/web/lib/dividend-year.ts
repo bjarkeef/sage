@@ -42,47 +42,54 @@ function monthKey(d: Date): string {
 }
 
 /** The span the year picker offers: earliest year money actually arrived,
- *  through next year. Derived, never hardcoded — a constant here would rot. */
+ *  through the last year the forecast reaches (at least next year). Derived,
+ *  never hardcoded — a constant here would rot, and a fixed "+1" is what once
+ *  left the calendar unable to show a forecast the API had already sent. */
 export function paymentYearBounds(
   events: CalendarEvent[],
   today: Date,
 ): { first: number; last: number } {
   const currentYear = today.getFullYear();
   let first = currentYear;
+  let last = currentYear + 1;
   for (const e of events) {
+    const year = Number(e.date.slice(0, 4));
+    if (!Number.isFinite(year)) continue;
+    if (year > last) last = year;
     // Paid history only. A projection landing next January says nothing about
     // when this portfolio started earning.
-    if (e.type !== "paid") continue;
-    const year = Number(e.date.slice(0, 4));
-    if (Number.isFinite(year) && year < first) first = year;
+    if (e.type === "paid" && year < first) first = year;
   }
-  return { first, last: currentYear + 1 };
+  return { first, last };
 }
 
-/** True when the calendar year on screen runs past the last date Sage will
- *  project to — so its later months are empty for want of a forecast, not for
- *  want of payments.
- *
- *  The year picker offers next year in full (`paymentYearBounds` ends at
- *  `currentYear + 1`) while `projectDividendSchedule` stops one year from
- *  today, so the two disagree for most of the calendar. A past year is never
- *  flagged: it was never forecast, and its gaps are history.
- *
- *  `horizonIso` is the server's own `projectedThrough`, never recomputed here:
- *  the rule lives in `@sage/core`, which `apps/web` does not depend on, and a
- *  second copy would drift the moment the horizon moved. Undefined (an older
- *  API, or a payload that carries none) means say nothing rather than guess.
- *
- *  Note the boundary: on 31 December the horizon is next 31 December, next year
- *  is forecast in full, and this correctly returns false. */
-export function yearRunsPastForecast(
-  selectedYear: number,
-  today: Date,
-  horizonIso: string | undefined,
-): boolean {
-  if (horizonIso === undefined) return false;
-  if (selectedYear < today.getFullYear()) return false;
-  return `${selectedYear}-12-31` > horizonIso;
+/** The monthly bars' rows for `year`, built from the SAME events the hero,
+ *  grid and list read. The server's `monthlyBreakdown` only covers the 12-month
+ *  forecast and drops rows FX could not convert, so bars drawn from it went
+ *  empty under a long-range year and disagreed with the hero when FX was
+ *  incomplete. One row per month that has events; `currency` is `""` when a
+ *  month's rows disagree, so no label claims a unit it cannot have. */
+export function breakdownFromEvents(events: CalendarEvent[], year: number): MonthlyBreakdownDTO[] {
+  const byMonth = new Map<string, CalendarEvent[]>();
+  for (const e of events) {
+    if (!e.date.startsWith(`${year}-`)) continue;
+    const month = e.date.slice(0, 7);
+    byMonth.set(month, [...(byMonth.get(month) ?? []), e]);
+  }
+  const total = (rows: CalendarEvent[], type: CalendarStatus) =>
+    rows
+      .filter((e) => e.type === type)
+      .reduce((sum, e) => sum + Number(e.income), 0)
+      .toFixed(2);
+  return [...byMonth.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, rows]) => ({
+      month,
+      retroactive: total(rows, "paid"),
+      announced: total(rows, "announced"),
+      projected: total(rows, "projected"),
+      currency: sumIncome(rows)?.currency ?? "",
+    }));
 }
 
 /** Twelve rows, always, so a caller can index the year by month rather than
