@@ -39,6 +39,20 @@ describe("UpdatePriceDialog", () => {
     );
   });
 
+  it("sends a decimal-comma price with a dot", async () => {
+    renderWithClient(<UpdatePriceDialog symbol="CASH_DKK" currency="DKK" />, makeTestQueryClient());
+    fireEvent.click(screen.getByRole("button", { name: "Update price" }));
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-07-18" } });
+    fireEvent.change(screen.getByLabelText("Price"), { target: { value: "1,02" } });
+    fireEvent.click(screen.getByRole("button", { name: "Set price (DKK)" }));
+    await waitFor(() =>
+      expect(api.putPriceMark).toHaveBeenCalledWith("CASH_DKK", {
+        date: "2026-07-18",
+        price: "1.02",
+      }),
+    );
+  });
+
   it("shows an error and stays open when the request fails", async () => {
     vi.mocked(api.putPriceMark).mockRejectedValueOnce(new Error("price mark failed: 400"));
     renderWithClient(<UpdatePriceDialog symbol="CASH_DKK" currency="DKK" />, makeTestQueryClient());

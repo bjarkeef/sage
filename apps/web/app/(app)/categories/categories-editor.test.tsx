@@ -125,6 +125,16 @@ describe("CategoriesEditor — selection follows deletes", () => {
     fireEvent.change(screen.getByDisplayValue("40"), { target: { value: "-10" } });
     expect(screen.getByText("-10.0% targeted")).toBeInTheDocument();
   });
+
+  it("reads a decimal comma in a target, in the headline and on save", async () => {
+    const saveSpy = vi.spyOn(api, "saveCategories").mockResolvedValue(FIXTURE);
+    renderEditor();
+    fireEvent.change(screen.getByDisplayValue("40"), { target: { value: "12,5" } });
+    expect(screen.getByText("12.5% targeted")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(saveSpy).toHaveBeenCalledTimes(1));
+    expect(saveSpy.mock.calls[0]![0].categories[0]!.targetPct).toBe(12.5);
+  });
 });
 
 describe("CategoriesEditor — nesting", () => {

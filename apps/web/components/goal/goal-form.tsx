@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Card, Field, SegmentedControl, Input, Switch, Button } from "@sage/ui";
 import type { GoalDTO, GoalDefaultsDTO, PutGoalInput } from "../../lib/types";
+import { parseDecimalInput } from "../../lib/decimal-input";
 
 const MODES = [
   { label: "Passive income", value: "passive_income" },
@@ -14,10 +15,7 @@ const INCREASE_OPTIONS = [
   { label: "Custom %", value: "custom" },
 ] as const;
 
-function num(v: string): number | null {
-  const n = Number(v);
-  return v.trim() === "" || Number.isNaN(n) ? null : n;
-}
+const num = parseDecimalInput;
 
 /** Collapsible section header — plain button + chevron, no ui dependency. */
 function Section({
