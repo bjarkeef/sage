@@ -6,6 +6,7 @@ import { buildCalendarEvents } from "../lib/dividend-events";
 import { paymentYearBounds } from "../lib/dividend-year";
 import type {
   AnnouncedDividendDTO,
+  LongRangeIncomeRowDTO,
   ProjectedIncomeRowDTO,
   RetroactiveIncomeRowDTO,
 } from "../lib/types";
@@ -67,15 +68,17 @@ function DividendCalendarGrid({
   retroactive = [],
   announced = [],
   projected = [],
+  longRange = [],
   ...rest
 }: {
   retroactive?: RetroactiveIncomeRowDTO[];
   announced?: AnnouncedDividendDTO[];
   projected?: ProjectedIncomeRowDTO[];
+  longRange?: LongRangeIncomeRowDTO[];
 } & Omit<React.ComponentProps<typeof Grid>, "events" | "bounds">) {
   const now = new Date();
   const events = [
-    ...buildCalendarEvents(retroactive, announced, projected, iso(now)).values(),
+    ...buildCalendarEvents(retroactive, announced, projected, iso(now), longRange).values(),
   ].flat();
   return <Grid events={events} bounds={paymentYearBounds(events, now)} {...rest} />;
 }
@@ -120,6 +123,25 @@ describe("DividendCalendarGrid", () => {
     expect(annChip.className).toContain("border-certainty-confirmed-border");
     expect(projChip.className).toContain("border-dashed");
     expect(projChip.className).toContain("opacity-6"); // low-confidence modifier (opacity-65)
+  });
+
+  it.each([
+    [4.2, "Grown 4.2%/yr from today's dividend"],
+    [-2, "Cut 2.0%/yr from today's dividend"],
+    [null, "Today's amount, no growth applied"],
+  ])("says how a long-range payment was grown (%s)", async (growthPct, line) => {
+    const user = userEvent.setup();
+    render(
+      <DividendCalendarGrid
+        longRange={[{ ...projectedLow, confidence: "high", growthPct }]}
+        initialDate={new Date("2026-07-01T00:00:00Z")}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /HIVAR/ }));
+    expect(
+      screen.getByText("Estimated · long range", { selector: "[data-popover-status]" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(line)).toBeInTheDocument();
   });
 
   it("opens a detail popover with date chain, figures, and asset link on chip click", async () => {
@@ -241,6 +263,28 @@ describe("DividendCalendarGrid", () => {
     income: "10.31",
     currency: "DKK",
   };
+
+  // The chip's yield is today's. A long-range amount is grown, and its year's
+  // yield would depend on a price Sage has no forecast for, so under a 2028
+  // amount today's figure reads as a claim about 2028. Near-term projected
+  // payments keep it: for them, today's yield is the right one.
+  it("shows no yield % on a long-range payment", () => {
+    render(
+      <DividendCalendarGrid
+        projected={[{ ...projectedTaskThree, symbol: "NEAR", confidence: "high" }]}
+        longRange={[{ ...projectedTaskThree, paymentDate: "2026-07-30", growthPct: 4.2 }]}
+        viewDate={new Date(2026, 6, 1)}
+        yieldBySymbol={
+          new Map([
+            ["KESTRL", 5.88],
+            ["NEAR", 3.1],
+          ])
+        }
+      />,
+    );
+    expect(screen.queryByText("5.88%")).not.toBeInTheDocument();
+    expect(screen.getByText("3.10%")).toBeInTheDocument();
+  });
 
   it("shows a holding's yield % on its day card", () => {
     render(

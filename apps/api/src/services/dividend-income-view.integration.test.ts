@@ -144,6 +144,128 @@ describeDb("buildDividendIncomeView — custom holding income projection", () =>
     const projectedSummary = Number(view.summary.projectedTwelveMonthIncome[0]!.amount);
     expect(projectedSummary).toBeCloseTo(expectedTotal, 2);
   });
+
+  it("carries the schedule on through the long range, ungrown", async () => {
+    const provider = new FakeMarketDataProvider();
+    const view = await buildDividendIncomeView({ db: t.db, provider }, userId, { currency: null });
+
+    const rows = view.longRange.filter((r) => r.symbol === "CASH_DKK");
+    expect(rows[0]!.projectedExDate).toBe("2027-07-30");
+    expect(rows.at(-1)!.projectedExDate).toBe("2029-10-30");
+    expect(rows).toHaveLength(10);
+    expect(rows.every((r) => r.growthPct === null)).toBe(true);
+  });
+});
+
+describeDb("buildDividendIncomeView — long range", () => {
+  let t: TestDb;
+
+  /** Quarterly history 2020–mid 2026, the per-share amount scaled by `factor`
+   *  each year: a steady raiser or a steady cutter with five full years. */
+  function quarterlyHistory(symbol: string, start: number, factor: number) {
+    const rows = [];
+    for (let year = 2020; year <= 2026; year++) {
+      for (const md of ["03-15", "06-15", "09-15", "12-15"]) {
+        const exDate = `${year}-${md}`;
+        if (exDate > "2026-06-30") continue;
+        rows.push({
+          symbol,
+          exDate,
+          amountPerShare: (start * factor ** (year - 2020)).toFixed(4),
+          currency: "USD",
+          paymentDate: exDate,
+          paymentDateEstimated: false,
+          period: "Quarterly",
+        });
+      }
+    }
+    return rows;
+  }
+
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: NOW });
+    t = await withTestDb();
+    await t.db.insert(user).values([
+      {
+        id: "lr-grow",
+        name: "G",
+        email: "g@x.dk",
+        emailVerified: true,
+        allowNegativeDividendGrowth: false,
+      },
+      {
+        id: "lr-neg",
+        name: "N",
+        email: "n@x.dk",
+        emailVerified: true,
+        allowNegativeDividendGrowth: true,
+      },
+    ]);
+    await t.db.insert(instrument).values([
+      { symbol: "RISECO", name: "Rise Co", exchange: "XNYS", currency: "USD", assetType: "stock" },
+      { symbol: "FALLCO", name: "Fall Co", exchange: "XNYS", currency: "USD", assetType: "stock" },
+    ]);
+    await t.db
+      .insert(dividendHistory)
+      .values([...quarterlyHistory("RISECO", 0.5, 1.1), ...quarterlyHistory("FALLCO", 1, 0.9)]);
+    for (const userId of ["lr-grow", "lr-neg"]) {
+      const [pf] = await t.db
+        .insert(portfolio)
+        .values({ userId, name: "Main" })
+        .returning({ id: portfolio.id });
+      await t.db.insert(transaction).values(
+        ["RISECO", "FALLCO"].map((instrumentSymbol) => ({
+          portfolioId: pf!.id,
+          instrumentSymbol,
+          type: "buy",
+          quantity: "10",
+          price: "20",
+          currency: "USD",
+          tradeDate: "2019-06-03",
+        })),
+      );
+    }
+  }, 120_000);
+
+  afterAll(async () => {
+    vi.useRealTimers();
+    await t.stop();
+  });
+
+  const build = (userId: string) =>
+    buildDividendIncomeView({ db: t.db, provider: new FakeMarketDataProvider() }, userId, {
+      currency: null,
+    });
+
+  it("starts after the 12-month forecast and ends on 31 December three years out", async () => {
+    const view = await build("lr-grow");
+    expect(view.longRangeThrough).toBe("2029-12-31");
+    expect(view.projected.length).toBeGreaterThan(0);
+    const firstLong = view.longRange.map((r) => r.projectedExDate).sort()[0]!;
+    expect(firstLong > view.projectedThrough).toBe(true);
+    expect(view.longRange.every((r) => r.projectedExDate <= "2029-12-31")).toBe(true);
+    const shortKeys = new Set(view.projected.map((r) => `${r.symbol}|${r.projectedExDate}`));
+    expect(view.longRange.some((r) => shortKeys.has(`${r.symbol}|${r.projectedExDate}`))).toBe(
+      false,
+    );
+  });
+
+  it("grows a rising payer and holds a falling one flat when negatives are off", async () => {
+    const view = await build("lr-grow");
+    const rise = view.longRange.filter((r) => r.symbol === "RISECO");
+    expect(rise[0]!.growthPct).toBeCloseTo(10, 0);
+    expect(Number(rise.at(-1)!.amountPerShare)).toBeGreaterThan(Number(rise[0]!.amountPerShare));
+    const fall = view.longRange.filter((r) => r.symbol === "FALLCO");
+    expect(fall[0]!.growthPct).toBe(0);
+    expect(new Set(fall.map((r) => r.amountPerShare)).size).toBe(1);
+  });
+
+  it("lets a falling payer shrink when negatives are allowed", async () => {
+    const view = await build("lr-neg");
+    const fall = view.longRange.filter((r) => r.symbol === "FALLCO");
+    expect(fall[0]!.growthPct).toBeCloseTo(-10, 0);
+    expect(Number(fall.at(-1)!.amountPerShare)).toBeLessThan(Number(fall[0]!.amountPerShare));
+  });
 });
 
 describeDb("buildDividendIncomeView — history from the ledger", () => {

@@ -1,4 +1,9 @@
-import type { RetroactiveIncomeRowDTO, AnnouncedDividendDTO, ProjectedIncomeRowDTO } from "./types";
+import type {
+  RetroactiveIncomeRowDTO,
+  AnnouncedDividendDTO,
+  ProjectedIncomeRowDTO,
+  LongRangeIncomeRowDTO,
+} from "./types";
 
 /** The three states a calendar payment can be in. `paid` is money that has
  *  arrived, `announced` is declared by the issuer, `projected` is Sage's own
@@ -18,6 +23,10 @@ export interface CalendarEvent {
   type: CalendarStatus;
   estimated?: boolean;
   lowConfidence?: boolean;
+  /** Past the 12-month forecast: today's holdings, the dividend grown by
+   *  `growthPct` a year (null: not grown). */
+  longRange?: boolean;
+  growthPct?: number | null;
   amountPerShare: string | null;
   shares: string | null;
   declarationDate: string | null;
@@ -41,6 +50,7 @@ export function buildCalendarEvents(
   announced: AnnouncedDividendDTO[],
   projected: ProjectedIncomeRowDTO[],
   todayIso: string,
+  longRange: LongRangeIncomeRowDTO[] = [],
 ): Map<string, CalendarEvent[]> {
   const map = new Map<string, CalendarEvent[]>();
   const push = (key: string, event: CalendarEvent) => {
@@ -87,9 +97,9 @@ export function buildCalendarEvents(
     });
   }
 
-  for (const p of projected) {
+  const projectedEvent = (p: ProjectedIncomeRowDTO): CalendarEvent => {
     const key = p.paymentDate ?? p.projectedExDate;
-    push(key, {
+    return {
       date: key,
       symbol: p.symbol,
       name: p.name,
@@ -104,7 +114,15 @@ export function buildCalendarEvents(
       exDate: p.projectedExDate,
       recordDate: null,
       paymentDate: p.paymentDate,
-    });
+    };
+  };
+  for (const p of projected) {
+    const event = projectedEvent(p);
+    push(event.date, event);
+  }
+  for (const p of longRange) {
+    const event = { ...projectedEvent(p), longRange: true, growthPct: p.growthPct };
+    push(event.date, event);
   }
 
   return map;
