@@ -303,7 +303,10 @@ export function DividendCalendarGrid({
                           </div>
                           {event.longRange && (
                             <div className="text-xs text-muted-foreground">
-                              {growthLine(event.growthPct ?? null)}
+                              {growthLine(
+                                event.growthPct ?? null,
+                                event.growthCappedFromPct ?? null,
+                              )}
                             </div>
                           )}
                           <div className="mt-4 grid grid-cols-4 gap-2">
@@ -376,11 +379,13 @@ export function DividendCalendarGrid({
   );
 }
 
-/** How a long-range payment's amount was reached, for its popover. */
-function growthLine(growthPct: number | null): string {
+/** How a long-range payment's amount was reached, for its popover. A capped
+ *  rate names the history it was capped from, so the cap is never silent. */
+function growthLine(growthPct: number | null, cappedFromPct: number | null): string {
   if (growthPct === null) return "Today's amount, no growth applied";
   const pct = Math.abs(growthPct).toFixed(1);
-  return growthPct < 0
-    ? `Cut ${pct}%/yr from today's dividend`
-    : `Grown ${pct}%/yr from today's dividend`;
+  if (growthPct < 0) return `Cut ${pct}%/yr from today's dividend`;
+  const capped =
+    cappedFromPct === null ? "" : ` (capped; its 5-year rate is ${cappedFromPct.toFixed(1)}%)`;
+  return `Grown ${pct}%/yr from today's dividend${capped}`;
 }

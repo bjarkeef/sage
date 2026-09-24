@@ -27,6 +27,8 @@ export interface CalendarEvent {
    *  `growthPct` a year (null: not grown). */
   longRange?: boolean;
   growthPct?: number | null;
+  /** The 5-year rate the forward cap lowered `growthPct` from, if it did. */
+  growthCappedFromPct?: number | null;
   amountPerShare: string | null;
   shares: string | null;
   declarationDate: string | null;
@@ -121,7 +123,12 @@ export function buildCalendarEvents(
     push(event.date, event);
   }
   for (const p of longRange) {
-    const event = { ...projectedEvent(p), longRange: true, growthPct: p.growthPct };
+    const event = {
+      ...projectedEvent(p),
+      longRange: true,
+      growthPct: p.growthPct,
+      growthCappedFromPct: p.growthCappedFromPct ?? null,
+    };
     push(event.date, event);
   }
 
