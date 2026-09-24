@@ -6,6 +6,11 @@ import { filterMonthlyBreakdown, monthsOfYear, sumIncome } from "../lib/dividend
 import type { CalendarStatus } from "../lib/dividend-events";
 import { CERTAINTY_FILL, CertaintyBarsLegend } from "./charts/certainty-bars";
 
+const COMPACT = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 0,
+});
+
 interface DividendIncomeBarsProps {
   data: MonthlyBreakdownDTO[];
   year: number; // the calendar year to chart
@@ -69,7 +74,10 @@ export function DividendIncomeBars({
   const avgPercent = max > 0 ? 100 - (avg / max) * 100 : 100;
 
   return (
-    <div>
+    // A container, so the columns can answer to the card's width rather than
+    // the viewport's: the same card is ~300px on a phone and ~800px beside the
+    // year summary on desktop.
+    <div className="@container">
       <div className="relative">
         {monthSum && avg > 0 && (
           <div
@@ -79,7 +87,9 @@ export function DividendIncomeBars({
             <span className="absolute -top-3 right-0 font-mono text-xs text-primary/60">avg</span>
           </div>
         )}
-        <div className="flex items-end gap-1.5" style={{ height: 160 }}>
+        {/* Twelve columns share a ~303px content box at 375px. The gap tightens
+            below @md so each column keeps ~23px — room for a mono "Dec". */}
+        <div className="flex items-end gap-0.5 @md:gap-1.5" style={{ height: 160 }}>
           {months.map((d) => {
             const retroVal = Number(d.retroactive);
             const annVal = Number(d.announced);
@@ -105,6 +115,11 @@ export function DividendIncomeBars({
             // chart replaces, so the tooltip is where it survives.
             const payers = payersByMonth?.get(d.month) ?? 0;
             const payerNote = payers > 0 ? `, ${payers} payer${payers === 1 ? "" : "s"}` : "";
+            // A 23px phone column holds three mono digits, so four-digit months
+            // shorten to "1K" there rather than spill into their neighbours;
+            // the exact figure stays in the tooltip, and a wide card shows it.
+            const fullValue = String(Math.round(total));
+            const shortValue = COMPACT.format(total);
             const tooltip = `${d.month}: paid ${retroVal.toFixed(2)}, confirmed ${annVal.toFixed(2)}, estimated ${projVal.toFixed(2)} ${d.currency}${payerNote}`;
 
             return (
@@ -114,13 +129,23 @@ export function DividendIncomeBars({
                 title={tooltip}
                 aria-current={isSelected ? "true" : undefined}
                 onClick={() => onMonthSelect?.(d.month)}
-                className={`flex flex-1 cursor-pointer flex-col items-center gap-1 rounded-control border-0 p-0 pb-0.5 ${isSelected ? "bg-surface-active ring-1 ring-inset ring-primary/60" : "bg-transparent"}`}
+                className={`flex min-w-0 flex-1 cursor-pointer flex-col items-center gap-1 rounded-control border-0 p-0 pb-0.5 ${isSelected ? "bg-surface-active ring-1 ring-inset ring-primary/60" : "bg-transparent"}`}
               >
-                {total > 0 && (
-                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                    {Math.round(total)}
-                  </span>
-                )}
+                {total > 0 &&
+                  (shortValue === fullValue ? (
+                    <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                      {fullValue}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="hidden font-mono text-xs tabular-nums text-muted-foreground @md:inline">
+                        {fullValue}
+                      </span>
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground @md:hidden">
+                        {shortValue}
+                      </span>
+                    </>
+                  ))}
                 <div className="flex w-full flex-col" style={{ height }}>
                   {projHeight > 0 && (
                     <div
