@@ -162,8 +162,19 @@ function medianPaymentLag(history: DividendHistoryRow[]): number {
  *  opposite claim. A second copy of the one-year rule living in the web app
  *  would drift the first time the horizon moved; this is the single source. */
 export function projectionHorizonIso(asOf: Date): string {
+  return addYearsIso(asOf, 1);
+}
+
+/** The last ex-date of the dividends calendar's long-range list: 31 December,
+ *  three years on. Calendar-only; the 12-month figures keep
+ *  `projectionHorizonIso`. */
+export function longRangeThroughIso(asOf: Date): string {
+  return `${asOf.getUTCFullYear() + 3}-12-31`;
+}
+
+function addYearsIso(asOf: Date, years: number): string {
   const d = new Date(asOf);
-  d.setUTCFullYear(d.getUTCFullYear() + 1);
+  d.setUTCFullYear(d.getUTCFullYear() + years);
   return d.toISOString().slice(0, 10);
 }
 
@@ -184,6 +195,12 @@ export function projectionHorizonIso(asOf: Date): string {
  * All generated ex-dates are strictly `> asOf` and `<= asOf + 12 months`, and
  * never collide with an announced date, so nothing is double counted. Pure: no
  * `Date.now()`; `asOf` is supplied by the caller.
+ *
+ * `through` moves that end date (the dividends calendar runs three years out)
+ * and `growth` raises generated amounts by a yearly fraction, stepping once per
+ * anniversary of `asOf`. Neither touches the first year, so without them, or
+ * with growth 0, the output is exactly the 12-month forecast. Announced
+ * amounts are declared, so they are never grown.
  */
 export function projectDividendSchedule(input: {
   symbol: string;
@@ -191,10 +208,21 @@ export function projectDividendSchedule(input: {
   history: DividendHistoryRow[];
   announced: AnnouncedDividendInput[];
   asOf: Date;
+  through?: string;
+  growth?: Decimal;
 }): ProjectedDividendRow[] {
   const { symbol, quantity, history, announced, asOf } = input;
   const asOfIso = asOf.toISOString().slice(0, 10);
-  const windowEndIso = projectionHorizonIso(asOf);
+  const windowEndIso = input.through ?? projectionHorizonIso(asOf);
+  const growth = input.growth ?? new Decimal(0);
+  // k = 0 through the first anniversary (inclusive, the horizon's own `<=`),
+  // 1 through the second, and so on.
+  const grown = (exDate: string, amount: Decimal): Decimal => {
+    if (growth.isZero()) return amount;
+    let k = 0;
+    while (exDate > addYearsIso(asOf, k + 1)) k++;
+    return k === 0 ? amount : amount.times(growth.plus(1).pow(k)).toDecimalPlaces(6);
+  };
 
   const rows: ProjectedDividendRow[] = announced
     .filter((a) => a.exDate <= windowEndIso)
@@ -223,7 +251,8 @@ export function projectDividendSchedule(input: {
   const announcedDates = announced.map((a) => a.exDate);
   const collides = (exDate: string) =>
     announcedDates.some((d) => Math.abs(daysBetween(d, exDate)) < ANNOUNCED_COLLISION_DAYS);
-  const pushProjected = (exDate: string, amount: Decimal, confidence: "high" | "low") => {
+  const pushProjected = (exDate: string, base: Decimal, confidence: "high" | "low") => {
+    const amount = grown(exDate, base);
     rows.push({
       symbol,
       kind: "projected",
@@ -239,17 +268,18 @@ export function projectDividendSchedule(input: {
   };
 
   if (frequency === "irregular") {
-    // Repeat-last-year fallback: shift each trailing-12M payment forward a year.
+    // Repeat-last-year fallback: shift each trailing-12M payment forward a
+    // year, and again each further year up to the window's end.
     const cutoff = isoAddDays(asOfIso, -365);
     for (const r of cleaned) {
       if (r.exDate <= cutoff || r.exDate > asOfIso) continue;
-      const nextEx = (() => {
-        const d = new Date(`${r.exDate}T00:00:00Z`);
-        d.setUTCFullYear(d.getUTCFullYear() + 1);
-        return d.toISOString().slice(0, 10);
-      })();
-      if (nextEx <= asOfIso || nextEx > windowEndIso || collides(nextEx)) continue;
-      pushProjected(nextEx, new Decimal(r.amountPerShare), "low");
+      const exDate = new Date(`${r.exDate}T00:00:00Z`);
+      for (let years = 1; ; years++) {
+        const nextEx = addYearsIso(exDate, years);
+        if (nextEx > windowEndIso) break;
+        if (nextEx <= asOfIso || collides(nextEx)) continue;
+        pushProjected(nextEx, new Decimal(r.amountPerShare), "low");
+      }
     }
     return rows.sort((a, b) => a.exDate.localeCompare(b.exDate));
   }

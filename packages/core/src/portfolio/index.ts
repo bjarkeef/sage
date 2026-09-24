@@ -28,6 +28,7 @@ export {
   regularDividendAmount,
   projectDividendSchedule,
   projectionHorizonIso,
+  longRangeThroughIso,
   classifyDividendTrend,
   clampDividendGrowth,
   FREQUENCY_INTERVAL_DAYS,
