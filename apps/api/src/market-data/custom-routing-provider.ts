@@ -11,6 +11,17 @@ import type {
 import type { Database } from "../db/client";
 import { instrument } from "../db/schema";
 
+/** A user-defined instrument (instrument.asset_type = 'custom'), which no
+ *  third-party provider knows about or should be asked about. */
+export async function isCustomSymbol(db: Database, symbol: string): Promise<boolean> {
+  const rows = await db
+    .select({ assetType: instrument.assetType })
+    .from(instrument)
+    .where(eq(instrument.symbol, symbol))
+    .limit(1);
+  return rows[0]?.assetType === "custom";
+}
+
 /**
  * Routes custom instruments (instrument.asset_type = 'custom') to the local
  * manual-price provider — authoritatively, with NO fallthrough — and every
@@ -25,13 +36,8 @@ export class CustomRoutingProvider implements IMarketDataProvider {
     private readonly upstream: IMarketDataProvider,
   ) {}
 
-  private async isCustom(symbol: string): Promise<boolean> {
-    const rows = await this.db
-      .select({ assetType: instrument.assetType })
-      .from(instrument)
-      .where(eq(instrument.symbol, symbol))
-      .limit(1);
-    return rows[0]?.assetType === "custom";
+  private isCustom(symbol: string): Promise<boolean> {
+    return isCustomSymbol(this.db, symbol);
   }
 
   private async route(symbol: string): Promise<IMarketDataProvider> {
