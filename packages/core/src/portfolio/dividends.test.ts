@@ -13,6 +13,7 @@ import {
   regularDividendAmount,
   projectDividendSchedule,
   projectionHorizonIso,
+  longRangeThroughIso,
   classifyDividendTrend,
   clampDividendGrowth,
   type DividendHistoryRow,
@@ -423,6 +424,87 @@ describe("projectDividendSchedule", () => {
     expect(projected.every((r) => r.exDate > "2026-06-30")).toBe(true);
     expect(projected.every((r) => r.exDate <= "2027-07-03")).toBe(true);
   });
+
+  describe("long range", () => {
+    const quarterly = (exDate: string, amount = "1.00"): DividendHistoryRow => ({
+      symbol: "RISECO",
+      exDate,
+      amountPerShare: amount,
+      currency: "USD",
+      paymentDate: null,
+      period: "Quarterly",
+    });
+    const history = [
+      quarterly("2025-09-15"),
+      quarterly("2025-12-15"),
+      quarterly("2026-03-16"),
+      quarterly("2026-06-15"),
+    ];
+    const base = {
+      symbol: "RISECO",
+      quantity: new Decimal(10),
+      history,
+      announced: [],
+      asOf,
+    };
+
+    it("is unchanged without through/growth", () => {
+      const a = projectDividendSchedule(base);
+      const b = projectDividendSchedule({ ...base, growth: new Decimal(0) });
+      expect(b).toEqual(a);
+      expect(a.length).toBeGreaterThan(0);
+      expect(a.every((r) => r.exDate <= "2027-07-03")).toBe(true);
+    });
+
+    it("runs to `through` and matches the 12-month forecast in the first year", () => {
+      const short = projectDividendSchedule(base);
+      const long = projectDividendSchedule({
+        ...base,
+        through: "2029-12-31",
+        growth: new Decimal("0.1"),
+      });
+      expect(long.slice(0, short.length)).toEqual(short);
+      expect(long.at(-1)!.exDate <= "2029-12-31").toBe(true);
+      expect(long.at(-1)!.exDate > "2029-09-01").toBe(true);
+    });
+
+    it("steps growth once per anniversary of asOf", () => {
+      const long = projectDividendSchedule({
+        ...base,
+        through: "2029-12-31",
+        growth: new Decimal("0.1"),
+      });
+      const perShare = (from: string, to: string) =>
+        new Set(long.filter((r) => r.exDate > from && r.exDate <= to).map((r) => r.amountPerShare));
+      expect(perShare("2026-07-03", "2027-07-03")).toEqual(new Set(["1"]));
+      expect(perShare("2027-07-03", "2028-07-03")).toEqual(new Set(["1.1"]));
+      expect(perShare("2028-07-03", "2029-07-03")).toEqual(new Set(["1.21"]));
+    });
+
+    it("repeats an irregular payer once per year, low confidence, grown", () => {
+      const irregular = [
+        { ...quarterly("2025-11-03", "2.00"), period: null },
+        { ...quarterly("2026-05-20", "0.50"), period: null },
+      ];
+      const long = projectDividendSchedule({
+        ...base,
+        history: irregular,
+        through: "2029-12-31",
+        growth: new Decimal("0.1"),
+      });
+      expect(long.map((r) => r.exDate)).toEqual([
+        "2026-11-03",
+        "2027-05-20",
+        "2027-11-03",
+        "2028-05-20",
+        "2028-11-03",
+        "2029-05-20",
+        "2029-11-03",
+      ]);
+      expect(long.every((r) => r.confidence === "low")).toBe(true);
+      expect(long.find((r) => r.exDate === "2027-11-03")!.amountPerShare).toBe("2.2");
+    });
+  });
 });
 
 describe("computeDividendCAGR", () => {
@@ -675,6 +757,13 @@ describe("clampDividendGrowth", () => {
   it("leaves zero unchanged either way", () => {
     expect(clampDividendGrowth(new Decimal("0"), false).toFixed(4)).toBe("0.0000");
     expect(clampDividendGrowth(new Decimal("0"), true).toFixed(4)).toBe("0.0000");
+  });
+});
+
+describe("longRangeThroughIso", () => {
+  it("is 31 December three years on", () => {
+    expect(longRangeThroughIso(new Date("2026-09-24T10:00:00Z"))).toBe("2029-12-31");
+    expect(longRangeThroughIso(new Date("2026-12-31T23:00:00Z"))).toBe("2029-12-31");
   });
 });
 
