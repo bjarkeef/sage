@@ -152,6 +152,37 @@ describe("DividendIncomeBars", () => {
     expect(screen.getByText("9")).toBeInTheDocument();
   });
 
+  it("lets every column shrink below its label's width", () => {
+    // A flex item's default min-width is its min-content, so twelve "Dec"-wide
+    // columns plus their gaps pushed the last bar out of a phone-width card.
+    render(<DividendIncomeBars data={breakdown} year={2026} currentMonth="2026-07" />);
+    for (const column of screen.getAllByRole("button")) {
+      expect(column.className).toContain("min-w-0");
+    }
+  });
+
+  it("shortens a four-digit month to fit a narrow card, keeping the exact figure for a wide one", () => {
+    render(
+      <DividendIncomeBars
+        data={[
+          {
+            month: "2026-03",
+            retroactive: "1234.40",
+            announced: "0",
+            projected: "0",
+            currency: "DKK",
+          },
+        ]}
+        year={2026}
+        currentMonth="2026-07"
+      />,
+    );
+    // jsdom applies no container query, so both are in the DOM; the classes
+    // decide which one a given card width shows.
+    expect(screen.getByText("1234").className).toContain("@md:inline");
+    expect(screen.getByText("1K").className).toContain("@md:hidden");
+  });
+
   it("names the number of distinct payers in a month's tooltip", () => {
     // The year grid this replaces showed "2 payers" at rest; losing it entirely
     // would drop the only signal for which months are thin.
