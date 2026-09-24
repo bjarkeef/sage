@@ -437,17 +437,20 @@ export async function buildDividendIncomeView(
   const projectedThrough = projectionHorizonIso(now);
   const longRangeThrough = longRangeThroughIso(now);
   const growthBySymbol = new Map<string, Decimal | null>();
+  // The historical rate, kept only where the forward cap changed it, so the
+  // calendar can say what the payment was capped from.
+  const cappedFromBySymbol = new Map<string, Decimal>();
   for (const p of positions) {
     const cagr = computeDividendCAGR(
       divHistory.filter((d) => d.symbol === p.symbol),
       5,
       now,
     );
-    growthBySymbol.set(
-      p.symbol,
-      cagr ? clampDividendGrowth(cagr, allowNegativeDividendGrowth) : null,
-    );
+    const growth = cagr ? clampDividendGrowth(cagr, allowNegativeDividendGrowth) : null;
+    growthBySymbol.set(p.symbol, growth);
+    if (cagr && growth && cagr.greaterThan(growth)) cappedFromBySymbol.set(p.symbol, cagr);
   }
+
   const longRangeRows: ProjectedDividendRow[] = positions
     .filter((p) => !customBySymbol.has(p.symbol))
     .flatMap((p) =>
@@ -679,6 +682,11 @@ export async function buildDividendIncomeView(
       /** Yearly growth applied, in percent; null when none was (a custom
        *  holding, or too little history for a 5-year rate). */
       growthPct: growth === null ? null : growth.times(100).toDecimalPlaces(2).toNumber(),
+      /** The 5-year rate when the forward cap lowered it, in percent; else null. */
+      growthCappedFromPct:
+        growth === null
+          ? null
+          : (cappedFromBySymbol.get(r.symbol)?.times(100).toDecimalPlaces(2).toNumber() ?? null),
     };
   });
   const announcedDTO = announcedScheduleRows.map((r) => {

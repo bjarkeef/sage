@@ -173,6 +173,9 @@ export interface LongRangeIncomeRowDTO extends ProjectedIncomeRowDTO {
   /** Yearly dividend growth applied, in percent; null when none was (a custom
    *  holding, or too little history for a 5-year rate). */
   growthPct: number | null;
+  /** The holding's 5-year rate when Sage's 10% forward cap lowered it, in
+   *  percent; null or absent otherwise. See docs/PROJECTIONS.md. */
+  growthCappedFromPct?: number | null;
 }
 
 export interface AnnouncedDividendDTO {

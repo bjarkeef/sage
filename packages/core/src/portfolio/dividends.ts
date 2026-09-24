@@ -575,11 +575,26 @@ export function classifyDividendTrend(cagr: Decimal | null): DividendTrend {
 }
 
 /**
- * Floors a dividend-growth figure at 0% when the caller doesn't want
- * decliners to pull a weighted aggregate negative — the `allowNegativeDividendGrowth`
- * user setting. Positive and zero values pass through unchanged either way.
+ * The highest yearly dividend growth Sage will carry FORWARD: 10%.
+ *
+ * A trailing 5-year CAGR is a correct fact about the past and a poor forecast.
+ * Measured from a suspension or a post-cut trough, it reads as explosive
+ * growth: a payout restarted after a suspension, or one that rose five-fold,
+ * comes out near 50% a year, which over the calendar's three years is ×3.4. Roughly 10% is what strong
+ * long-run dividend growers actually sustain. Historical CAGR shown as a
+ * statistic (analytics, trend) is never capped; only forward use goes through
+ * `clampDividendGrowth`. Rationale for readers: `docs/PROJECTIONS.md`.
+ */
+export const MAX_FORWARD_DIVIDEND_GROWTH = new Decimal("0.10");
+
+/**
+ * A holding's historical dividend CAGR turned into the rate Sage projects
+ * forward, for the dividends calendar and the Goal's default. Capped at
+ * `MAX_FORWARD_DIVIDEND_GROWTH`; floored at 0% when the user has turned off
+ * `allowNegativeDividendGrowth`, so decliners can't pull an aggregate negative.
  */
 export function clampDividendGrowth(cagr: Decimal, allowNegative: boolean): Decimal {
+  if (cagr.greaterThan(MAX_FORWARD_DIVIDEND_GROWTH)) return MAX_FORWARD_DIVIDEND_GROWTH;
   if (allowNegative) return cagr;
   return cagr.lessThan(0) ? new Decimal(0) : cagr;
 }
