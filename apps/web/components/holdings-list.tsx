@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Delta, SegmentedControl, EmptyState, buttonVariants } from "@sage/ui";
 import type { PositionDTO, SubtotalDTO } from "../lib/types";
 import { formatMoney, moneyToNumber } from "../lib/format";
-import { HOLDING_ROW_GRID, HoldingRow } from "./holding-row";
+import { HOLDINGS_TABLE_GRID, HOLDING_ROW_GRID, HoldingRow } from "./holding-row";
 
 type SortKey = "value" | "return" | "today" | "yield" | "name";
 
@@ -127,18 +127,18 @@ export function HoldingsList({
               )}
             </div>
 
-            <div className={`${HOLDING_ROW_GRID} px-3 pb-1 pt-1`}>
-              <span className="label-caps text-muted-foreground">Holding</span>
-              <span className="hidden text-right label-caps text-muted-foreground md:block">
-                Value
-              </span>
-              <span className="text-right label-caps text-muted-foreground">Return</span>
-              <span className="hidden text-right label-caps text-muted-foreground md:block">
-                Weight
-              </span>
-            </div>
+            <div className={`${HOLDINGS_TABLE_GRID} gap-y-0.5`}>
+              <div className={`${HOLDING_ROW_GRID} px-3 pb-1 pt-1`}>
+                <span className="label-caps text-muted-foreground">Holding</span>
+                <span className="hidden text-right label-caps text-muted-foreground md:block">
+                  Value
+                </span>
+                <span className="text-right label-caps text-muted-foreground">Return</span>
+                <span className="hidden text-right label-caps text-muted-foreground md:block">
+                  Weight
+                </span>
+              </div>
 
-            <div className="space-y-0.5">
               {sortRows(rows).map((p) => (
                 <HoldingRow key={p.symbol} position={p} groupTotal={groupTotal} />
               ))}
