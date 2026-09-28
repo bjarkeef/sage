@@ -91,6 +91,14 @@ function sumWhere(points: TapePoint[], pred: (p: TapePoint) => boolean): number 
   return s;
 }
 
+// The money windows follow the headline tags, so a chip, the focus card and the
+// HUD's focused figure all sum the same points. The tags select by ex-date
+// horizon, so a forward payment can land after today + 365.
+const isForward = (p: TapePoint) => p.headline === "forward";
+const isTrailing = (p: TapePoint) => p.headline === "trailing";
+
+// Payment-date windows, for what has no tag: the prior 12 months and the pay
+// frequency count.
 const isNext12 = (todayDay: number) => (p: TapePoint) =>
   p.day > todayDay && p.day <= todayDay + 365;
 const isLast12 = (todayDay: number) => (p: TapePoint) =>
@@ -98,10 +106,10 @@ const isLast12 = (todayDay: number) => (p: TapePoint) =>
 
 /** Every payer the tape draws, largest next-12-month income first; payers with
  *  history only (sold) follow, by symbol. */
-export function rankPayers(points: TapePoint[], todayDay: number): PayerRank[] {
+export function rankPayers(points: TapePoint[]): PayerRank[] {
   const bySymbol = indexBySymbol(points);
   return [...bySymbol.entries()]
-    .map(([symbol, ps]) => ({ symbol, next12: sumWhere(ps, isNext12(todayDay)) }))
+    .map(([symbol, ps]) => ({ symbol, next12: sumWhere(ps, isForward) }))
     .sort((a, b) => b.next12 - a.next12 || a.symbol.localeCompare(b.symbol));
 }
 
@@ -128,10 +136,10 @@ export function payFrequency(perYear: number): string | null {
 
 export function payerSummary(points: TapePoint[], symbol: string, todayDay: number): PayerSummary {
   const mine = points.filter((p) => p.symbol === symbol);
-  const last12 = sumWhere(mine, isLast12(todayDay));
+  const last12 = sumWhere(mine, isTrailing);
   const prior12 = sumWhere(mine, (p) => p.day > todayDay - 730 && p.day <= todayDay - 365);
-  const next12 = sumWhere(mine, isNext12(todayDay));
-  const bookNext12 = sumWhere(points, isNext12(todayDay));
+  const next12 = sumWhere(mine, isForward);
+  const bookNext12 = sumWhere(points, isForward);
   const countNext = mine.filter(isNext12(todayDay)).length;
   const countLast = mine.filter(isLast12(todayDay)).length;
   return {

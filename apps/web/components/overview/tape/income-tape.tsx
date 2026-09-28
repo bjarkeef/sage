@@ -261,7 +261,7 @@ export function IncomeTape({
   const totals = measureTotals(points, resolved.measure, focus);
   const prev = resolved.compare ? measureTotals(points, resolved.compare, focus) : null;
   const months = React.useMemo(() => monthTotals(points, focus), [points, focus]);
-  const ranked = React.useMemo(() => rankPayers(points, todayDay), [points, todayDay]);
+  const ranked = React.useMemo(() => rankPayers(points), [points]);
   const ytotals = React.useMemo(() => yearTotals(points, focus), [points, focus]);
   const years: { year: number; totals: typeof EMPTY_TOTALS; partial: boolean }[] = [];
   for (let y = bounds.min; y <= bounds.max; y++) {

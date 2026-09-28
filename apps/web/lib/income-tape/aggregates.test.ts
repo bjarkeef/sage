@@ -81,7 +81,7 @@ describe("ghostOf", () => {
 
 describe("payers", () => {
   it("ranks by next-12-month income", () => {
-    expect(rankPayers(PTS, today).map((r) => r.symbol)).toEqual(["KO", "O"]);
+    expect(rankPayers(PTS).map((r) => r.symbol)).toEqual(["KO", "O"]);
   });
 
   it("summarises one payer for the focus card", () => {
@@ -92,6 +92,33 @@ describe("payers", () => {
     expect(s.changePct).toBeCloseTo((31 / 30 - 1) * 100);
     expect(s.share).toBeCloseTo(32 / 136);
     expect(s.frequency).toBe("pays once a year");
+  });
+});
+
+describe("payer windows follow the headline tags, as the HUD does", () => {
+  // PG's projected payment is counted forward by ex-date though its cash lands
+  // after today + 365; the untagged points sit inside the date windows but
+  // belong to no headline. The HUD sums tags, so the chips and card must too.
+  const tagged = [
+    ...PTS,
+    p("2027-11-20", "PG", 40, "estimated", "forward"),
+    p("2027-09-01", "PG", 7, "estimated", null),
+    p("2026-01-10", "PG", 20, "paid", "trailing"),
+    p("2025-12-20", "PG", 9, "paid", null),
+  ];
+
+  it("sums next 12 and share over forward-tagged points", () => {
+    const s = payerSummary(tagged, "PG", today);
+    expect(s.next12).toBe(40);
+    expect(s.share).toBeCloseTo(40 / (136 + 40));
+    expect(rankPayers(tagged).find((r) => r.symbol === "PG")?.next12).toBe(40);
+  });
+
+  it("sums last 12 over trailing-tagged points and compares with the prior 12 by date", () => {
+    const s = payerSummary(tagged, "PG", today);
+    expect(s.last12).toBe(20);
+    // Prior 12 (2024-09-29 to 2025-09-28) holds nothing for PG: no change figure.
+    expect(s.changePct).toBeNull();
   });
 });
 
