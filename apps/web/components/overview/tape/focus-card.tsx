@@ -18,7 +18,12 @@ export function FocusCard({
   onClose: () => void;
 }) {
   return (
-    <Card className="relative w-[310px] p-4 text-sm">
+    // Floats over the HUD's comparison slot (see TapeHud), so it needs an
+    // opaque surface and its own shadow rather than Card's translucent
+    // `bg-surface-card` wash, which let the figure show through underneath.
+    // Same tokens the floating chart tooltip uses (chart-tooltip.tsx):
+    // `bg-popover` / `text-popover-foreground` / `shadow-md`.
+    <Card className="relative w-[310px] border border-hairline bg-popover p-4 text-sm text-popover-foreground shadow-md">
       <button
         type="button"
         aria-label="Clear focus"
