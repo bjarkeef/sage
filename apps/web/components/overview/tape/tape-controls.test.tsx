@@ -34,6 +34,10 @@ describe("PayerChips", () => {
         onPick={vi.fn()}
       />,
     );
+    // A payer with next12 === 0 has nothing coming — it starts collapsed
+    // under "Show N no longer held" (see the sold-payer tests in
+    // payer-chips.test.tsx); reveal it before checking its rendering.
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 no longer held" }));
     expect(screen.getByRole("button", { name: "SOLD" }).textContent).toBe("SOLD");
     expect(screen.getByRole("button", { name: /^KO/ }).textContent).toBe("KO 1,200");
   });
