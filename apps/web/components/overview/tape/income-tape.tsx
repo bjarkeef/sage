@@ -69,7 +69,6 @@ interface Press {
   moved: boolean;
   hover: TapePoint | null;
   vel: number;
-  id: number;
 }
 
 /**
@@ -109,6 +108,9 @@ export function IncomeTape({
   const [focus, setFocus] = React.useState<string | null>(null);
   const [hover, setHover] = React.useState<TapePoint | null>(null);
   const [entering, setEntering] = React.useState(motionOn);
+  // `motionOn` starts true until the reduced-motion query is read; once motion is
+  // off the entrance is over at once — off means instant, never slower.
+  const enteringNow = entering && motionOn;
   const ctx = React.useMemo(() => ({ todayDay, year, extent }), [todayDay, year, extent]);
 
   // Only the first width matters here; the stage is re-fitted once measured.
@@ -204,7 +206,7 @@ export function IncomeTape({
   const press = React.useRef<Press | null>(null);
   const hoverAt = (clientX: number) => {
     const el = stageRef.current;
-    if (!el || entering) return;
+    if (!el || enteringNow) return;
     const v = motion.viewRef.current;
     const day = v.leftDay + (clientX - el.getBoundingClientRect().left) / v.pxPerDay;
     const reach = Math.max(10, barWidth(v.pxPerDay) * 2) / v.pxPerDay;
@@ -212,17 +214,20 @@ export function IncomeTape({
     setHover((h) => (h === p ? h : p));
   };
   const onPointerDown = (e: React.PointerEvent) => {
-    press.current = {
-      x: e.clientX,
-      t: performance.now(),
-      moved: false,
-      hover,
-      vel: 0,
-      id: e.pointerId,
-    };
+    if (e.button !== 0) return; // a right or middle press is not a drag or a click
+    // Capture now, so the release is seen even when it happens off the stage.
+    stageRef.current?.setPointerCapture?.(e.pointerId);
+    press.current = { x: e.clientX, t: performance.now(), moved: false, hover, vel: 0 };
   };
   const onPointerMove = (e: React.PointerEvent) => {
-    const pr = press.current;
+    let pr = press.current;
+    // A press whose release was never seen (button let go off the stage) is
+    // stale: drop it rather than let the tape follow a mouse with no button held.
+    if (pr && e.buttons === 0) {
+      press.current = null;
+      if (pr.moved) motion.hold(false);
+      pr = null;
+    }
     if (!pr) return hoverAt(e.clientX);
     const dx = pr.x - e.clientX;
     if (!pr.moved && Math.abs(dx) < DRAG_THRESHOLD_PX) return;
@@ -231,7 +236,6 @@ export function IncomeTape({
       setHover(null);
       leaveRange();
       motion.hold(true);
-      stageRef.current?.setPointerCapture?.(pr.id);
     }
     const now = performance.now();
     const ppd = motion.viewRef.current.pxPerDay;
@@ -336,7 +340,7 @@ export function IncomeTape({
               focus={focus}
               hover={hover}
               months={months}
-              entering={entering}
+              entering={enteringNow}
               worldRef={worldRef}
             />
           )}
