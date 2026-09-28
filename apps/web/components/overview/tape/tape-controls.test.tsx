@@ -26,6 +26,18 @@ describe("PayerChips", () => {
     expect(buttons[2]).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("shows no amount for a payer with nothing coming, rather than a 0", () => {
+    render(
+      <PayerChips
+        payers={[...payers, { symbol: "SOLD", next12: 0 }]}
+        focus={null}
+        onPick={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "SOLD" }).textContent).toBe("SOLD");
+    expect(screen.getByRole("button", { name: /^KO/ }).textContent).toBe("KO 1,200");
+  });
+
   it("calls onPick with the clicked payer's symbol", () => {
     const onPick = vi.fn();
     render(<PayerChips payers={payers} focus={null} onPick={onPick} />);
