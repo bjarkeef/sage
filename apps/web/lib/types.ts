@@ -539,6 +539,9 @@ export interface IncomeStreamPointDTO {
   currency: string;
   symbol: string;
   certainty: PaymentCertainty;
+  /** The headline total this payment is part of: "forward" is the overview's
+   *  next-12-months figure, "trailing" its last-12-months comparison. */
+  headline: "trailing" | "forward" | null;
 }
 
 export interface UpcomingRow {

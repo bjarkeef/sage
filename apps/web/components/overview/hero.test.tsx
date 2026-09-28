@@ -11,6 +11,7 @@ const payment = {
   currency: "USD",
   symbol: "KO",
   certainty: "paid" as const,
+  headline: null,
 };
 
 describe("OverviewHero", () => {
