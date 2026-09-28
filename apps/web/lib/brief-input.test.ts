@@ -21,6 +21,7 @@ const ALL_ON: OverviewPrefs = {
   incomeCard: true,
   portfolioCard: true,
   upcomingCard: true,
+  tapeMotion: true,
 };
 
 function point(amount: string, currency = "USD"): PortfolioHistoryPoint {

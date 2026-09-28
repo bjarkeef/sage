@@ -27,6 +27,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         incomeCard: true,
         portfolioCard: true,
         upcomingCard: true,
+        tapeMotion: true,
       },
       dividendTaxRate: null,
       autoAddDividends: true,

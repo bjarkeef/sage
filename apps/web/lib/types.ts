@@ -456,6 +456,8 @@ export interface OverviewPrefs {
   incomeCard: boolean;
   portfolioCard: boolean;
   upcomingCard: boolean;
+  /** Glide, count and animate the income tape. */
+  tapeMotion: boolean;
 }
 
 export interface UserSettingsDTO {

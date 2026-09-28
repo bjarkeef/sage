@@ -28,6 +28,7 @@ const SETTINGS: UserSettingsDTO = {
     incomeCard: true,
     portfolioCard: true,
     upcomingCard: true,
+    tapeMotion: true,
   },
   dividendTaxRate: null,
   autoAddDividends: true,
