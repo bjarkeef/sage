@@ -69,6 +69,32 @@ describe("TapeHud", () => {
     expect(screen.getByText("KO · All time")).toBeInTheDocument();
     expect(screen.queryByText(/^vs /)).not.toBeInTheDocument();
   });
+
+  it("overlays the focus card on the comparison slot instead of growing the HUD", () => {
+    render(
+      <TapeHud
+        range={resolveRange("today", ctx)}
+        totals={totals}
+        prev={{ ...totals, total: 6184 }}
+        currency="DKK"
+        focus="KO"
+        motion={false}
+        aside={<div data-testid="focus-card">card</div>}
+      />,
+    );
+    // The comparison it replaces stays mounted, just hidden — removing it
+    // would let the slot collapse and the HUD grow when the card is taller.
+    const comparison = screen.getByText("vs last 12 months").closest("div")!;
+    expect(comparison).toHaveClass("invisible");
+    expect(comparison).toBeInTheDocument();
+
+    // The card itself sits absolutely inside the slot, anchored bottom-right,
+    // so it overlays rather than participates in the slot's own height.
+    const card = screen.getByTestId("focus-card").parentElement!;
+    expect(card).toHaveClass("absolute");
+    expect(card).toHaveClass("bottom-0");
+    expect(card).toHaveClass("right-0");
+  });
 });
 
 describe("RangeControl", () => {
