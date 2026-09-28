@@ -21,6 +21,7 @@ export function RangeControl({
     <div className="-mx-1 flex min-w-0 max-w-full items-center gap-1 overflow-x-auto px-1">
       <SegmentedControl
         size="sm"
+        className="shrink-0"
         value={active ?? ""}
         onChange={(v) => onPick(v as RangeKey)}
         options={[
@@ -33,6 +34,7 @@ export function RangeControl({
       <Button
         variant="ghost"
         size="sm"
+        className="shrink-0"
         aria-label="Previous year"
         disabled={year <= bounds.min}
         onClick={() => onStepYear(-1)}
@@ -42,6 +44,7 @@ export function RangeControl({
       <Button
         variant="ghost"
         size="sm"
+        className="shrink-0"
         aria-label="Next year"
         disabled={year >= bounds.max}
         onClick={() => onStepYear(1)}
