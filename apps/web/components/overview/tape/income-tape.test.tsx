@@ -94,6 +94,49 @@ describe("IncomeTape", () => {
     expect(screen.getByText("Next 12 months")).toBeInTheDocument();
   });
 
+  it("pans on ArrowRight, but not from a control or with a modifier", async () => {
+    renderTape();
+    await screen.findByText("Next 12 months");
+    const key = (target: EventTarget, init: KeyboardEventInit) => {
+      const e = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
+      act(() => void target.dispatchEvent(e));
+    };
+
+    // From a button, a tab, a link: the arrow is the control's own.
+    key(screen.getByRole("radio", { name: "All time" }), { key: "ArrowRight" });
+    key(screen.getByRole("button", { name: /^KO/ }), { key: "ArrowRight" });
+    const tab = document.createElement("div");
+    tab.setAttribute("role", "tab");
+    const link = document.createElement("a");
+    link.href = "#";
+    document.body.append(tab, link);
+    try {
+      key(tab, { key: "ArrowRight" });
+      key(link, { key: "ArrowRight" });
+    } finally {
+      tab.remove();
+      link.remove();
+    }
+    // Alt + → is the browser's forward; ⌘/Ctrl + → moves a caret.
+    key(window, { key: "ArrowRight", altKey: true });
+    key(window, { key: "ArrowRight", metaKey: true });
+    key(window, { key: "ArrowRight", ctrlKey: true });
+    expect(screen.getByText("Next 12 months")).toBeInTheDocument();
+    expect(screen.queryByText("In view")).not.toBeInTheDocument();
+
+    key(window, { key: "ArrowRight" });
+    expect(screen.getByText("In view")).toBeInTheDocument();
+  });
+
+  it("leaves an Esc another layer already handled", async () => {
+    renderTape();
+    fireEvent.click(await screen.findByRole("button", { name: /^KO/ }));
+    const handled = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    handled.preventDefault();
+    act(() => void window.dispatchEvent(handled));
+    expect(screen.getByText("KO · Next 12 months")).toBeInTheDocument();
+  });
+
   it("leaves the vertical wheel to the page and pans on shift + wheel", async () => {
     renderTape();
     const stage = await screen.findByRole("group", { name: /income timeline/i });

@@ -40,6 +40,11 @@ export const TAPE_HEIGHT = "max(374px, calc((100vh - 389px) * 0.85))";
 const DRAG_THRESHOLD_PX = 3;
 const FLING_WINDOW_MS = 80;
 const LINE_MODE_PX = 32;
+/** Elements that keep their own arrow keys. */
+const TAPE_KEY_CONTROLS = [
+  "input, textarea, select, button, a, [contenteditable]",
+  "[role=radio], [role=menuitem], [role=option], [role=combobox], [role=tab], [role=slider]",
+].join(", ");
 const EMPTY_TOTALS = { total: 0, paid: 0, confirmed: 0, estimated: 0, count: 0 };
 
 /** The payment closest to `day` within `maxDays`; `points` are sorted by day. */
@@ -167,15 +172,18 @@ export function IncomeTape({
     setFocus((f) => (f === symbol ? null : symbol));
   }, []);
 
-  // Keyboard: ← → pan a month, Esc clears focus. Arrows never while a control has focus.
+  // Keyboard: ← → pan a month, Esc clears focus. Arrows never while a control has
+  // focus. A key another layer handled (a dialog's Esc) or one held with a
+  // modifier (Alt + → is history forward, ⌘/Ctrl + → a caret move) is not ours.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || e.metaKey || e.ctrlKey) return;
       if (e.key === "Escape") {
         setFocus(null);
         return;
       }
       const t = e.target as HTMLElement | null;
-      if (t?.closest?.("input, textarea, select, button, [role=radio], [contenteditable]")) return;
+      if (t?.closest?.(TAPE_KEY_CONTROLS)) return;
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         leaveRange();
         motion.panBy((e.key === "ArrowRight" ? 30 : -30) * motion.viewRef.current.pxPerDay, true);
@@ -195,6 +203,8 @@ export function IncomeTape({
       if (!sideways && !e.shiftKey) return;
       const d = sideways ? e.deltaX : e.deltaY;
       e.preventDefault();
+      // The bar under a still pointer slides away; its readout goes with it.
+      setHover(null);
       leaveRange();
       motion.panBy((e.deltaMode === 1 ? d * LINE_MODE_PX : d) * 1.1, true);
     };
