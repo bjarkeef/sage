@@ -25,12 +25,15 @@ const TONE: Record<PaymentCertainty, string> = {
 export function YearRibbon({
   years,
   inView,
+  currency,
   selectedYear,
   goal,
   onPickYear,
 }: {
   years: { year: number; totals: Totals; partial: boolean }[];
   inView: [number, number];
+  /** Names the amount for a screen reader; the drawn figure sits under the HUD's. */
+  currency: string;
   selectedYear: number | null;
   goal: GoalMark;
   onPickYear: (year: number) => void;
@@ -61,7 +64,7 @@ export function YearRibbon({
               <button
                 key={y.year}
                 type="button"
-                aria-label={`${y.year}: ${Math.round(y.totals.total).toLocaleString("en-US")}`}
+                aria-label={`${y.year}: ${currency} ${Math.round(y.totals.total).toLocaleString("en-US")}`}
                 aria-pressed={selected}
                 onClick={() => onPickYear(y.year)}
                 className={`absolute top-0 rounded-card transition-colors hover:bg-surface-hover ${selected ? "bg-surface-active" : inRange ? "bg-surface-hover" : ""}`}

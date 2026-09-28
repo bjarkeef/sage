@@ -33,6 +33,7 @@ describe("YearRibbon", () => {
       <YearRibbon
         years={YEARS}
         inView={inView}
+        currency="DKK"
         selectedYear={null}
         goal={{ kind: "none" }}
         onPickYear={() => {}}
@@ -49,12 +50,13 @@ describe("YearRibbon", () => {
       <YearRibbon
         years={YEARS}
         inView={inView}
+        currency="DKK"
         selectedYear={null}
         goal={{ kind: "none" }}
         onPickYear={onPickYear}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /2025/ }));
+    fireEvent.click(screen.getByRole("button", { name: "2025: DKK 5,000" }));
     expect(onPickYear).toHaveBeenCalledWith(2025);
   });
 
@@ -63,6 +65,7 @@ describe("YearRibbon", () => {
       <YearRibbon
         years={YEARS}
         inView={inView}
+        currency="DKK"
         selectedYear={null}
         goal={{ kind: "line", amount: 7000, label: "GOAL DKK 7,000" }}
         onPickYear={() => {}}
@@ -75,6 +78,7 @@ describe("YearRibbon", () => {
       <YearRibbon
         years={YEARS}
         inView={inView}
+        currency="DKK"
         selectedYear={null}
         goal={{ kind: "caption", text: "Goal: DKK 231,728 a year by 2041 — 2.6% of it this year" }}
         onPickYear={() => {}}
@@ -87,6 +91,7 @@ describe("YearRibbon", () => {
       <YearRibbon
         years={YEARS}
         inView={inView}
+        currency="DKK"
         selectedYear={null}
         goal={{ kind: "none" }}
         onPickYear={() => {}}
