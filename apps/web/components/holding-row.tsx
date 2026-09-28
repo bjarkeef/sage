@@ -10,14 +10,23 @@ import { toSearchResult } from "../lib/instrument";
 
 const UNAVAILABLE = <span className="text-muted-foreground">unavailable</span>;
 
-/** Shared grid tracks — the readable-row contract requires the header row and
- *  data rows to align on identical columns. Value + Weight collapse on mobile
- *  (hidden md:block on their cells drops them out of the flow). A fifth,
- *  32px track budgets space for the quick-add action; the `sm` icon button it
- *  holds actually renders ~38px, and the overflow is absorbed by the row's
- *  own trailing padding rather than by this track. */
-export const HOLDING_ROW_GRID =
-  "grid grid-cols-[minmax(0,1fr)_170px_32px] items-center gap-3 md:grid-cols-[minmax(0,1fr)_130px_170px_100px_32px]";
+/** Shared column tracks — the readable-row contract requires the header row and
+ *  data rows to align on identical columns. The tracks live on the table
+ *  (HOLDINGS_TABLE_GRID) and every row is a subgrid of it, so a figure column
+ *  widens to its longest entry — "-DKK 2,418.07 (-17.52%)" — instead of
+ *  spilling into its neighbour, while the minimums keep short books from
+ *  collapsing into a huddle. On a phone the name keeps a 136px floor and the
+ *  return figure wraps its percent under the amount rather than squeezing the
+ *  name to three letters. Value + Weight collapse on mobile (hidden
+ *  md:block on their cells drops them out of the flow). A fifth, 32px track
+ *  budgets space for the quick-add action; the `sm` icon button it holds
+ *  actually renders ~38px, and the overflow is absorbed by the row's own
+ *  trailing padding rather than by this track. */
+export const HOLDINGS_TABLE_GRID =
+  "grid items-center gap-x-3 grid-cols-[minmax(136px,1fr)_minmax(0,max-content)_32px] md:grid-cols-[minmax(0,1fr)_minmax(130px,max-content)_minmax(170px,max-content)_minmax(100px,max-content)_32px]";
+
+/** One row of a HOLDINGS_TABLE_GRID: spans every track and inherits them. */
+export const HOLDING_ROW_GRID = "col-span-full grid grid-cols-subgrid items-center";
 
 /** One holdings row: identity · value/shares · return/today · weight/yield. */
 export function HoldingRow({
@@ -72,7 +81,7 @@ export function HoldingRow({
         </div>
       </div>
 
-      <div className="whitespace-nowrap text-right">
+      <div className="text-right md:whitespace-nowrap">
         {/* Headline is the unrealized price gain on the *current* holding — a
             clean ÷-current-cost-basis figure. Lifetime dividends live on the
             asset page, never folded into this percent: on a sold-down position
@@ -82,12 +91,12 @@ export function HoldingRow({
             value={moneyToNumber(p.unrealizedGainLoss)}
             percent={p.gainLossPercent ?? undefined}
             currency={p.currency}
-            className="justify-end font-medium"
+            className="flex-wrap justify-end gap-x-1 gap-y-0 font-medium md:flex-nowrap"
           />
         ) : (
           UNAVAILABLE
         )}
-        <div className={`text-xs ${todayTone}`}>
+        <div className={`whitespace-nowrap text-xs ${todayTone}`}>
           {p.dailyChangePercent != null ? `${formatPercent(p.dailyChangePercent)} today` : "—"}
         </div>
       </div>
