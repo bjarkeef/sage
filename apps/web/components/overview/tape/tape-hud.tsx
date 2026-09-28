@@ -68,8 +68,17 @@ export function TapeHud({
   );
 
   return (
-    <div className="flex flex-wrap items-end justify-between gap-6">
-      <div className="min-w-0">
+    // `sm:flex-row sm:flex-nowrap`, not `flex-wrap`: with the right column
+    // fixed at 310px, a wrapping flex container still breaks onto two lines
+    // whenever the LEFT column's un-shrunk (hypothetical) width doesn't fit —
+    // `min-w-0` only lets it shrink once it's already on a line, it doesn't
+    // stop the wrap decision. Wrapped, the right-hand slot lands on its own
+    // row under the figure, and the card — anchored to the slot's bottom,
+    // growing upward — then overlaps the figure it's supposed to sit beside.
+    // Forcing one row and letting the left column shrink (`min-w-0 flex-1`)
+    // removes the wrap entirely, so the two columns can never overlap.
+    <div className="flex flex-col gap-6 sm:flex-row sm:flex-nowrap sm:items-end sm:justify-between">
+      <div className="min-w-0 sm:flex-1">
         <p className="label-caps flex flex-wrap gap-x-2 text-muted-foreground">
           <span className="text-foreground">
             {focus ? `${focus} · ${range.label}` : range.label}
@@ -103,11 +112,14 @@ export function TapeHud({
         <div
           // At `sm`+ this box is sized by the comparison's own (in-flow)
           // height, and the card overlays it absolutely — the HUD's height
-          // never depends on the card. Below `sm`, where this wraps onto its
-          // own row, the reserved min-height (~ FocusCard's content: two
-          // header lines + a 5-row dl inside p-4) keeps the row from
-          // resizing when the card replaces the comparison in view.
-          className="relative min-h-0 max-sm:min-h-[220px] sm:w-[310px] sm:shrink-0"
+          // never depends on the card. Below `sm`, where the columns stack
+          // (this row sits under the figure instead of beside it), the
+          // reserved `min-h-60` (240px) stands in for the card's own height:
+          // FocusCard is p-4 (32px) + a symbol line + a name/frequency line
+          // (mb-3) + a 5-row `dl` (gap-y-1) — measured ~235px in the browser,
+          // so 240px keeps the row from resizing when the card replaces the
+          // comparison in view.
+          className="relative min-h-0 shrink-0 max-sm:min-h-60 sm:w-[310px]"
         >
           {comparison}
           {showAside && (
