@@ -50,6 +50,22 @@ export function TapeHud({
   const figure = useRollingNumber(totals.total, motion, numberPart);
   const change = prev ? changePct(totals.total, prev.total) : null;
   const changeRoll = useRollingNumber(change ?? 0, motion, signedPct);
+  // `aside` is the focus card taking the comparison's slot. Keep the
+  // comparison mounted (just hidden) rather than swapping it out — removing
+  // it would let the slot collapse to the card's own (taller) height and
+  // shift the tape below. The card overlays it absolutely instead.
+  const showAside = aside !== undefined;
+  const comparison = range.compareLabel && prev && (
+    <div className={`text-right text-sm text-muted-foreground ${showAside ? "invisible" : ""}`}>
+      <p>vs {range.compareLabel}</p>
+      <p className={`stat-num ${change == null ? "" : change >= 0 ? "text-gain" : "text-loss"}`}>
+        {change == null ? "new" : <span ref={changeRoll.ref}>{changeRoll.text}</span>}
+      </p>
+      <p className="font-mono tabular-nums">
+        {currency} {Math.round(prev.total).toLocaleString("en-US")}
+      </p>
+    </div>
+  );
 
   return (
     <div className="flex flex-wrap items-end justify-between gap-6">
@@ -83,20 +99,22 @@ export function TapeHud({
         </p>
         {brief && <div className="mt-4">{brief}</div>}
       </div>
-      {aside ??
-        (range.compareLabel && prev && (
-          <div className="text-right text-sm text-muted-foreground">
-            <p>vs {range.compareLabel}</p>
-            <p
-              className={`stat-num ${change == null ? "" : change >= 0 ? "text-gain" : "text-loss"}`}
-            >
-              {change == null ? "new" : <span ref={changeRoll.ref}>{changeRoll.text}</span>}
-            </p>
-            <p className="font-mono tabular-nums">
-              {currency} {Math.round(prev.total).toLocaleString("en-US")}
-            </p>
-          </div>
-        ))}
+      {(comparison || showAside) && (
+        <div
+          // At `sm`+ this box is sized by the comparison's own (in-flow)
+          // height, and the card overlays it absolutely — the HUD's height
+          // never depends on the card. Below `sm`, where this wraps onto its
+          // own row, the reserved min-height (~ FocusCard's content: two
+          // header lines + a 5-row dl inside p-4) keeps the row from
+          // resizing when the card replaces the comparison in view.
+          className="relative min-h-0 max-sm:min-h-[220px] sm:w-[310px] sm:shrink-0"
+        >
+          {comparison}
+          {showAside && (
+            <div className="absolute bottom-0 right-0 z-20 w-[310px] max-w-full">{aside}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
