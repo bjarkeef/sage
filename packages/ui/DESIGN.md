@@ -202,7 +202,7 @@ Any surface that mixes what has happened with what is forecast should use it,
 and should use nothing else to say the same thing. Sage is the only app in its
 benchmark set that knows the difference between a declared dividend and a
 predicted one; drawing that difference is the most distinctive thing the design
-system owns. The overview's income stream and the /dividends bars are the same
+system owns. The overview's income tape and the /dividends bars are the same
 vocabulary at two scales.
 
 Never encode certainty as opacity alone — a 40%-alpha bar on a busy ground
