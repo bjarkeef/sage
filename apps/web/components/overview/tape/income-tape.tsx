@@ -359,6 +359,7 @@ export function IncomeTape({
       <YearRibbon
         years={years}
         inView={resolved.dates}
+        currency={currency}
         selectedYear={range === "year" ? year : null}
         goal={mark}
         onPickYear={(y) => pick("year", y)}
