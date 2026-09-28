@@ -59,4 +59,23 @@ describe("toTapePoints", () => {
       ["KO", 75, "forward"],
     ]);
   });
+
+  it("merges two payments from one holding on the same day and certainty into one mark", () => {
+    const pt = (amount: string, certainty: "paid" | "confirmed", headline: "trailing" | null) => ({
+      date: "2026-06-02",
+      amount,
+      currency: "DKK",
+      symbol: "KO",
+      certainty,
+      headline,
+    });
+    const pts = toTapePoints(
+      [pt("10.00", "paid", "trailing"), pt("5.00", "paid", null), pt("3.00", "confirmed", null)],
+      null,
+    );
+    expect(pts.map((p) => [p.symbol, p.iso, p.certainty, p.amount, p.headline])).toEqual([
+      ["KO", "2026-06-02", "paid", 15, "trailing"],
+      ["KO", "2026-06-02", "confirmed", 3, null],
+    ]);
+  });
 });

@@ -91,7 +91,7 @@ export const TapeChart = React.memo(function TapeChart({
         const change = ghost ? changePct(p.amount, ghost.amount) : null;
         const lines = [p.symbol, fmt(p.amount), ...(change != null ? [signed(change, 1)] : [])];
         return {
-          key: `${p.symbol}-${p.iso}`,
+          key: `${p.symbol}-${p.iso}-${p.certainty}`,
           x: X(p.day),
           anchorTop: base - Math.max(h, gh),
           lines,

@@ -51,16 +51,32 @@ export function sameDayLastYear(day: number): number {
   return Date.UTC(y, m, Math.min(d.getUTCDate(), lastOfMonth)) / DAY_MS;
 }
 
+/** Two payments from one holding on the same day with the same certainty (a
+ *  special alongside a regular, or two lots booked apart) would be drawn as one
+ *  bar on top of the other while every total sums both, so they merge into one
+ *  mark here. */
 export function toTapePoints(points: IncomeStreamPointDTO[], taxRate: number | null): TapePoint[] {
   const f = netFactor(taxRate);
-  return points
-    .map((p) => ({
+  const merged = new Map<string, TapePoint>();
+  for (const p of points) {
+    const key = `${p.symbol}|${p.date}|${p.certainty}`;
+    const amount = Number(p.amount) * f;
+    const seen = merged.get(key);
+    if (seen) {
+      seen.amount += amount;
+      // Same day and certainty means the same headline window, so the tags
+      // should agree; if one is null, keep the one that counts.
+      seen.headline = seen.headline ?? p.headline;
+      continue;
+    }
+    merged.set(key, {
       day: isoToDay(p.date),
       iso: p.date,
       symbol: p.symbol,
-      amount: Number(p.amount) * f,
+      amount,
       certainty: p.certainty,
       headline: p.headline,
-    }))
-    .sort((a, b) => a.day - b.day);
+    });
+  }
+  return [...merged.values()].sort((a, b) => a.day - b.day);
 }
