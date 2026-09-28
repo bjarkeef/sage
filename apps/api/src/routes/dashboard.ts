@@ -15,12 +15,13 @@ type IncomeView = Awaited<ReturnType<typeof buildDividendIncomeView>>;
 type AnnouncedRow = IncomeView["announced"][number];
 type ProjectedRow = IncomeView["projected"][number];
 type RetroactiveRow = IncomeView["retroactive"][number];
+type LongRangeRow = IncomeView["longRange"][number];
 type MonthlyBreakdownRow = IncomeView["summary"]["monthlyBreakdown"][number];
 
 const WINDOW_DAYS = 30;
 const MAX_ROWS = 5;
 const MIN_ROWS = 3;
-const MAX_STREAM_POINTS = 800;
+const MAX_STREAM_POINTS = 4000;
 
 export interface UpcomingRow {
   symbol: string;
@@ -85,19 +86,6 @@ export function previousMarketDay(todayIso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Adds `n` months to an ISO date in UTC, clamping the day so that adding to
- *  the 31st never rolls into the following month (JS Date would turn
- *  2026-03-31 minus one month into 2026-03-03). */
-function addMonths(iso: string, n: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  const day = d.getUTCDate();
-  d.setUTCDate(1);
-  d.setUTCMonth(d.getUTCMonth() + n);
-  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-  d.setUTCDate(Math.min(day, lastDay));
-  return d.toISOString().slice(0, 10);
-}
-
 /** Adds `n` days to an ISO date, in UTC — same arithmetic shape as
  *  previousMarketDay, so callers stay immune to local-timezone drift. */
 function addDays(iso: string, n: number): string {
@@ -117,67 +105,93 @@ export interface IncomeStreamPointDTO {
    *  one — same fallback `selectUpcoming` uses, so a payment cannot appear on
    *  two different days depending on which component drew it. */
   date: string;
-  /** Already in the display currency: the income view FX-converts all three
-   *  arrays before they leave it. Gross — the tax rate travels separately on
-   *  `income.dividendTaxRate` and is applied at render, the way every other
-   *  income surface in the app does it. */
+  /** Display currency, GROSS — netted client-side by `dividendTaxRate`. */
   amount: string;
   currency: string;
   symbol: string;
   certainty: PaymentCertainty;
+  /** Which headline total this payment is part of. The overview's "next 12
+   *  months" is `projectedTwelveMonthIncome`, which sums announced, projected
+   *  and in-flight rows by ex-date horizon — not by payment date — so the client
+   *  cannot rebuild it from dates. It sums the points tagged here instead, and
+   *  the two agree by construction. */
+  headline: HeadlineWindow | null;
 }
 
-/** Twelve months back and twelve forward, every payment as one point.
+export type HeadlineWindow = "trailing" | "forward";
+
+/** Every payment the book has received and expects, one point each: from the
+ *  first dividend in the ledger through the calendar's long-range forecast
+ *  (31 December three years out). The overview's income tape pans across it.
  *
- *  The window is symmetric on purpose: the forward half is the span the hero
- *  figure names ("income, next twelve months"), so the reader can see the
- *  figure's own territory rather than being asked to trust it. The backward
- *  half is what makes the forward half legible — a lumpy book looks like a
- *  forecasting artefact until you can see it was lumpy last year too.
+ *  Only points in the headline's currency are kept — the same `inDisplay` rule
+ *  the income view's totals use — because a tape that sums what it draws cannot
+ *  add EUR face value to a DKK total. No headline currency, no points.
  *
- *  Capped, because a monthly-paying book of a few hundred holdings would
- *  otherwise put thousands of points on the wire for a chart 1,200px wide.
- *  The cap drops the OLDEST points first: the right-hand half is the half the
- *  headline is about.
- *
- *  Pure — "today" is an argument, not a clock read — so it unit-tests directly
- *  and cannot rot the way a fixture with a hardcoded date does.
- */
+ *  Capped, dropping the OLDEST first: the forward half is what the headline is
+ *  about. Pure — "today" is an argument, not a clock read. */
 export function selectIncomeStream(
-  retroactive: RetroactiveRow[],
-  announced: AnnouncedRow[],
-  projected: ProjectedRow[],
-  todayIso: string,
+  sources: {
+    retroactive: RetroactiveRow[];
+    announced: AnnouncedRow[];
+    projected: ProjectedRow[];
+    longRange: LongRangeRow[];
+  },
+  opts: { todayIso: string; headlineCurrency: string | null },
 ): IncomeStreamPointDTO[] {
-  const from = addMonths(todayIso, -12);
-  const to = addMonths(todayIso, 12);
+  const { todayIso, headlineCurrency } = opts;
+  if (!headlineCurrency) return [];
+  // Same cutoff the income view uses for trailingTwelveMonthIncome.
+  const trailingCutoff = new Date(Date.parse(todayIso) - 365 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 
   const points: IncomeStreamPointDTO[] = [
-    ...retroactive.map((r) => ({
-      date: r.paymentDate ?? r.exDate,
-      amount: r.income,
-      currency: r.currency,
-      symbol: r.symbol,
-      certainty: "paid" as const,
-    })),
-    ...announced.map((a) => ({
+    ...sources.retroactive.map((r) => {
+      const date = r.paymentDate ?? r.exDate;
+      // Received rows are dated on or before today; in-flight rows (ex-date
+      // passed, cash pending) always after it, and the headline counts them forward.
+      const headline: HeadlineWindow | null =
+        date > todayIso ? "forward" : date > trailingCutoff ? "trailing" : null;
+      return {
+        date,
+        amount: r.income,
+        currency: r.currency,
+        symbol: r.symbol,
+        certainty: "paid" as const,
+        headline,
+      };
+    }),
+    ...sources.announced.map((a) => ({
       date: a.paymentDate ?? a.exDate,
       amount: a.income,
       currency: a.currency,
       symbol: a.symbol,
       certainty: "confirmed" as const,
+      headline: "forward" as const,
     })),
-    ...projected.map((p) => ({
+    ...sources.projected.map((p) => ({
       date: p.paymentDate ?? p.projectedExDate,
       amount: p.income,
       currency: p.currency,
       symbol: p.symbol,
       certainty: "estimated" as const,
+      headline: "forward" as const,
+    })),
+    // Already past the 12-month horizon (the income view filters on ex-date),
+    // so nothing here is counted twice and nothing is part of a headline.
+    ...sources.longRange.map((p) => ({
+      date: p.paymentDate ?? p.projectedExDate,
+      amount: p.income,
+      currency: p.currency,
+      symbol: p.symbol,
+      certainty: "estimated" as const,
+      headline: null,
     })),
   ]
     // A zero drawn at zero height is an invisible mark that still costs a DOM
     // node and still answers a hover; drop them rather than draw nothing.
-    .filter((pt) => pt.date >= from && pt.date <= to && new Decimal(pt.amount).gt(0))
+    .filter((pt) => pt.currency === headlineCurrency && new Decimal(pt.amount).gt(0))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   return points.length > MAX_STREAM_POINTS
@@ -271,10 +285,19 @@ export function dashboardRoutes(
 
     const upcomingDividends = selectUpcoming(income.announced, income.projected, todayIso);
     const incomeStream = selectIncomeStream(
-      income.retroactive,
-      income.announced,
-      income.projected,
-      todayIso,
+      {
+        retroactive: income.retroactive,
+        announced: income.announced,
+        projected: income.projected,
+        longRange: income.longRange,
+      },
+      {
+        todayIso,
+        headlineCurrency:
+          income.summary.projectedTwelveMonthIncome[0]?.currency ??
+          income.summary.trailingTwelveMonthIncome[0]?.currency ??
+          null,
+      },
     );
     const recentDividends = selectRecentDividends(income.announced, todayIso);
     const thisMonth = selectThisMonth(income.summary.monthlyBreakdown, currentMonth);

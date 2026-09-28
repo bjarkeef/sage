@@ -31,6 +31,7 @@ function pt(o: Partial<IncomeStreamPointDTO> & { date: string }): IncomeStreamPo
     currency: "USD",
     symbol: "O",
     certainty: "paid",
+    headline: null,
     ...o,
   };
 }
