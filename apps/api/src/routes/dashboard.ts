@@ -151,14 +151,20 @@ export function selectIncomeStream(
       const date = r.paymentDate ?? r.exDate;
       // Received rows are dated on or before today; in-flight rows (ex-date
       // passed, cash pending) always after it, and the headline counts them forward.
-      const headline: HeadlineWindow | null =
-        date > todayIso ? "forward" : date > trailingCutoff ? "trailing" : null;
+      const inFlight = date > todayIso;
+      const headline: HeadlineWindow | null = inFlight
+        ? "forward"
+        : date > trailingCutoff
+          ? "trailing"
+          : null;
       return {
         date,
         amount: r.income,
         currency: r.currency,
         symbol: r.symbol,
-        certainty: "paid" as const,
+        // The income view calls a future cash date confirmed: the entitlement is
+        // fixed, but nothing has been paid yet.
+        certainty: inFlight ? ("confirmed" as const) : ("paid" as const),
         headline,
       };
     }),

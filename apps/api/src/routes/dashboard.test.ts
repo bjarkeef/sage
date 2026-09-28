@@ -196,6 +196,17 @@ describe("selectIncomeStream", () => {
     ]);
   });
 
+  it("tags an in-flight payment confirmed, not paid: the cash has not landed", () => {
+    const pts = stream({
+      retroactive: [retro("LANDED", fromToday(0)), retro("INFLIGHT", fromToday(4))],
+    });
+
+    expect(pts.map((p) => [p.symbol, p.certainty, p.headline])).toEqual([
+      ["LANDED", "paid", "trailing"],
+      ["INFLIGHT", "confirmed", "forward"],
+    ]);
+  });
+
   it("keeps the whole history and runs out through the long-range forecast", () => {
     const pts = stream({
       retroactive: [retro("OLD", fromToday(-2000)), retro("IN", fromToday(-300))],
