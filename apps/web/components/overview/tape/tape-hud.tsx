@@ -68,7 +68,7 @@ export function TapeHud({
   );
 
   return (
-    // `sm:flex-row sm:flex-nowrap`, not `flex-wrap`: with the right column
+    // `lg:flex-row lg:flex-nowrap`, not `flex-wrap`: with the right column
     // fixed at 310px, a wrapping flex container still breaks onto two lines
     // whenever the LEFT column's un-shrunk (hypothetical) width doesn't fit —
     // `min-w-0` only lets it shrink once it's already on a line, it doesn't
@@ -77,13 +77,20 @@ export function TapeHud({
     // growing upward — then overlaps the figure it's supposed to sit beside.
     // Forcing one row and letting the left column shrink (`min-w-0 flex-1`)
     // removes the wrap entirely, so the two columns can never overlap.
-    <div className="flex flex-col gap-6 sm:flex-row sm:flex-nowrap sm:items-end sm:justify-between">
-      <div className="min-w-0 sm:flex-1">
-        <p className="label-caps flex flex-wrap gap-x-2 text-muted-foreground">
-          <span className="text-foreground">
+    // Measured in the browser: `sm` (640) still overflowed `main` horizontally
+    // between 640–768, so the two-column row only turns on at `lg` (1024) —
+    // 1024 itself keeps the row layout; everything below it stacks.
+    <div className="flex flex-col gap-6 lg:flex-row lg:flex-nowrap lg:items-end lg:justify-between">
+      <div className="min-w-0 lg:flex-1">
+        {/* One line at every width: focusing prefixes the ticker, and that
+            extra text used to wrap the eyebrow onto a second line below `lg`,
+            shifting the tape 15px on focus. The label (name + optional
+            ticker) never wraps or shrinks; the dates truncate instead. */}
+        <p className="label-caps flex min-w-0 gap-x-2 text-muted-foreground">
+          <span className="shrink-0 whitespace-nowrap text-foreground">
             {focus ? `${focus} · ${range.label}` : range.label}
           </span>
-          <span>{formatDates(range.dates)}</span>
+          <span className="min-w-0 truncate">{formatDates(range.dates)}</span>
         </p>
         <p className="mt-3 horizon-num">
           <span className="pr-1.5 align-baseline text-lg font-light text-muted-foreground">
@@ -110,16 +117,16 @@ export function TapeHud({
       </div>
       {(comparison || showAside) && (
         <div
-          // At `sm`+ this box is sized by the comparison's own (in-flow)
+          // At `lg`+ this box is sized by the comparison's own (in-flow)
           // height, and the card overlays it absolutely — the HUD's height
-          // never depends on the card. Below `sm`, where the columns stack
+          // never depends on the card. Below `lg`, where the columns stack
           // (this row sits under the figure instead of beside it), the
           // reserved `min-h-60` (240px) stands in for the card's own height:
           // FocusCard is p-4 (32px) + a symbol line + a name/frequency line
           // (mb-3) + a 5-row `dl` (gap-y-1) — measured ~235px in the browser,
           // so 240px keeps the row from resizing when the card replaces the
           // comparison in view.
-          className="relative min-h-0 shrink-0 max-sm:min-h-60 sm:w-[310px]"
+          className="relative min-h-0 shrink-0 max-lg:min-h-60 lg:w-[310px]"
         >
           {comparison}
           {showAside && (

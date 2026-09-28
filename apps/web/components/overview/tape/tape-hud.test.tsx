@@ -98,16 +98,42 @@ describe("TapeHud", () => {
     // The slot is a fixed-width, non-shrinking column, not a wrap target —
     // a `flex-wrap` row can still break onto two lines when this column's
     // un-shrunk width doesn't fit, which is what let the card land on top
-    // of the figure above it.
+    // of the figure above it. The row only switches to two columns at `lg`
+    // (1024): `sm` still let `main` scroll horizontally between 640–768.
     const slot = comparison.parentElement!;
     expect(slot).toHaveClass("shrink-0");
-    expect(slot.className).toContain("sm:w-[310px]");
-    expect(slot.className).toContain("max-sm:min-h-60");
+    expect(slot.className).toContain("lg:w-[310px]");
+    expect(slot.className).toContain("max-lg:min-h-60");
 
     const row = slot.parentElement!;
     expect(row.className).not.toContain("flex-wrap");
-    expect(row.className).toContain("sm:flex-row");
-    expect(row.className).toContain("sm:flex-nowrap");
+    expect(row.className).toContain("lg:flex-row");
+    expect(row.className).toContain("lg:flex-nowrap");
+  });
+
+  it("keeps the eyebrow on one line, truncating the dates instead of wrapping", () => {
+    render(
+      <TapeHud
+        range={resolveRange("today", ctx)}
+        totals={totals}
+        prev={{ ...totals, total: 6184 }}
+        currency="DKK"
+        focus="CASH_SAVINGS"
+        motion={false}
+      />,
+    );
+    // Focusing prefixes the eyebrow with the ticker; that extra text used to
+    // push it onto a second line below `lg`, shifting the tape 15px.
+    const label = screen.getByText("CASH_SAVINGS · Next 12 months");
+    const eyebrow = label.parentElement!;
+    expect(eyebrow.className).not.toContain("flex-wrap");
+    expect(eyebrow.className).toContain("min-w-0");
+    expect(label.className).toContain("whitespace-nowrap");
+    expect(label.className).toContain("shrink-0");
+
+    const dates = screen.getByText(formatDates([today, today + 365]));
+    expect(dates.className).toContain("truncate");
+    expect(dates.className).toContain("min-w-0");
   });
 });
 
