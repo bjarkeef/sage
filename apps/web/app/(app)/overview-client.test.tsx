@@ -23,6 +23,15 @@ import { OverviewClient } from "./overview-client";
 import { allByMoney } from "../../lib/test/by-money";
 import * as api from "../../lib/api";
 
+/** n days from the moment the suite runs, in UTC — never a literal date, so
+ *  this file can't rot into a past-dated fixture (see CLAUDE.md's
+ *  self-expiring-tests note). */
+function fromToday(n: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 const FIXTURE_DASHBOARD: DashboardDTO = {
   displayCurrency: "USD",
   positions: [
@@ -87,7 +96,24 @@ const FIXTURE_DASHBOARD: DashboardDTO = {
     },
     dividendTaxRate: 35,
   },
-  incomeStream: [],
+  incomeStream: [
+    {
+      date: fromToday(-40),
+      amount: "1100.00",
+      currency: "USD",
+      symbol: "KO",
+      certainty: "paid",
+      headline: "trailing",
+    },
+    {
+      date: fromToday(20),
+      amount: "1284.00",
+      currency: "USD",
+      symbol: "KO",
+      certainty: "estimated",
+      headline: "forward",
+    },
+  ],
   upcomingDividends: [
     {
       symbol: "O",
@@ -153,6 +179,10 @@ function renderOverview(prefsOverrides: Partial<OverviewPrefs> = {}) {
     ...FIXTURE_SETTINGS,
     overviewPrefs: { ...FIXTURE_SETTINGS.overviewPrefs, ...prefsOverrides },
   });
+  // The goal band shares this page and fetches on its own; seeding it fresh
+  // here keeps every test quiet instead of letting a real fetch to a
+  // non-existent API reject in the background (see GoalPage's own tests).
+  qc.setQueryData(qk.goal(), { goal: null, defaults: null, result: null });
   const result = renderWithClient(<OverviewClient />, qc);
   return { ...result, queryClient: qc };
 }
@@ -173,15 +203,17 @@ describe("OverviewClient", () => {
     // cache, not just fast enough to race a refetch.
     renderOverview();
 
-    // Netted through the fixture's 35% rate: 1284.00 gross -> 834.60.
-    await waitFor(() => expect(allByMoney("$834.60")).toHaveLength(1));
+    // The tape's figure is the sum of the fixture's forward-tagged points
+    // (1284.00), netted through the fixture's 35% rate -> 834.60. It prints
+    // the ISO currency code, not a "$" sign.
+    await waitFor(() => expect(allByMoney("USD834.60")).toHaveLength(1));
     expect(dashSpy).not.toHaveBeenCalled();
     expect(settingsSpy).not.toHaveBeenCalled();
   });
 
   it("hides the stat strip by default and shows it when statStrip is on", async () => {
     const { queryClient } = renderOverview({ statStrip: false });
-    await screen.findByText("Income · next twelve months");
+    await screen.findByText("Next 12 months");
     expect(screen.queryByText("YTD return")).not.toBeInTheDocument();
 
     queryClient.setQueryData(qk.userSettings(), {
@@ -194,13 +226,19 @@ describe("OverviewClient", () => {
 
   it("hides a card when its pref is off", async () => {
     renderOverview({ upcomingCard: false });
-    await screen.findByText("Income · next twelve months");
+    await screen.findByText("Next 12 months");
     expect(screen.queryByText("Upcoming")).not.toBeInTheDocument();
+  });
+
+  it("leads with the income tape and keeps the goal band beneath it", async () => {
+    renderOverview();
+    expect(await screen.findByRole("group", { name: /income timeline/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Today" })).toHaveAttribute("aria-checked", "true");
   });
 
   it("nets the Upcoming card's dividend amounts through the real page wiring", async () => {
     renderOverview();
-    await screen.findByText("Income · next twelve months");
+    await screen.findByText("Next 12 months");
     // FIXTURE_DASHBOARD's upcoming dividend is gross $40.00 with a 35% tax
     // rate configured: the card must show the netted $26.00 and never the raw
     // gross figure, pinning overview-client.tsx's netting wire-up (regressing
@@ -215,7 +253,7 @@ describe("OverviewClient", () => {
 
   it("opens with no greeting and no figure the page already prints", async () => {
     renderOverview({});
-    await screen.findByText("Income · next twelve months");
+    await screen.findByText("Next 12 months");
     // Two rejected patterns, both of which have shipped before. A greeting used
     // as information ("Good evening, Sage") duplicates the eyebrow two lines
     // up and spends the one slot that could carry a fact; "stands at" restated
@@ -251,6 +289,7 @@ describe("OverviewClient", () => {
       const qc = makeTestQueryClient();
       qc.setQueryData(qk.dashboard(), { ...EMPTY, ...overrides });
       qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+      qc.setQueryData(qk.goal(), { goal: null, defaults: null, result: null });
       return renderWithClient(<OverviewClient />, qc);
     }
 
@@ -267,7 +306,7 @@ describe("OverviewClient", () => {
     it("drops every placeholder the empty page used to print", async () => {
       renderEmpty();
       await screen.findByText("Welcome to Sage.");
-      expect(screen.queryByText("Income · next twelve months")).not.toBeInTheDocument();
+      expect(screen.queryByText("Next 12 months")).not.toBeInTheDocument();
       expect(screen.queryByText("Book value")).not.toBeInTheDocument();
       expect(screen.queryByText("—")).not.toBeInTheDocument();
       expect(screen.queryByText(/No holdings yet/)).not.toBeInTheDocument();
@@ -290,7 +329,7 @@ describe("OverviewClient", () => {
           stalePrices: [],
         },
       });
-      await screen.findByText("Income · next twelve months");
+      await screen.findByText("Next 12 months");
       expect(screen.queryByText("Welcome to Sage.")).not.toBeInTheDocument();
     });
   });
@@ -304,6 +343,7 @@ describe("OverviewClient", () => {
       const qc = makeTestQueryClient();
       qc.setQueryData(qk.dashboard(), { ...FIXTURE_DASHBOARD, ...overrides });
       qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+      qc.setQueryData(qk.goal(), { goal: null, defaults: null, result: null });
       return renderWithClient(<OverviewClient />, qc);
     }
 
@@ -335,7 +375,7 @@ describe("OverviewClient", () => {
         ],
       });
 
-      await screen.findByText("Income · next twelve months");
+      await screen.findByText("Next 12 months");
       expect(screen.getByText("Book value")).toBeInTheDocument();
       expect(screen.queryByText("$3,197.00")).not.toBeInTheDocument();
       expect(screen.getByText("—")).toBeInTheDocument();
