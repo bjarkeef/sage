@@ -19,6 +19,8 @@ export function formatDates([from, to]: [number, number]): string {
 const numberPart = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const signedPct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+
 const SWATCH: [keyof Totals, string, string][] = [
   ["paid", "paid", "var(--certainty-paid)"],
   ["confirmed", "confirmed", "var(--certainty-confirmed)"],
@@ -47,11 +49,7 @@ export function TapeHud({
 }) {
   const figure = useRollingNumber(totals.total, motion, numberPart);
   const change = prev ? changePct(totals.total, prev.total) : null;
-  const changeRef = useRollingNumber(
-    change ?? 0,
-    motion,
-    (n) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`,
-  );
+  const changeRoll = useRollingNumber(change ?? 0, motion, signedPct);
 
   return (
     <div className="flex flex-wrap items-end justify-between gap-6">
@@ -66,7 +64,7 @@ export function TapeHud({
           <span className="pr-1.5 align-baseline text-lg font-light text-muted-foreground">
             {currency}
           </span>
-          <span ref={figure}>{numberPart(totals.total)}</span>
+          <span ref={figure.ref}>{figure.text}</span>
         </p>
         <p className="mt-4 flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs tabular-nums text-muted-foreground">
           {SWATCH.map(([k, word, tone]) => (
@@ -92,11 +90,7 @@ export function TapeHud({
             <p
               className={`stat-num ${change == null ? "" : change >= 0 ? "text-gain" : "text-loss"}`}
             >
-              {change == null ? (
-                "new"
-              ) : (
-                <span ref={changeRef}>{`${change >= 0 ? "+" : ""}${change.toFixed(1)}%`}</span>
-              )}
+              {change == null ? "new" : <span ref={changeRoll.ref}>{changeRoll.text}</span>}
             </p>
             <p className="font-mono tabular-nums">
               {currency} {Math.round(prev.total).toLocaleString("en-US")}

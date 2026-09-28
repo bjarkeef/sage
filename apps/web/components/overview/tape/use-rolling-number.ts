@@ -9,15 +9,36 @@ const TAU_MS = 140;
  * the one figure DESIGN.md lets move under a moving pointer. It starts at its
  * true value (never counts up from zero) and writes straight to the DOM, so a
  * roll never re-renders the page.
+ *
+ * The hook owns the text, not React: render `text` as the span's only child.
+ * It is the first value, fixed for the component's life, so a re-render never
+ * commits the final figure over a roll in progress; the layout effect writes
+ * before the browser paints, so no frame shows the final value and then snaps
+ * back. `format` must be stable (module scope), or every render restarts it.
  */
-export function useRollingNumber(target: number, enabled: boolean, format: (n: number) => string) {
-  const ref = React.useRef<HTMLSpanElement | null>(null);
+export function useRollingNumber(
+  target: number,
+  enabled: boolean,
+  format: (n: number) => string,
+): { ref: (el: HTMLSpanElement | null) => void; text: string } {
+  const el = React.useRef<HTMLSpanElement | null>(null);
   const shown = React.useRef(target);
   const raf = React.useRef<number | null>(null);
+  const [text] = React.useState(() => format(target));
 
-  React.useEffect(() => {
+  // A span that mounts later (the comparison appears only when there is one)
+  // starts from the rolled value, not the first render's.
+  const ref = React.useCallback(
+    (node: HTMLSpanElement | null) => {
+      el.current = node;
+      if (node) node.textContent = format(shown.current);
+    },
+    [format],
+  );
+
+  React.useLayoutEffect(() => {
     const write = () => {
-      if (ref.current) ref.current.textContent = format(shown.current);
+      if (el.current) el.current.textContent = format(shown.current);
     };
     if (!enabled) {
       shown.current = target;
@@ -41,5 +62,5 @@ export function useRollingNumber(target: number, enabled: boolean, format: (n: n
     };
   }, [target, enabled, format]);
 
-  return ref;
+  return { ref, text };
 }

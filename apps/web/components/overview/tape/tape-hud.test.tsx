@@ -34,6 +34,27 @@ describe("TapeHud", () => {
     expect(screen.getByText("+3.5%")).toBeInTheDocument();
   });
 
+  it("rolls toward a new figure rather than painting the final value first", () => {
+    const hud = (total: number) => (
+      <TapeHud
+        range={resolveRange("today", ctx)}
+        totals={{ ...totals, total }}
+        prev={{ ...totals, total: 6082 }}
+        currency="DKK"
+        focus={null}
+        motion
+      />
+    );
+    const { rerender, container } = render(hud(6296.5));
+    const figure = () => container.querySelector(".horizon-num > span:last-child")!.textContent;
+    expect(figure()).toBe("6,296.50");
+    rerender(hud(9000));
+    // Before the first animation frame the figure still reads its old value:
+    // React committing "9,000.00" and the roll snapping back would flash it.
+    expect(figure()).not.toBe("9,000.00");
+    expect(figure()).toBe("6,296.50");
+  });
+
   it("prefixes the focused payer and hides the comparison for All time", () => {
     render(
       <TapeHud
