@@ -10,7 +10,6 @@ export function PayerChips({
 }: {
   payers: PayerRank[];
   focus: string | null;
-  currency: string;
   onPick: (symbol: string) => void;
 }) {
   return (
