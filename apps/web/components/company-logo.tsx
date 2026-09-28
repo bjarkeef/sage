@@ -65,7 +65,7 @@ export function CompanyLogo({ website, symbol, size = 40 }: CompanyLogoProps) {
     return (
       <div
         aria-hidden="true"
-        className="flex items-center justify-center rounded-control bg-muted font-mono text-xs font-medium text-muted-foreground"
+        className="flex shrink-0 items-center justify-center rounded-control bg-muted font-mono text-xs font-medium text-muted-foreground"
         style={{ width: size, height: size }}
       >
         {initials}
@@ -77,7 +77,7 @@ export function CompanyLogo({ website, symbol, size = 40 }: CompanyLogoProps) {
   // stays crisp on high-DPI screens.
   return (
     <div
-      className="flex items-center justify-center overflow-hidden rounded-control border border-border bg-white"
+      className="flex shrink-0 items-center justify-center overflow-hidden rounded-control border border-border bg-white"
       style={{ width: size, height: size }}
     >
       <Image
