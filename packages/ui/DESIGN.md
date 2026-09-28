@@ -22,6 +22,9 @@ Live values: `packages/ui/src/styles/tokens.css` + `globals.css`.
 | Card padding      | **24px** (`p-6`); `<Card compact>` → **20px** (`p-5`); intra-card gaps **12–14px**                                                                                                                                                                                                                                   |
 | Row height        | **44px** (`min-h-11`) single-line rows; two-line cells (primary + secondary) grow the same row, no separate track                                                                                                                                                                                                    |
 
+`tape-bleed` is `horizon-bleed` without the 1440px cap, for the income tape
+only: on a pannable timeline, width is visible time.
+
 ### Breakpoints
 
 Two boundaries, and only two. Anything else is a one-off that will drift.
@@ -309,6 +312,17 @@ product rather than an illustration of it, and a chart that assembles itself in
 front of you says "these are your numbers, arriving" in a way a static PNG
 cannot. Everywhere else, the cascade is enough. If you are reaching for this
 clause to make a card livelier, the answer is no.
+
+**The income tape is that exception, and it carries one more.** Its entrance —
+bars rising left to right, once per mount, ≤ 850ms — is the data-bearing
+entrance above. And its lead figure (with the comparison percent beside it)
+**rolls** toward its new value while the reader pans, with a ~140ms time
+constant, because the figure _is_ the window the hand is moving. That is the
+only figure in the app allowed to move under a moving pointer. The paid /
+confirmed / estimated split, month totals, the focus card and the ribbon under
+it change instantly, per the rule below. Panning eases (~110ms) and a released
+drag carries momentum. All of it is off — instant, not slower — when the OS asks
+for reduced motion or the user turns off _Motion_ in Settings → Overview.
 
 **Interaction motion is separate from entrance motion and has its own budget.**
 Hover and state transitions: 120–200ms, ease-out. A crosshair or pointer-follower
