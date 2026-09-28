@@ -204,6 +204,11 @@ describeDb("GET/PATCH /user/settings", () => {
     });
   });
 
+  it("defaults tapeMotion on, and stores it off when asked", () => {
+    expect(fillDefaults(undefined).tapeMotion).toBe(true);
+    expect(fillDefaults({ tapeMotion: false }).tapeMotion).toBe(false);
+  });
+
   it("rejects a non-boolean overviewPrefs value with 400", async () => {
     const cookie = await signUpTestUser(app, "invalid-user@example.com");
 

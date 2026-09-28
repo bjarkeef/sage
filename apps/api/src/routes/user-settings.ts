@@ -23,6 +23,7 @@ export const DEFAULT_OVERVIEW_PREFS: OverviewPrefs = {
   incomeCard: true,
   portfolioCard: true,
   upcomingCard: true,
+  tapeMotion: true,
 };
 
 const overviewPrefsSchema = z
@@ -38,6 +39,7 @@ const overviewPrefsSchema = z
     incomeCard: z.boolean(),
     portfolioCard: z.boolean(),
     upcomingCard: z.boolean(),
+    tapeMotion: z.boolean(),
   })
   .partial()
   .strict();

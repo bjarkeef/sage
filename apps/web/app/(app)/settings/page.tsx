@@ -66,6 +66,12 @@ const OVERVIEW_ROWS: { key: keyof OverviewPrefs; label: string; description: str
     label: "Upcoming card",
     description: "The next dividends heading your way.",
   },
+  {
+    key: "tapeMotion",
+    label: "Motion",
+    description:
+      "Glide, count and animate the income tape. Always off when your system asks for reduced motion.",
+  },
 ];
 
 export default function SettingsPage() {

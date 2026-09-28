@@ -19,6 +19,8 @@ export interface OverviewPrefs {
   incomeCard: boolean;
   portfolioCard: boolean;
   upcomingCard: boolean;
+  /** Glide, roll and animate the overview's income tape. Off is instant. */
+  tapeMotion: boolean;
 }
 
 export const user = pgTable("user", {
