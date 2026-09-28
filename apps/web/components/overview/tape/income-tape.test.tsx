@@ -8,7 +8,17 @@ import type { IncomeStreamPointDTO } from "../../../lib/types";
 vi.mock("../../../lib/api", () => ({ getGoal: vi.fn(() => new Promise(() => {})) }));
 
 const realRO = globalThis.ResizeObserver;
+const realPE = globalThis.PointerEvent;
 beforeAll(() => {
+  // jsdom has no PointerEvent, and its fallback event drops clientX and buttons.
+  class PE extends MouseEvent {
+    pointerId: number;
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init);
+      this.pointerId = init.pointerId ?? 1;
+    }
+  }
+  globalThis.PointerEvent = PE as typeof PointerEvent;
   class RO {
     constructor(private cb: ResizeObserverCallback) {}
     observe() {
@@ -21,6 +31,7 @@ beforeAll(() => {
 });
 afterAll(() => {
   globalThis.ResizeObserver = realRO;
+  globalThis.PointerEvent = realPE;
 });
 
 const TODAY = "2026-09-28";
@@ -100,5 +111,48 @@ describe("IncomeTape", () => {
     act(() => void stage.dispatchEvent(shifted));
     expect(shifted.defaultPrevented).toBe(true);
     expect(screen.getByText("In view")).toBeInTheDocument();
+  });
+
+  it("drops a press released off the stage instead of dragging with no button held", async () => {
+    renderTape();
+    const stage = await screen.findByRole("group", { name: /income timeline/i });
+    fireEvent.pointerDown(stage, { clientX: 500, button: 0, buttons: 1 });
+    // The release happened outside; the next move arrives with no button down.
+    fireEvent.pointerMove(stage, { clientX: 440, buttons: 0 });
+    expect(screen.getByText("Next 12 months")).toBeInTheDocument();
+    expect(screen.queryByText("In view")).not.toBeInTheDocument();
+  });
+
+  it("with OS reduced motion, draws the settled chart at once — no entrance", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: /prefers-reduced-motion:\s*reduce/.test(query),
+      media: query,
+      onchange: null,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent: () => false,
+    }));
+    try {
+      renderWithClient(
+        <IncomeTape
+          points={POINTS}
+          todayISO={TODAY}
+          taxRate={0}
+          currency="DKK"
+          motionPref
+          names={new Map()}
+        />,
+      );
+      await screen.findByText("Next 12 months");
+      const stage = screen.getByRole("group", { name: /income timeline/i });
+      const svg = stage.querySelector("svg");
+      expect(svg).not.toBeNull();
+      expect(svg).not.toHaveClass("tape-enter");
+      expect(stage.querySelectorAll("[data-label]").length).toBeGreaterThan(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
