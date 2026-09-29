@@ -199,81 +199,92 @@ export function HoldingsDividendTable({
         </div>
       </div>
 
-      <div className={`${GRID} border-b border-border pb-2`}>
-        {COLUMNS.map((col) => (
-          <button
-            key={col.key}
-            type="button"
-            onClick={() => handleHeaderClick(col.key)}
-            className={`label-caps text-muted-foreground transition-colors hover:text-foreground ${
-              col.align === "left" ? "text-left" : "text-right"
-            }`}
-          >
-            {col.label}
-            {sort.key === col.key ? (sort.dir === "asc" ? " ↑" : " ↓") : ""}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-col">
-        {sorted.map((r) => {
-          const positive = r.cagrPct != null && r.cagrPct >= 0;
-          return (
-            <Link
-              key={r.symbol}
-              href={`/asset/${r.symbol}`}
-              data-testid="holding-row"
-              className={`${GRID} border-b border-border py-3 text-sm transition-colors last:border-b-0 hover:bg-surface-hover`}
-            >
-              <div className="flex min-w-0 items-center gap-2 text-left">
-                <CompanyLogo website={r.website} symbol={r.symbol} size={22} />
-                <span className="font-mono font-medium tabular-nums">{r.symbol}</span>
-                <span className="min-w-0 truncate text-xs text-muted-foreground">{r.name}</span>
-              </div>
-
-              <div className="text-right font-mono tabular-nums">
-                {formatMoney({ amount: r.annual.toFixed(2), currency: r.annualCurrency })}
-              </div>
-
-              <div className="flex items-center justify-end gap-2">
-                <div className="h-1.5 flex-1 overflow-hidden rounded-badge bg-surface-hover">
-                  <div
-                    className="h-full rounded-badge"
-                    style={{
-                      width: `${maxShare > 0 ? (r.incomeShare / maxShare) * 100 : 0}%`,
-                      background: incomeRankColors.get(r.symbol),
-                    }}
-                  />
-                </div>
-                <span
-                  data-testid="share-of-income"
-                  className="w-10 text-right font-mono text-xs tabular-nums text-muted-foreground"
-                >
-                  {(r.incomeShare * 100).toFixed(1)}%
-                </span>
-              </div>
-
-              <div data-testid="yield" className="text-right font-mono tabular-nums">
-                {r.yieldPct != null ? `${r.yieldPct.toFixed(1)}%` : "—"}
-              </div>
-
-              <div data-testid="yield-on-cost" className="text-right font-mono tabular-nums">
-                {r.yieldOnCostPct != null ? `${r.yieldOnCostPct.toFixed(1)}%` : "—"}
-              </div>
-
-              <div
-                data-testid="growth"
-                className={`text-right font-mono tabular-nums ${
-                  r.cagrPct == null ? "text-muted-foreground" : positive ? "text-gain" : "text-loss"
+      {/* Six fixed tracks need ~720px (660 of columns, 60 of gaps). On a
+          phone the table scrolls inside this box instead of dragging `main`
+          sideways — DESIGN.md's breakpoint contract. */}
+      <div className="min-w-0 overflow-x-auto">
+        <div className="min-w-[720px]">
+          <div className={`${GRID} border-b border-border pb-2`}>
+            {COLUMNS.map((col) => (
+              <button
+                key={col.key}
+                type="button"
+                onClick={() => handleHeaderClick(col.key)}
+                className={`label-caps text-muted-foreground transition-colors hover:text-foreground ${
+                  col.align === "left" ? "text-left" : "text-right"
                 }`}
               >
-                {r.cagrPct == null
-                  ? "—"
-                  : `${TREND_GLYPH[r.trend]} ${positive ? "+" : "−"}${Math.abs(r.cagrPct).toFixed(0)}%`}
-              </div>
-            </Link>
-          );
-        })}
+                {col.label}
+                {sort.key === col.key ? (sort.dir === "asc" ? " ↑" : " ↓") : ""}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-col">
+            {sorted.map((r) => {
+              const positive = r.cagrPct != null && r.cagrPct >= 0;
+              return (
+                <Link
+                  key={r.symbol}
+                  href={`/asset/${r.symbol}`}
+                  data-testid="holding-row"
+                  className={`${GRID} border-b border-border py-3 text-sm transition-colors last:border-b-0 hover:bg-surface-hover`}
+                >
+                  <div className="flex min-w-0 items-center gap-2 text-left">
+                    <CompanyLogo website={r.website} symbol={r.symbol} size={22} />
+                    <span className="font-mono font-medium tabular-nums">{r.symbol}</span>
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">{r.name}</span>
+                  </div>
+
+                  <div className="text-right font-mono tabular-nums">
+                    {formatMoney({ amount: r.annual.toFixed(2), currency: r.annualCurrency })}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-badge bg-surface-hover">
+                      <div
+                        className="h-full rounded-badge"
+                        style={{
+                          width: `${maxShare > 0 ? (r.incomeShare / maxShare) * 100 : 0}%`,
+                          background: incomeRankColors.get(r.symbol),
+                        }}
+                      />
+                    </div>
+                    <span
+                      data-testid="share-of-income"
+                      className="w-10 text-right font-mono text-xs tabular-nums text-muted-foreground"
+                    >
+                      {(r.incomeShare * 100).toFixed(1)}%
+                    </span>
+                  </div>
+
+                  <div data-testid="yield" className="text-right font-mono tabular-nums">
+                    {r.yieldPct != null ? `${r.yieldPct.toFixed(1)}%` : "—"}
+                  </div>
+
+                  <div data-testid="yield-on-cost" className="text-right font-mono tabular-nums">
+                    {r.yieldOnCostPct != null ? `${r.yieldOnCostPct.toFixed(1)}%` : "—"}
+                  </div>
+
+                  <div
+                    data-testid="growth"
+                    className={`text-right font-mono tabular-nums ${
+                      r.cagrPct == null
+                        ? "text-muted-foreground"
+                        : positive
+                          ? "text-gain"
+                          : "text-loss"
+                    }`}
+                  >
+                    {r.cagrPct == null
+                      ? "—"
+                      : `${TREND_GLYPH[r.trend]} ${positive ? "+" : "−"}${Math.abs(r.cagrPct).toFixed(0)}%`}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </Card>
   );
