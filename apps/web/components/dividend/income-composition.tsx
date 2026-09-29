@@ -50,7 +50,9 @@ export function IncomeComposition({ groups }: { groups: DividendIncomeDTO["incom
 
   return (
     <Card compact className="relative flex h-full flex-col">
-      <div className="mb-3.5 flex items-start justify-between gap-3">
+      {/* Wraps: title and the three-way switch need ~330px side by side,
+          7px more than this card has on a 375px phone. */}
+      <div className="mb-3.5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <CardTitle className="mb-0">Income composition</CardTitle>
           <div className="text-xs text-muted-foreground">Share of annual income</div>
