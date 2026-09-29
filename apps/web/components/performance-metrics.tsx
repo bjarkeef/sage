@@ -147,9 +147,12 @@ export function PerfMetrics({ data }: { data: PerformanceDTO }) {
     : data.benchmarks;
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    // Three columns only from `lg`: at `md` the sidebar leaves each card
+    // ~146px, and a stat-num figure like "DKK 40,000.00" needs ~208px — it
+    // spilled out of its card and scrolled a 768px tablet page 50px.
+    <div className="grid gap-4 lg:grid-cols-3">
       <MetricCard
-        className="md:col-span-2"
+        className="lg:col-span-2"
         title="Against the benchmarks"
         definition="Time-weighted return strips out when you added or sold, so it compares like for like with an index — which is why it can differ sharply from what your money actually earned. The benchmarks are total-return series: they reinvest the index's own dividends, because your figure counts yours. That makes them read higher than the price index quoted in the news. Gaps are in percentage points."
         figure={primaryGapPp != null ? formatGapPp(primaryGapPp) : "—"}
@@ -236,7 +239,7 @@ export function PerfMetrics({ data }: { data: PerformanceDTO }) {
       />
 
       <MetricCard
-        className="md:col-span-3"
+        className="lg:col-span-3"
         title="Best and worst day"
         definition="The strongest and weakest single days in the period."
         figure={
