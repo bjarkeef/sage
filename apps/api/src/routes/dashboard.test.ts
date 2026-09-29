@@ -3,7 +3,7 @@ import { selectUpcoming, selectIncomeStream } from "./dashboard";
 
 type AnnouncedRow = Parameters<typeof selectUpcoming>[0][number];
 type ProjectedRow = Parameters<typeof selectUpcoming>[1][number];
-type RetroactiveRow = Parameters<typeof selectIncomeStream>[0][number];
+type RetroactiveRow = Parameters<typeof selectIncomeStream>[0]["retroactive"][number];
 
 /** n days from the moment the suite runs, in UTC — never a literal date, so
  *  this file can't rot into a past-dated fixture the way a hardcoded string
@@ -150,77 +150,151 @@ function retro(
   };
 }
 
+type LongRangeRow = Parameters<typeof selectIncomeStream>[0]["longRange"][number];
+
+function longRange(
+  symbol: string,
+  projectedExDate: string,
+  paymentDate: string | null,
+  income = "10.00",
+): LongRangeRow {
+  return {
+    symbol,
+    name: `${symbol} Inc`,
+    projectedExDate,
+    paymentDate,
+    paymentDateEstimated: true,
+    income,
+    currency: "USD",
+  } as LongRangeRow;
+}
+
+function stream(
+  s: Partial<Parameters<typeof selectIncomeStream>[0]>,
+  headlineCurrency: string | null = "USD",
+) {
+  return selectIncomeStream(
+    { retroactive: [], announced: [], projected: [], longRange: [], ...s },
+    { todayIso: TODAY, headlineCurrency },
+  );
+}
+
 describe("selectIncomeStream", () => {
-  it("tags each source array with the certainty it represents", () => {
-    const pts = selectIncomeStream(
-      [retro("O", fromToday(-30))],
-      [announced("KO", fromToday(5), fromToday(10))],
-      [projected("PG", fromToday(100), fromToday(105))],
-      TODAY,
-    );
+  it("tags each source with the certainty it represents", () => {
+    const pts = stream({
+      retroactive: [retro("O", fromToday(-30))],
+      announced: [announced("KO", fromToday(5), fromToday(10))],
+      projected: [projected("PG", fromToday(100), fromToday(105))],
+      longRange: [longRange("MSFT", fromToday(500), fromToday(510))],
+    });
 
     expect(pts.map((p) => [p.symbol, p.certainty])).toEqual([
       ["O", "paid"],
       ["KO", "confirmed"],
       ["PG", "estimated"],
+      ["MSFT", "estimated"],
     ]);
   });
 
-  it("spans twelve months either side of today and drops what falls outside", () => {
-    const pts = selectIncomeStream(
-      [retro("OLD", fromToday(-400)), retro("IN", fromToday(-300))],
-      [],
-      [projected("FAR", fromToday(400), fromToday(400))],
-      TODAY,
-    );
+  it("tags an in-flight payment confirmed, not paid: the cash has not landed", () => {
+    const pts = stream({
+      retroactive: [retro("LANDED", fromToday(0)), retro("INFLIGHT", fromToday(4))],
+    });
 
-    expect(pts.map((p) => p.symbol)).toEqual(["IN"]);
+    expect(pts.map((p) => [p.symbol, p.certainty, p.headline])).toEqual([
+      ["LANDED", "paid", "trailing"],
+      ["INFLIGHT", "confirmed", "forward"],
+    ]);
+  });
+
+  it("keeps the whole history and runs out through the long-range forecast", () => {
+    const pts = stream({
+      retroactive: [retro("OLD", fromToday(-2000)), retro("IN", fromToday(-300))],
+      longRange: [longRange("FAR", fromToday(1100), fromToday(1100))],
+    });
+
+    expect(pts.map((p) => p.symbol)).toEqual(["OLD", "IN", "FAR"]);
+  });
+
+  it("names the headline window each point counts toward", () => {
+    const pts = stream({
+      retroactive: [
+        retro("ANCIENT", fromToday(-400)),
+        retro("RECENT", fromToday(-30)),
+        // In flight: ex-date passed, cash still to land — the headline counts it forward.
+        retro("INFLIGHT", fromToday(4)),
+      ],
+      announced: [announced("KO", fromToday(5), fromToday(10))],
+      projected: [projected("PG", fromToday(300), fromToday(400))],
+      longRange: [longRange("MSFT", fromToday(500), fromToday(510))],
+    });
+
+    expect(Object.fromEntries(pts.map((p) => [p.symbol, p.headline]))).toEqual({
+      ANCIENT: null,
+      RECENT: "trailing",
+      INFLIGHT: "forward",
+      KO: "forward",
+      // Counted forward even though it pays after today + 365: the headline
+      // selects projected rows by ex-date horizon, not by payment date.
+      PG: "forward",
+      MSFT: null,
+    });
+  });
+
+  it("forward points sum to what the headline sums: announced + projected + in flight", () => {
+    const retroactive = [
+      retro("R", fromToday(-10), { income: "7.00" }),
+      retro("F", fromToday(3), { income: "5.00" }),
+    ];
+    const ann = [announced("A", fromToday(5), fromToday(9), { income: "11.00" })];
+    const proj = [projected("P", fromToday(200), fromToday(420), { income: "13.00" })];
+    const pts = stream({ retroactive, announced: ann, projected: proj });
+
+    const forward = pts
+      .filter((p) => p.headline === "forward")
+      .reduce((s, p) => s + Number(p.amount), 0);
+    expect(forward).toBeCloseTo(5 + 11 + 13, 6);
+  });
+
+  it("drops points in any currency but the headline's, and returns nothing without one", () => {
+    const eur = { ...retro("EUR", fromToday(-5)), currency: "EUR" };
+    expect(
+      stream({ retroactive: [eur, retro("USD", fromToday(-4))] }).map((p) => p.symbol),
+    ).toEqual(["USD"]);
+    expect(stream({ retroactive: [retro("USD", fromToday(-4))] }, null)).toEqual([]);
   });
 
   it("falls back to the ex-date when the payer named no payment date", () => {
-    // Same fallback selectUpcoming uses. If these two ever diverge, one payment
-    // renders on two different days depending on which component drew it.
     const ex = fromToday(-8);
-    const [pt] = selectIncomeStream([retro("O", null, { exDate: ex })], [], [], TODAY);
-
+    const [pt] = stream({ retroactive: [retro("O", null, { exDate: ex })] });
     expect(pt!.date).toBe(ex);
   });
 
-  it("sorts ascending across all three sources, not within each", () => {
-    const pts = selectIncomeStream(
-      [retro("A", fromToday(-10))],
-      [announced("B", fromToday(-20), fromToday(-20))],
-      [projected("C", fromToday(-30), fromToday(-30))],
-      TODAY,
-    );
-
+  it("sorts ascending across all sources, not within each", () => {
+    const pts = stream({
+      retroactive: [retro("A", fromToday(-10))],
+      announced: [announced("B", fromToday(-20), fromToday(-20))],
+      projected: [projected("C", fromToday(-30), fromToday(-30))],
+    });
     expect(pts.map((p) => p.symbol)).toEqual(["C", "B", "A"]);
   });
 
   it("drops zero-amount payments rather than drawing an invisible mark", () => {
-    const pts = selectIncomeStream(
-      [retro("ZERO", fromToday(-5), { income: "0.00" }), retro("REAL", fromToday(-4))],
-      [],
-      [],
-      TODAY,
-    );
-
+    const pts = stream({
+      retroactive: [retro("ZERO", fromToday(-5), { income: "0.00" }), retro("REAL", fromToday(-4))],
+    });
     expect(pts.map((p) => p.symbol)).toEqual(["REAL"]);
   });
 
-  it("keeps the forward half when the cap bites, dropping the oldest first", () => {
-    // 900 payments, all in the past year, oldest first — over the 800 cap.
-    const many = Array.from({ length: 900 }, (_, i) =>
-      retro(`S${i}`, fromToday(-360 + Math.floor(i / 3))),
-    );
-    const pts = selectIncomeStream(
-      many,
-      [],
-      [projected("TOMORROW", fromToday(1), fromToday(1))],
-      TODAY,
-    );
+  it("keeps the newest points when the cap bites, dropping the oldest first", () => {
+    const many = Array.from({ length: 4100 }, (_, i) => retro(`S${i}`, fromToday(-4100 + i)));
+    const pts = stream({
+      retroactive: many,
+      projected: [projected("TOMORROW", fromToday(1), fromToday(1))],
+    });
 
-    expect(pts).toHaveLength(800);
+    expect(pts).toHaveLength(4000);
+    expect(pts[0]!.symbol).toBe("S101");
     expect(pts.at(-1)?.symbol).toBe("TOMORROW");
   });
 });

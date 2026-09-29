@@ -35,6 +35,21 @@ describe("SegmentedControl", () => {
     expect(screen.getByRole("radio", { name: "Sell" }).className).toContain("focus-visible:ring-2");
   });
 
+  it("keeps a multi-word label on one line", () => {
+    // At 375px "Year to date" wrapped to two lines; a caller that runs out of
+    // room scrolls the control instead.
+    render(
+      <SegmentedControl
+        options={[...options, { label: "Year to date", value: "ytd" }]}
+        value="buy"
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole("radio", { name: "Year to date" }).className).toContain(
+      "whitespace-nowrap",
+    );
+  });
+
   it("calls onChange when an option is clicked", () => {
     const onChange = vi.fn();
     render(<SegmentedControl options={options} value="buy" onChange={onChange} />);

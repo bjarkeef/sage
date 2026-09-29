@@ -456,6 +456,8 @@ export interface OverviewPrefs {
   incomeCard: boolean;
   portfolioCard: boolean;
   upcomingCard: boolean;
+  /** Glide, count and animate the income tape. */
+  tapeMotion: boolean;
 }
 
 export interface UserSettingsDTO {
@@ -539,6 +541,9 @@ export interface IncomeStreamPointDTO {
   currency: string;
   symbol: string;
   certainty: PaymentCertainty;
+  /** The headline total this payment is part of: "forward" is the overview's
+   *  next-12-months figure, "trailing" its last-12-months comparison. */
+  headline: "trailing" | "forward" | null;
 }
 
 export interface UpcomingRow {

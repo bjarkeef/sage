@@ -73,6 +73,7 @@ function settings(
       incomeCard: true,
       portfolioCard: true,
       upcomingCard: true,
+      tapeMotion: true,
       ...overrides,
     },
     dividendTaxRate,
@@ -102,14 +103,15 @@ describe("SettingsPage — Overview section", () => {
     expect(screen.getByText("Income card")).toBeInTheDocument();
     expect(screen.getByText("Portfolio card")).toBeInTheDocument();
     expect(screen.getByText("Upcoming card")).toBeInTheDocument();
+    expect(screen.getByText("Motion")).toBeInTheDocument();
 
-    // 8 overview rows + "Add dividends automatically" + "Allow negative dividend growth", both in the Dividends section.
+    // 9 overview rows + "Add dividends automatically" + "Allow negative dividend growth", both in the Dividends section.
     const switches = screen.getAllByRole("switch");
-    expect(switches).toHaveLength(11);
+    expect(switches).toHaveLength(12);
     // The settings query resolves a tick after the static labels render — wait
     // for the load-driven enable before asserting on disabled/checked state.
     await waitFor(() => expect(switches[0]).not.toBeDisabled());
-    // brief, paydayGreeting, marketState, statStrip, goalBand, performanceCard, incomeCard, portfolioCard, upcomingCard, autoAdd, allowNegativeGrowth
+    // brief, paydayGreeting, marketState, statStrip, goalBand, performanceCard, incomeCard, portfolioCard, upcomingCard, tapeMotion, autoAdd, allowNegativeGrowth
     const statStripSwitch = switches[3]!; // defaults off
     expect(statStripSwitch).toHaveAttribute("data-state", "unchecked");
     for (const s of switches) {
@@ -218,6 +220,14 @@ describe("SettingsPage — Overview section", () => {
     // marketState reverts to its original ON state; performanceCard stays flipped OFF.
     await waitFor(() => expect(marketSwitch).toHaveAttribute("data-state", "checked"));
     expect(performanceSwitch).toHaveAttribute("data-state", "unchecked");
+  });
+
+  it("offers the tape's Motion switch among the overview settings", async () => {
+    render(<SettingsPage />);
+    expect(await screen.findByText("Motion")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Always off when your system asks for reduced motion/),
+    ).toBeInTheDocument();
   });
 });
 
