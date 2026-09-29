@@ -692,8 +692,11 @@ export function PortfolioChart({
               // three equal columns of a 390px card is ~110px each, and a Gain
               // cell reads "+DKK 20,000.00 (+15.00%)" — 230px of unbreakable
               // figure. It pushed 108px past the card on a phone once this
-              // chart moved into one.
-              "grid-flow-row divide-x-0 divide-y [&>*]:px-0 [&>*]:py-2.5 sm:grid-flow-col sm:auto-cols-max sm:justify-start sm:divide-x sm:divide-y-0 sm:[&>*]:px-6 sm:[&>*]:py-1 sm:[&>*:first-child]:pl-0"
+              // chart moved into one. And stacked up to `lg`, not `sm`: in a
+              // row the three cells need ~690px, which the overview's card only
+              // has from 1024px — at 640–1023 (tablet, or a sidebar beside it)
+              // the row ran ~120–210px past the card and scrolled the page.
+              "grid-flow-row divide-x-0 divide-y [&>*]:px-0 [&>*]:py-2.5 lg:grid-flow-col lg:auto-cols-max lg:justify-start lg:divide-x lg:divide-y-0 lg:[&>*]:px-6 lg:[&>*]:py-1 lg:[&>*:first-child]:pl-0"
         }
       >
         <Stat
