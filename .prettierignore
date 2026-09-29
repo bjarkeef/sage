@@ -6,6 +6,10 @@ node_modules/**
 # Git worktrees live here — full copies of the repo, not files to format.
 .claude/**
 
+# Local tool caches kept out of git via .git/info/exclude, which prettier does
+# not read — without this, `pnpm check` fails on a file that isn't in the repo.
+.impeccable/
+
 # Playwright output
 e2e/test-results
 e2e/playwright-report

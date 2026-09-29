@@ -79,7 +79,7 @@ export function GoalProjectionChart({
 
   return (
     <div className="flex flex-col">
-      <div className="mb-2 flex items-center gap-4 text-xs text-muted-foreground">
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="label-caps">Projection</span>
         <span className="inline-flex items-center gap-1.5">
           <i className="h-0.5 w-4 rounded-full" style={{ background: "var(--primary)" }} />{" "}

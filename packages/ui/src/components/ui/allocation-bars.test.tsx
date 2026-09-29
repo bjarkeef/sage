@@ -87,7 +87,7 @@ describe("AllocationBars", () => {
       d.className.includes("auto-fit"),
     )!;
 
-    expect(legend.className).toContain("minmax(300px,1fr)");
+    expect(legend.className).toContain("minmax(min(300px,100%),1fr)");
   });
 
   it("keeps the narrow track when rows are label and percent only", () => {
@@ -100,7 +100,7 @@ describe("AllocationBars", () => {
       d.className.includes("auto-fit"),
     )!;
 
-    expect(legend.className).toContain("minmax(190px,1fr)");
+    expect(legend.className).toContain("minmax(min(190px,100%),1fr)");
   });
 
   it("hideTitle suppresses the heading in rows variant too", () => {
