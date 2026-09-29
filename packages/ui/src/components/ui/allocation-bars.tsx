@@ -85,13 +85,15 @@ export function AllocationBars({
             packed five columns into 1072px and left the label 25px, rendering
             "VanEck Morningstar Developed Markets…" as "Van…". With a value
             present the floor rises to 300px, which packs three and leaves the
-            label ~170px. */}
+            label ~170px. The floor is `min(floor, 100%)` so that a card
+            narrower than the floor gets one column of its own width instead of
+            a 300px column that pushed a 768px tablet page 68px sideways. */}
         <div
           className={cn(
             "grid gap-x-6 gap-y-0.5",
             display.some((row) => row.value)
-              ? "grid-cols-[repeat(auto-fit,minmax(300px,1fr))]"
-              : "grid-cols-[repeat(auto-fit,minmax(190px,1fr))]",
+              ? "grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))]"
+              : "grid-cols-[repeat(auto-fit,minmax(min(190px,100%),1fr))]",
           )}
         >
           {display.map((row, i) => (
