@@ -48,7 +48,9 @@ export function SegmentedControl({
               // Every other interactive primitive in this package draws its own
               // focus ring; this one leaned on the UA outline. Same treatment
               // as Button, so the two agree wherever they sit in a row.
-              "rounded-full font-mono font-medium transition-all",
+              // nowrap: a multi-word label ("Year to date") never breaks in two;
+              // a caller short of room scrolls the control instead.
+              "whitespace-nowrap rounded-full font-mono font-medium transition-all",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               size === "sm" ? "px-3 py-1 text-xs" : "px-4 py-1.5 text-[13px]",
               active

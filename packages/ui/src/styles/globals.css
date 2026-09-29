@@ -186,6 +186,51 @@
   margin-left: calc((var(--horizon-w) - 100%) / -2);
 }
 
+/* The income tape runs the full width of the main area — no 1440px cap like
+ * `horizon-bleed`: on a pannable timeline, width is visible time, not
+ * stretched marks. Needs the `@container/main` wrapper, as horizon-bleed does. */
+@utility tape-bleed {
+  width: 100cqw;
+  margin-left: calc((100cqw - 100%) / -2);
+}
+
+/* The tape's one entrance: bars rise left to right, once per mount (≤ 850ms:
+ * 600ms + up to 250ms of delay). Off wholesale under reduced motion. */
+@keyframes tape-rise {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.tape-enter rect[data-bar] {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: tape-rise 600ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--rise-delay, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tape-enter rect[data-bar] {
+    animation: none;
+  }
+}
+
+/* Labels fade in (180ms) when the view settles. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-label] {
+    animation: none !important;
+  }
+}
+
 @utility fade-up {
   animation: fade-up 0.5s ease-out both;
 }

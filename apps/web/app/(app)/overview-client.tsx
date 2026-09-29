@@ -1,12 +1,10 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardTitle, PageShell, EmptyState, buttonVariants } from "@sage/ui";
 import { getDashboard, getUserSettings } from "../../lib/api";
 import { qk } from "../../lib/query/keys";
-import type { IncomeStreamPointDTO } from "../../lib/types";
 import { composeColorLine } from "../../lib/brief";
 import { toBriefInput } from "../../lib/brief-input";
 import { formatMoney } from "../../lib/format";
@@ -15,8 +13,7 @@ import { CurrencyPicker } from "../../components/currency-picker";
 import { useDisplayCurrency } from "../../components/display-currency-context";
 import { PortfolioChart } from "../../components/portfolio-chart-lazy";
 import { TransactionDialog } from "../../components/transaction-dialog";
-import { OverviewHero } from "../../components/overview/hero";
-import { IncomeStream } from "../../components/overview/income-stream";
+import { IncomeTape } from "../../components/overview/tape/income-tape";
 import { OverviewStatStrip } from "../../components/overview/stat-strip";
 import { GoalBand } from "../../components/overview/goal-band";
 import { MarketEyebrow } from "../../components/overview/market-eyebrow";
@@ -25,34 +22,6 @@ import { IncomeCard } from "../../components/overview/income-card";
 import { PortfolioCard } from "../../components/overview/portfolio-card";
 import { UpcomingCard } from "../../components/overview/upcoming-card";
 import { NewsCard } from "../../components/overview/news-card";
-
-/** The stream's key. Three swatches and three words — the ramp is ordinal, and
- *  a reader who does not know that `paid` is the lightest tone in dark and the
- *  darkest in light has no way to read the picture without it. */
-function StreamLegend() {
-  return (
-    <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
-      {(
-        [
-          ["Paid", "var(--certainty-paid)"],
-          ["Confirmed", "var(--certainty-confirmed)"],
-          ["Estimated", "var(--certainty-estimated)"],
-        ] as const
-      ).map(([word, tone]) => (
-        <span key={word} className="label-caps flex items-center gap-2 text-muted-foreground">
-          {/* Shaped like the marks it names — a short stadium bar, not a
-              square chip — so the key and the chart read as one object. */}
-          <i
-            aria-hidden
-            className="h-3 w-1.5 flex-none rounded-full"
-            style={{ background: tone }}
-          />
-          {word}
-        </span>
-      ))}
-    </div>
-  );
-}
 
 /** The first screen after sign-up, and the only thing on it: what this page
  *  will become, and the two ways to get there. Import leads — anyone arriving
@@ -95,16 +64,6 @@ export function OverviewClient() {
     staleTime: 300_000,
   });
 
-  // Lifted here rather than kept inside the stream: the figure is a sibling,
-  // and the point of the composition is that pointing at a payment rewrites it.
-  // Null whenever the pointer is off the plot.
-  //
-  // Above the `if (!dashboard || !settings) return null` below, and it has to
-  // stay there: a hook after an early return runs in a different order on the
-  // renders that bail out, which is the one React rule that breaks silently at
-  // runtime rather than loudly at build time.
-  const [hovered, setHovered] = React.useState<IncomeStreamPointDTO | null>(null);
-
   if (!dashboard || !settings) return null; // hydrated on first paint; guards SSR fallback
 
   const prefs = settings.overviewPrefs;
@@ -116,7 +75,6 @@ export function OverviewClient() {
   const colorSegments = prefs.brief ? composeColorLine(toBriefInput(dashboard, prefs, now)) : [];
 
   const stream = dashboard.incomeStream;
-  const paymentsAhead = stream.filter((p) => p.date > todayISO).length;
 
   // The book's worth, kept on the page but no longer leading it. Only when the
   // book is in one currency: summing across currencies is the thing this app
@@ -161,41 +119,35 @@ export function OverviewClient() {
         </div>
       </header>
 
-      {/* No card. The figure, the stream under it and the goal line beneath
-          that are one object, and at this size a surface around them only says
-          they are separate from a page that has nothing else on it. The stream
-          runs out through the column's gutters — see `horizon-bleed` — so it is
-          the ground rather than a picture. */}
+      {/* The income tape: every dividend, first to last forecast, panned
+          through time. The figure, the tape, the ribbon and the goal band
+          under it are one object, so no card surrounds them. */}
       <section className="mb-20 sm:mb-28">
-        <OverviewHero
-          income={dashboard.income.projectedTwelveMonth}
-          trailing={dashboard.income.trailingTwelveMonth}
-          taxRate={dashboard.income.dividendTaxRate}
-          paymentsAhead={paymentsAhead}
-          hovered={hovered}
-          brief={
-            prefs.brief ? (
-              <BriefHeader
-                layout="inline"
-                segments={colorSegments}
-                marketStateEnabled={false}
-                todayChangePercent={dashboard.todayChange?.percent ?? null}
-              />
-            ) : null
-          }
-        />
-
-        {stream.length > 0 && (
-          <>
-            <IncomeStream
-              className="horizon-bleed mt-10"
-              points={stream}
-              todayISO={todayISO}
-              taxRate={dashboard.income.dividendTaxRate}
-              onHover={setHovered}
-            />
-            <StreamLegend />
-          </>
+        {stream.length > 0 ? (
+          <IncomeTape
+            points={stream}
+            todayISO={todayISO}
+            taxRate={dashboard.income.dividendTaxRate}
+            // The API keeps only points in the headline's currency.
+            currency={stream[0]!.currency}
+            motionPref={prefs.tapeMotion}
+            names={new Map(dashboard.positions.map((p) => [p.symbol, p.name]))}
+            brief={
+              prefs.brief ? (
+                <BriefHeader
+                  layout="inline"
+                  segments={colorSegments}
+                  marketStateEnabled={false}
+                  todayChangePercent={dashboard.todayChange?.percent ?? null}
+                />
+              ) : null
+            }
+          />
+        ) : (
+          <div>
+            <p className="label-caps mb-2.5 text-muted-foreground">Next 12 months</p>
+            <span className="horizon-num">—</span>
+          </div>
         )}
 
         {prefs.goalBand && <GoalBand />}
