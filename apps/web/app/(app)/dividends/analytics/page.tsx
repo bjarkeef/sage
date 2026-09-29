@@ -269,7 +269,9 @@ export default function DividendAnalyticsPage() {
           </div>
           {/* Consolidated holdings table — Annual, share-of-income bar,
               Yield, Yield on cost, Growth (CAGR); rows link to /asset/[symbol]. */}
-          <div className="col-span-12">
+          {/* min-w-0: a grid cell won't shrink below its content's width, so
+              without it the table's own overflow-x-auto never engages. */}
+          <div className="col-span-12 min-w-0">
             <HoldingsDividendTable
               perHolding={income.perHolding}
               positions={portfolio?.positions ?? []}
