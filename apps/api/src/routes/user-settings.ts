@@ -44,6 +44,19 @@ const overviewPrefsSchema = z
   .partial()
   .strict();
 
+/** A logo.dev *publishable* key. Publishable keys are made to be embedded in
+ *  browser requests, which is the only way Sage uses one, so storing it in the
+ *  clear and returning it to its owner discloses nothing. A secret key (`sk_…`)
+ *  is refused: it has no business in an image URL. An empty string clears the
+ *  key, the same as null. */
+const logoDevTokenSchema = z
+  .string()
+  .trim()
+  .max(200)
+  .refine((v) => v === "" || /^pk_[A-Za-z0-9_-]+$/.test(v))
+  .transform((v) => (v === "" ? null : v))
+  .nullable();
+
 const updateSchema = z
   .object({
     // The display name, which is what the overview greets you by. better-auth
@@ -57,6 +70,9 @@ const updateSchema = z
     dividendTaxRate: z.number().min(0).max(100).nullable(),
     autoAddDividends: z.boolean(),
     allowNegativeDividendGrowth: z.boolean(),
+    showCompanyLogos: z.boolean(),
+    showNewsThumbnails: z.boolean(),
+    logoDevToken: logoDevTokenSchema,
   })
   .partial();
 
@@ -87,6 +103,9 @@ export function userSettingsRoutes(db: Database) {
         overviewPrefs: user.overviewPrefs,
         dividendTaxRate: user.dividendTaxRate,
         allowNegativeDividendGrowth: user.allowNegativeDividendGrowth,
+        showCompanyLogos: user.showCompanyLogos,
+        logoDevToken: user.logoDevToken,
+        showNewsThumbnails: user.showNewsThumbnails,
       })
       .from(user)
       .where(eq(user.id, userId))
@@ -105,6 +124,9 @@ export function userSettingsRoutes(db: Database) {
       dividendTaxRate: toNullableNumber(row?.dividendTaxRate),
       autoAddDividends: pf?.autoAddDividends ?? true,
       allowNegativeDividendGrowth: row?.allowNegativeDividendGrowth ?? true,
+      showCompanyLogos: row?.showCompanyLogos ?? false,
+      showNewsThumbnails: row?.showNewsThumbnails ?? false,
+      logoDevToken: row?.logoDevToken ?? null,
     });
   });
 
@@ -124,6 +146,9 @@ export function userSettingsRoutes(db: Database) {
         overviewPrefs: user.overviewPrefs,
         dividendTaxRate: user.dividendTaxRate,
         allowNegativeDividendGrowth: user.allowNegativeDividendGrowth,
+        showCompanyLogos: user.showCompanyLogos,
+        logoDevToken: user.logoDevToken,
+        showNewsThumbnails: user.showNewsThumbnails,
       })
       .from(user)
       .where(eq(user.id, userId))
@@ -150,6 +175,11 @@ export function userSettingsRoutes(db: Database) {
         ? body.allowNegativeDividendGrowth
         : (existing?.allowNegativeDividendGrowth ?? true);
 
+    const showCompanyLogos = body.showCompanyLogos ?? existing?.showCompanyLogos ?? false;
+    const showNewsThumbnails = body.showNewsThumbnails ?? existing?.showNewsThumbnails ?? false;
+    const logoDevToken =
+      body.logoDevToken !== undefined ? body.logoDevToken : (existing?.logoDevToken ?? null);
+
     await db
       .update(user)
       .set({
@@ -158,6 +188,9 @@ export function userSettingsRoutes(db: Database) {
         overviewPrefs: mergedPrefs ?? null,
         dividendTaxRate: dividendTaxRate == null ? null : dividendTaxRate.toFixed(2),
         allowNegativeDividendGrowth,
+        showCompanyLogos,
+        showNewsThumbnails,
+        logoDevToken,
       })
       .where(eq(user.id, userId));
 
@@ -188,6 +221,9 @@ export function userSettingsRoutes(db: Database) {
       dividendTaxRate,
       autoAddDividends,
       allowNegativeDividendGrowth,
+      showCompanyLogos,
+      showNewsThumbnails,
+      logoDevToken,
     });
   });
 
