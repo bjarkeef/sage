@@ -242,6 +242,111 @@ describeDb("GET/PATCH /user/settings", () => {
     expect(patchBody.displayCurrency).toBe("EUR");
     expect(patchBody.overviewPrefs).toEqual({ ...DEFAULT_OVERVIEW_PREFS, brief: false });
   });
+
+  // Logos and thumbnails are the only features that make the browser ask a
+  // third party about a holding, so a fresh account must start with both off.
+  describe("media privacy settings", () => {
+    type Media = {
+      showCompanyLogos: boolean;
+      showNewsThumbnails: boolean;
+      logoDevToken: string | null;
+    };
+
+    function patch(cookie: string, body: unknown) {
+      return app.request("/user/settings", {
+        method: "PATCH",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(body),
+      });
+    }
+
+    it("starts a fresh user with logos and thumbnails off and no key", async () => {
+      const cookie = await signUpTestUser(app, "media-default-user@example.com");
+
+      const res = await app.request("/user/settings", { headers: { cookie } });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Media;
+      expect(body.showCompanyLogos).toBe(false);
+      expect(body.showNewsThumbnails).toBe(false);
+      expect(body.logoDevToken).toBeNull();
+    });
+
+    it("persists both switches and a trimmed key through PATCH then GET", async () => {
+      const cookie = await signUpTestUser(app, "media-persist-user@example.com");
+
+      const patchRes = await patch(cookie, {
+        showCompanyLogos: true,
+        showNewsThumbnails: true,
+        logoDevToken: "  pk_test-Key_123  ",
+      });
+      expect(patchRes.status).toBe(200);
+      const patchBody = (await patchRes.json()) as Media;
+      expect(patchBody).toMatchObject({
+        showCompanyLogos: true,
+        showNewsThumbnails: true,
+        logoDevToken: "pk_test-Key_123",
+      });
+
+      const getBody = (await (
+        await app.request("/user/settings", { headers: { cookie } })
+      ).json()) as Media;
+      expect(getBody).toMatchObject({
+        showCompanyLogos: true,
+        showNewsThumbnails: true,
+        logoDevToken: "pk_test-Key_123",
+      });
+    });
+
+    it("leaves the media settings untouched when PATCH only sets something else", async () => {
+      const cookie = await signUpTestUser(app, "media-untouched-user@example.com");
+      await patch(cookie, { showCompanyLogos: true, logoDevToken: "pk_keep" });
+
+      const res = await patch(cookie, { displayCurrency: "EUR" });
+      const body = (await res.json()) as Media;
+      expect(body.showCompanyLogos).toBe(true);
+      expect(body.showNewsThumbnails).toBe(false);
+      expect(body.logoDevToken).toBe("pk_keep");
+    });
+
+    it("clears the key with null, and with an empty string", async () => {
+      const cookie = await signUpTestUser(app, "media-clear-user@example.com");
+
+      await patch(cookie, { logoDevToken: "pk_first" });
+      const viaNull = (await (await patch(cookie, { logoDevToken: null })).json()) as Media;
+      expect(viaNull.logoDevToken).toBeNull();
+
+      await patch(cookie, { logoDevToken: "pk_second" });
+      const viaEmpty = (await (await patch(cookie, { logoDevToken: "   " })).json()) as Media;
+      expect(viaEmpty.logoDevToken).toBeNull();
+
+      const getBody = (await (
+        await app.request("/user/settings", { headers: { cookie } })
+      ).json()) as Media;
+      expect(getBody.logoDevToken).toBeNull();
+    });
+
+    it("rejects a key that is not a publishable pk_ key, and keeps the stored one", async () => {
+      const cookie = await signUpTestUser(app, "media-invalid-user@example.com");
+      await patch(cookie, { logoDevToken: "pk_stored" });
+
+      for (const bad of ["sk_secret", "pk_", "pk_has space", "pk_" + "a".repeat(200), 42]) {
+        const res = await patch(cookie, { logoDevToken: bad });
+        expect(res.status).toBe(400);
+      }
+
+      const getBody = (await (
+        await app.request("/user/settings", { headers: { cookie } })
+      ).json()) as Media;
+      expect(getBody.logoDevToken).toBe("pk_stored");
+    });
+
+    it("rejects a non-boolean switch with 400", async () => {
+      const cookie = await signUpTestUser(app, "media-bool-user@example.com");
+
+      expect((await patch(cookie, { showCompanyLogos: "yes" })).status).toBe(400);
+      expect((await patch(cookie, { showNewsThumbnails: 1 })).status).toBe(400);
+    });
+  });
 });
 
 describe("fillDefaults — overview prefs backward compatibility", () => {

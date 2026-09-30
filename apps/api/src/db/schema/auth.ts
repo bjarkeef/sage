@@ -42,6 +42,17 @@ export const user = pgTable("user", {
    *  holding can't pull the aggregate negative. Defaults true (honest signed
    *  average) so existing users see no silent change. */
   allowNegativeDividendGrowth: boolean("allow_negative_dividend_growth").notNull().default(true),
+  /** Draw real company logos from logo.dev instead of initials. Off by
+   *  default: each logo is a request from the browser to logo.dev naming a
+   *  company, so turning it on tells logo.dev what the user looks at. */
+  showCompanyLogos: boolean("show_company_logos").notNull().default(false),
+  /** The user's own logo.dev publishable key (`pk_…`). Null falls back to the
+   *  operator's NEXT_PUBLIC_LOGO_DEV_TOKEN, if any. A publishable key is
+   *  meant to ship to browsers, so it is stored and returned as plain text. */
+  logoDevToken: text("logo_dev_token"),
+  /** Load news article images from each publisher's servers. Off by default
+   *  for the same reason as logos. */
+  showNewsThumbnails: boolean("show_news_thumbnails").notNull().default(false),
 });
 
 export const session = pgTable("session", {
