@@ -149,6 +149,10 @@ export async function buildExport(
     .from(portfolio)
     .where(eq(portfolio.id, portfolioId));
 
+  // The privacy opt-ins (showCompanyLogos, showNewsThumbnails, logoDevToken)
+  // are deliberately not exported. Each one makes the browser ask a third party
+  // about a holding, so it has to be a choice made on the instance itself — a
+  // restore must never turn one on silently.
   const [u] = await db
     .select({
       displayCurrency: user.displayCurrency,

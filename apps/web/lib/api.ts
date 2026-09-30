@@ -466,6 +466,18 @@ export async function updateAllowNegativeDividendGrowth(value: boolean): Promise
   if (!res.ok) throw new Error(`settings update failed: ${res.status}`);
 }
 
+export async function updateMediaPrefs(
+  prefs: Partial<Pick<UserSettingsDTO, "showCompanyLogos" | "showNewsThumbnails" | "logoDevToken">>,
+): Promise<void> {
+  const res = await fetch(`${clientApiBase()}/user/settings`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(prefs),
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`settings update failed: ${res.status}`);
+}
+
 export async function updateDisplayName(name: string): Promise<void> {
   const res = await fetch(`${clientApiBase()}/user/settings`, {
     method: "PATCH",

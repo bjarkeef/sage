@@ -119,6 +119,10 @@ have an account to tell you anything is wrong. After changing it:
 docker compose up -d --build web
 ```
 
+Company logos and news thumbnails are not env vars: each user turns them on in
+Settings → Privacy, and both start off. `NEXT_PUBLIC_LOGO_DEV_TOKEN` (build
+time) only supplies a default logo.dev key for users who turn logos on.
+
 ## Always-on, and reaching it from your phone
 
 Sage on a laptop you close is Sage you will stop using. The stack is built to be
