@@ -468,6 +468,13 @@ export interface UserSettingsDTO {
   dividendTaxRate: number | null;
   autoAddDividends: boolean;
   allowNegativeDividendGrowth: boolean;
+  /** Draw logos from logo.dev instead of initials. Off by default. */
+  showCompanyLogos: boolean;
+  /** Load article images from each publisher's servers. Off by default. */
+  showNewsThumbnails: boolean;
+  /** The user's logo.dev publishable key; null falls back to the operator's
+   *  NEXT_PUBLIC_LOGO_DEV_TOKEN, if one was built in. */
+  logoDevToken: string | null;
 }
 
 export interface DiversificationDimRowDTO {
