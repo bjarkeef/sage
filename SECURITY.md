@@ -49,8 +49,9 @@ These are deliberate, documented, and not vulnerabilities:
   instance exposed to the internet before that is a real problem, and the
   deployment docs say so.
 - **Company logos and news thumbnails are off by default**, because loading
-  either tells a third party which company it is for.
-  `NEXT_PUBLIC_LOGO_DEV_TOKEN` and `NEXT_PUBLIC_NEWS_THUMBNAILS` turn them on;
-  `.env.example` states what each discloses. With both unset, nothing in Sage
-  sends a third party anything about your positions. Reports of _other_
+  either tells a third party which company it is for. Each is a per-user
+  switch in Settings → Privacy, off for every account until that user turns it
+  on; the page states what each discloses. `NEXT_PUBLIC_LOGO_DEV_TOKEN` only
+  supplies a default logo.dev key and turns nothing on. With both switches off,
+  nothing in Sage sends a third party anything about your positions. Reports of _other_
   undocumented outbound requests are very welcome.
