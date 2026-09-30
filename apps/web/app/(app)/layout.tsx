@@ -3,6 +3,7 @@ import { PageShell } from "@sage/ui";
 import { Sidebar } from "../../components/sidebar";
 import { MobileNav } from "../../components/mobile-nav";
 import { DisplayCurrencyProvider } from "../../components/display-currency-context";
+import { MediaPrefsProvider } from "../../components/media-prefs-context";
 import { ProvidersDegradedCallout } from "../../components/providers-degraded-callout";
 import { getUserSettings } from "../../lib/api";
 import type { UserSettingsDTO } from "../../lib/types";
@@ -32,6 +33,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       dividendTaxRate: null,
       autoAddDividends: true,
       allowNegativeDividendGrowth: true,
+      showCompanyLogos: false,
+      showNewsThumbnails: false,
+      logoDevToken: null,
     };
   }
 
@@ -42,17 +46,25 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           indicator, so the last row of a page is never trapped underneath it. */}
       <main className="relative flex-1 overflow-y-auto py-7 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-7">
         <DisplayCurrencyProvider value={settings.displayCurrency}>
-          {/* A container, so a single element can measure the full content
-              width and escape the centred column — see the overview's plot.
-              A container query rather than `100vw`: the sidebar is part of the
-              viewport and not part of this, so vw units would push the plot
-              under it and put a horizontal scrollbar on every page. */}
-          <div className="@container/main">
-            <PageShell>
-              <ProvidersDegradedCallout />
-            </PageShell>
-            {children}
-          </div>
+          <MediaPrefsProvider
+            initial={{
+              showCompanyLogos: settings.showCompanyLogos,
+              showNewsThumbnails: settings.showNewsThumbnails,
+              logoDevToken: settings.logoDevToken,
+            }}
+          >
+            {/* A container, so a single element can measure the full content
+                width and escape the centred column — see the overview's plot.
+                A container query rather than `100vw`: the sidebar is part of the
+                viewport and not part of this, so vw units would push the plot
+                under it and put a horizontal scrollbar on every page. */}
+            <div className="@container/main">
+              <PageShell>
+                <ProvidersDegradedCallout />
+              </PageShell>
+              {children}
+            </div>
+          </MediaPrefsProvider>
         </DisplayCurrencyProvider>
       </main>
       <MobileNav />

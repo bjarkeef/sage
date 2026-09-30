@@ -11,6 +11,7 @@ import {
   updateDividendTaxRate,
   updateAllowNegativeDividendGrowth,
   updateDisplayName,
+  updateMediaPrefs,
 } from "@/lib/api";
 import { parseDecimalInput } from "@/lib/decimal-input";
 import { invalidateFor } from "@/lib/query/invalidation";
@@ -74,6 +75,10 @@ const OVERVIEW_ROWS: { key: keyof OverviewPrefs; label: string; description: str
   },
 ];
 
+/** logo.dev publishable keys — the same shape the API accepts. */
+const LOGO_KEY_PATTERN = /^pk_[A-Za-z0-9_-]+$/;
+const LOGO_KEY_MAX = 200;
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
@@ -93,6 +98,14 @@ export default function SettingsPage() {
 
   const [autoAdd, setAutoAdd] = useState<boolean | null>(null);
   const [allowNegativeGrowth, setAllowNegativeGrowth] = useState<boolean | null>(null);
+  const [showLogos, setShowLogos] = useState<boolean | null>(null);
+  const [showThumbnails, setShowThumbnails] = useState<boolean | null>(null);
+  // Committed logo.dev key and the input's raw text, kept apart for the same
+  // reason as the tax rate: an invalid or failed save reverts to the last
+  // value the server confirmed.
+  const [logoKey, setLogoKey] = useState<string | null>(null);
+  const [logoKeyInput, setLogoKeyInput] = useState("");
+  const [logoKeyError, setLogoKeyError] = useState<string | undefined>(undefined);
   const [nameDraft, setNameDraft] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
@@ -116,6 +129,10 @@ export default function SettingsPage() {
       setTaxRateInput(settings.dividendTaxRate != null ? String(settings.dividendTaxRate) : "");
       setAutoAdd(settings.autoAddDividends);
       setAllowNegativeGrowth(settings.allowNegativeDividendGrowth);
+      setShowLogos(settings.showCompanyLogos);
+      setShowThumbnails(settings.showNewsThumbnails);
+      setLogoKey(settings.logoDevToken);
+      setLogoKeyInput(settings.logoDevToken ?? "");
       setNameDraft(settings.name);
     }
   }, [settings]);
@@ -196,6 +213,51 @@ export default function SettingsPage() {
     }
   }
 
+  // The app-wide MediaPrefsProvider follows this query, so invalidating it is
+  // what makes logos and thumbnails appear or vanish without a reload.
+  async function handleShowLogosToggle(value: boolean) {
+    const previous = showLogos;
+    setShowLogos(value);
+    try {
+      await updateMediaPrefs({ showCompanyLogos: value });
+      await queryClient.invalidateQueries({ queryKey: qk.userSettings() });
+    } catch {
+      setShowLogos(previous);
+    }
+  }
+
+  async function handleShowThumbnailsToggle(value: boolean) {
+    const previous = showThumbnails;
+    setShowThumbnails(value);
+    try {
+      await updateMediaPrefs({ showNewsThumbnails: value });
+      await queryClient.invalidateQueries({ queryKey: qk.userSettings() });
+    } catch {
+      setShowThumbnails(previous);
+    }
+  }
+
+  async function handleLogoKeyBlur() {
+    const trimmed = logoKeyInput.trim();
+    const next = trimmed === "" ? null : trimmed;
+    if (next !== null && (next.length > LOGO_KEY_MAX || !LOGO_KEY_PATTERN.test(next))) {
+      // Invalid — revert the input without saving, and say why.
+      setLogoKeyInput(logoKey ?? "");
+      setLogoKeyError("That is not a publishable key. It starts with pk_.");
+      return;
+    }
+    setLogoKeyInput(next ?? "");
+    if (next === logoKey) return;
+    try {
+      await updateMediaPrefs({ logoDevToken: next });
+      setLogoKey(next);
+      await queryClient.invalidateQueries({ queryKey: qk.userSettings() });
+    } catch {
+      setLogoKeyInput(logoKey ?? "");
+    }
+  }
+
+  const defaultLogoKey = process.env.NEXT_PUBLIC_LOGO_DEV_TOKEN || null;
   const nameDirty = nameDraft.trim().length > 0 && nameDraft.trim() !== (settings?.name ?? "");
 
   async function handleSaveName() {
@@ -345,6 +407,76 @@ export default function SettingsPage() {
               checked={allowNegativeGrowth ?? true}
               disabled={allowNegativeGrowth === null}
               onCheckedChange={(v) => void handleAllowNegativeGrowthToggle(v)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div id="privacy" className="mt-8 scroll-mt-8">
+        <SectionHeader title="Privacy" className="mb-0" />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Both are off by default. Turning one on means your browser asks a third party about each
+          holding it shows.
+        </p>
+        <div className="mt-3 divide-y divide-hairline">
+          <div className="py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Company logos</p>
+                <p className="text-xs text-muted-foreground">
+                  Real logos from logo.dev instead of initials. logo.dev sees which companies you
+                  look at.
+                </p>
+              </div>
+              <Switch
+                aria-label="Company logos"
+                checked={showLogos ?? false}
+                disabled={showLogos === null}
+                onCheckedChange={(v) => void handleShowLogosToggle(v)}
+              />
+            </div>
+            {(showLogos || logoKey !== null) && (
+              <div className="mt-3">
+                <Field
+                  label="logo.dev publishable key"
+                  htmlFor="logo-dev-key"
+                  error={logoKeyError}
+                  hint="Free at logo.dev. Starts with pk_. Leave empty to use the server's default key, if one is set."
+                >
+                  <Input
+                    id="logo-dev-key"
+                    placeholder="pk_…"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={logoKeyInput}
+                    onChange={(e) => {
+                      setLogoKeyInput(e.target.value);
+                      setLogoKeyError(undefined);
+                    }}
+                    onBlur={() => void handleLogoKeyBlur()}
+                    className="w-full max-w-sm font-mono text-sm"
+                  />
+                </Field>
+              </div>
+            )}
+            {showLogos && logoKey === null && defaultLogoKey === null && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Logos stay as initials until a key is set.
+              </p>
+            )}
+          </div>
+          <div className="flex items-center justify-between py-3">
+            <div>
+              <p className="text-sm font-medium">News thumbnails</p>
+              <p className="text-xs text-muted-foreground">
+                Article images, loaded from each news source&apos;s servers.
+              </p>
+            </div>
+            <Switch
+              aria-label="News thumbnails"
+              checked={showThumbnails ?? false}
+              disabled={showThumbnails === null}
+              onCheckedChange={(v) => void handleShowThumbnailsToggle(v)}
             />
           </div>
         </div>

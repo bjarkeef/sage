@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
+import { useMediaPrefs } from "./media-prefs-context";
 
 function domainFromUrl(url: string): string | null {
   try {
@@ -13,23 +14,26 @@ function domainFromUrl(url: string): string | null {
 
 /**
  * Ordered logo sources, best quality first, each tried in turn until one loads.
- * Empty unless the operator opted in.
+ * Empty without a token, and there is only a token once the user opted in.
  *
- * Logos are the one thing on screen that can tell an outside server what you
- * hold. Drawing one means asking a third party for a named company, from your
- * browser, at your address; do it for every row and the set of requests is your
- * holdings list. So the default here is to ask nobody, and render initials.
+ * Logos are one of the two things on screen that can tell an outside server
+ * what you hold. Drawing one means asking a third party for a named company,
+ * from your browser, at your address; do it for every row and the set of
+ * requests is your holdings list. So the default here is to ask nobody, and
+ * render initials.
  *
- * Setting `NEXT_PUBLIC_LOGO_DEV_TOKEN` opts in, with the cost written down in
- * `.env.example` and in the README's "How it works".
+ * The opt-in is the "Company logos" switch in Settings → Privacy, off by
+ * default; `useMediaPrefs()` hands `CompanyLogo` a token only while it is on.
+ * `NEXT_PUBLIC_LOGO_DEV_TOKEN` can supply a default key for that switch, but no
+ * longer turns anything on by itself. The cost is written down beside the
+ * switch and in the README's "How it works".
  *
  * There was a Google favicon fallback here until 2026-08-29. It needed no token
  * and had no setting to disable it, so every instance leaked that list by
  * default. It was deleted rather than gated: a second opt-in path to the same
  * disclosure is not worth the choice it offers.
  */
-export function logoSources(domain: string | null, symbol: string): string[] {
-  const token = process.env.NEXT_PUBLIC_LOGO_DEV_TOKEN;
+export function logoSources(domain: string | null, symbol: string, token: string | null): string[] {
   if (!token) return [];
 
   const sources: string[] = [];
@@ -51,12 +55,13 @@ interface CompanyLogoProps {
 }
 
 export function CompanyLogo({ website, symbol, size = 40 }: CompanyLogoProps) {
+  const { logoToken } = useMediaPrefs();
   const domain = website ? domainFromUrl(website) : null;
   // Walk the source list on error; when exhausted, render the initials chip.
   const [sourceIndex, setSourceIndex] = React.useState(0);
-  React.useEffect(() => setSourceIndex(0), [domain, symbol]);
+  React.useEffect(() => setSourceIndex(0), [domain, symbol, logoToken]);
 
-  const sources = logoSources(domain, symbol);
+  const sources = logoSources(domain, symbol, logoToken);
   const initials = symbol.slice(0, 2);
 
   if (sources.length === 0 || sourceIndex >= sources.length) {

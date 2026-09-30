@@ -1,7 +1,13 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { ArticleRow, newsThumbnailsEnabled } from "./article-row";
+import { ArticleRow } from "./article-row";
+import { MediaPrefsProvider } from "../media-prefs-context";
+import { renderWithClient } from "@/lib/test/render-with-client";
 import type { NewsArticleDTO } from "@/lib/types";
+
+// The provider follows the user-settings query; keep it pending so each test
+// sees exactly the `initial` it passed.
+vi.mock("@/lib/api", () => ({ getUserSettings: () => new Promise(() => {}) }));
 
 const article: NewsArticleDTO = {
   title: "Coca-Cola raises its dividend",
@@ -13,19 +19,21 @@ const article: NewsArticleDTO = {
   otherSymbols: [],
 };
 
-const ORIGINAL = process.env.NEXT_PUBLIC_NEWS_THUMBNAILS;
-
-afterEach(() => {
-  if (ORIGINAL === undefined) delete process.env.NEXT_PUBLIC_NEWS_THUMBNAILS;
-  else process.env.NEXT_PUBLIC_NEWS_THUMBNAILS = ORIGINAL;
-});
+function renderWithThumbnails(on: boolean, ui = <ArticleRow article={article} />) {
+  return renderWithClient(
+    <MediaPrefsProvider
+      initial={{ showCompanyLogos: false, showNewsThumbnails: on, logoDevToken: null }}
+    >
+      {ui}
+    </MediaPrefsProvider>,
+  );
+}
 
 /** A thumbnail is a request to the publisher's image host, from the reader's
  *  address, made without them clicking anything — down a feed scoped to their
- *  holdings. Same disclosure company logos are turned off for. */
+ *  holdings. Same disclosure company logos are off by default for. */
 describe("ArticleRow thumbnails", () => {
   it("asks nobody for an image by default", () => {
-    delete process.env.NEXT_PUBLIC_NEWS_THUMBNAILS;
     render(<ArticleRow article={article} />);
     expect(document.querySelector("img")).toBeNull();
     // The headline still renders — this is a layout the app already ships,
@@ -33,23 +41,18 @@ describe("ArticleRow thumbnails", () => {
     expect(screen.getByText("Coca-Cola raises its dividend")).toBeInTheDocument();
   });
 
-  it("loads the image once the operator opts in", () => {
-    process.env.NEXT_PUBLIC_NEWS_THUMBNAILS = "true";
-    render(<ArticleRow article={article} />);
+  it("asks nobody while the user's switch is off", () => {
+    renderWithThumbnails(false);
+    expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("loads the image once the user turns thumbnails on", () => {
+    renderWithThumbnails(true);
     expect(document.querySelector("img")).toHaveAttribute("src", article.thumbnailUrl);
   });
 
-  it("treats any value other than true as off", () => {
-    // A half-set variable must not leak; only an explicit opt-in counts.
-    process.env.NEXT_PUBLIC_NEWS_THUMBNAILS = "1";
-    expect(newsThumbnailsEnabled()).toBe(false);
-    process.env.NEXT_PUBLIC_NEWS_THUMBNAILS = "";
-    expect(newsThumbnailsEnabled()).toBe(false);
-  });
-
   it("stays off where the caller already suppressed thumbnails", () => {
-    process.env.NEXT_PUBLIC_NEWS_THUMBNAILS = "true";
-    render(<ArticleRow article={article} showThumbnail={false} />);
+    renderWithThumbnails(true, <ArticleRow article={article} showThumbnail={false} />);
     expect(document.querySelector("img")).toBeNull();
   });
 });
