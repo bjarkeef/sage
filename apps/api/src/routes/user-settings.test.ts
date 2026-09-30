@@ -340,6 +340,16 @@ describeDb("GET/PATCH /user/settings", () => {
       expect(getBody.logoDevToken).toBe("pk_stored");
     });
 
+    it("accepts a key of exactly 200 characters", async () => {
+      const cookie = await signUpTestUser(app, "media-boundary-user@example.com");
+      const key = "pk_" + "a".repeat(197);
+      expect(key).toHaveLength(200);
+
+      const res = await patch(cookie, { logoDevToken: key });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as Media).logoDevToken).toBe(key);
+    });
+
     it("rejects a non-boolean switch with 400", async () => {
       const cookie = await signUpTestUser(app, "media-bool-user@example.com");
 

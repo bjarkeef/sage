@@ -441,7 +441,7 @@ export default function SettingsPage() {
                   label="logo.dev publishable key"
                   htmlFor="logo-dev-key"
                   error={logoKeyError}
-                  hint="Free at logo.dev. Starts with pk_. Leave empty to use the server's default key, if one is set."
+                  hint="Free at logo.dev. Starts with pk_. Leave empty to use this instance's default key, if one was built in."
                 >
                   <Input
                     id="logo-dev-key"

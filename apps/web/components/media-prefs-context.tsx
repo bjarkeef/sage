@@ -51,7 +51,17 @@ export function resolveMediaPrefs(s: MediaSettings): MediaPrefs {
  *  that page's own user-settings query renders with data on the client that the
  *  server rendered without. Settings still reaches it: its save invalidates the
  *  query, the page's own enabled observer refetches, and every observer of the
- *  key, this one included, sees the result. */
+ *  key, this one included, sees the result.
+ *
+ *  Across tabs, deliberately loosely — accepted for a single-user self-hosted
+ *  app:
+ *  - in the tab where the switch was flipped, it applies at once;
+ *  - another tab picks it up on window focus, once its settings are more than
+ *    60s stale (the query client's default staleTime), because the pages that
+ *    read settings themselves refetch them on focus and this observer shares
+ *    the result;
+ *  - /holdings and /news read no settings of their own, so a stale tab there
+ *    keeps the old state until it navigates or reloads. */
 export function MediaPrefsProvider({
   initial,
   children,

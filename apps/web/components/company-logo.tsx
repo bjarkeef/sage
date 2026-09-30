@@ -38,12 +38,14 @@ export function logoSources(domain: string | null, symbol: string, token: string
 
   const sources: string[] = [];
   if (domain) {
-    sources.push(`https://img.logo.dev/${domain}?token=${token}&size=128&format=png&retina=true`);
+    sources.push(
+      `https://img.logo.dev/${domain}?token=${encodeURIComponent(token)}&size=128&format=png&retina=true`,
+    );
   }
   // The ticker endpoint covers stocks AND ETFs by symbol, so it catches funds
   // and anything with no usable website (most ETFs).
   sources.push(
-    `https://img.logo.dev/ticker/${encodeURIComponent(symbol)}?token=${token}&size=128&format=png&retina=true`,
+    `https://img.logo.dev/ticker/${encodeURIComponent(symbol)}?token=${encodeURIComponent(token)}&size=128&format=png&retina=true`,
   );
   return sources;
 }
