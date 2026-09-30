@@ -40,19 +40,22 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen">
-      <Sidebar />
-      {/* Bottom padding below md clears the fixed tab bar plus the iPhone home
-          indicator, so the last row of a page is never trapped underneath it. */}
-      <main className="relative flex-1 overflow-y-auto py-7 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-7">
-        <DisplayCurrencyProvider value={settings.displayCurrency}>
-          <MediaPrefsProvider
-            initial={{
-              showCompanyLogos: settings.showCompanyLogos,
-              showNewsThumbnails: settings.showNewsThumbnails,
-              logoDevToken: settings.logoDevToken,
-            }}
-          >
+    // Around the whole shell, not just <main>: the sidebar's command palette
+    // and the mobile nav draw company logos too, and outside the provider they
+    // would read its default and stay on initials whatever the user chose.
+    <MediaPrefsProvider
+      initial={{
+        showCompanyLogos: settings.showCompanyLogos,
+        showNewsThumbnails: settings.showNewsThumbnails,
+        logoDevToken: settings.logoDevToken,
+      }}
+    >
+      <div className="flex h-screen">
+        <Sidebar />
+        {/* Bottom padding below md clears the fixed tab bar plus the iPhone home
+            indicator, so the last row of a page is never trapped underneath it. */}
+        <main className="relative flex-1 overflow-y-auto py-7 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-7">
+          <DisplayCurrencyProvider value={settings.displayCurrency}>
             {/* A container, so a single element can measure the full content
                 width and escape the centred column — see the overview's plot.
                 A container query rather than `100vw`: the sidebar is part of the
@@ -64,10 +67,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               </PageShell>
               {children}
             </div>
-          </MediaPrefsProvider>
-        </DisplayCurrencyProvider>
-      </main>
-      <MobileNav />
-    </div>
+          </DisplayCurrencyProvider>
+        </main>
+        <MobileNav />
+      </div>
+    </MediaPrefsProvider>
   );
 }
