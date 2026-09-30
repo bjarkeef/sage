@@ -8,6 +8,20 @@ Sage was developed in private and its history was rewritten before publication,
 so there is no commit-by-commit record from before this release. The log starts
 here.
 
+## [Unreleased]
+
+### Changed
+
+- Company logos and news thumbnails are now per-user switches in
+  Settings → Privacy, off for every account. If you built with
+  `NEXT_PUBLIC_LOGO_DEV_TOKEN`, logos will show initials after upgrading
+  until each user turns them on; the variable now only supplies a default key.
+
+### Removed
+
+- `NEXT_PUBLIC_NEWS_THUMBNAILS`. Remove it from `.env`; thumbnails are the
+  "News thumbnails" switch in Settings → Privacy.
+
 ## [1.0.0-beta.2] - 2026-09-16
 
 A walkthrough of a clean install, and a second pass over the numbers against a

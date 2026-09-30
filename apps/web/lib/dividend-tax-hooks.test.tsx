@@ -33,6 +33,9 @@ const SETTINGS: UserSettingsDTO = {
   dividendTaxRate: null,
   autoAddDividends: true,
   allowNegativeDividendGrowth: true,
+  showCompanyLogos: false,
+  showNewsThumbnails: false,
+  logoDevToken: null,
 };
 
 const INCOME: DividendIncomeDTO = {

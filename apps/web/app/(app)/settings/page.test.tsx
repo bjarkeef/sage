@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
-import { beforeEach, describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { renderWithClient, makeTestQueryClient } from "@/lib/test/render-with-client";
 
 const {
@@ -9,12 +9,14 @@ const {
   updateDividendTaxRateMock,
   updateAutoAddDividendsMock,
   updateAllowNegativeDividendGrowthMock,
+  updateMediaPrefsMock,
 } = vi.hoisted(() => ({
   getUserSettingsMock: vi.fn(),
   patchOverviewPrefsMock: vi.fn(),
   updateDividendTaxRateMock: vi.fn(),
   updateAutoAddDividendsMock: vi.fn(),
   updateAllowNegativeDividendGrowthMock: vi.fn(),
+  updateMediaPrefsMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -23,6 +25,7 @@ vi.mock("@/lib/api", () => ({
   updateDividendTaxRate: updateDividendTaxRateMock,
   updateAutoAddDividends: updateAutoAddDividendsMock,
   updateAllowNegativeDividendGrowth: updateAllowNegativeDividendGrowthMock,
+  updateMediaPrefs: updateMediaPrefsMock,
   deleteAllHoldings: vi.fn().mockResolvedValue(undefined),
   // The System card fetches instance status; this suite is about the sections
   // above it, so keep it resolved rather than left in flight.
@@ -79,6 +82,9 @@ function settings(
     dividendTaxRate,
     autoAddDividends: true,
     allowNegativeDividendGrowth: true,
+    showCompanyLogos: false,
+    showNewsThumbnails: false,
+    logoDevToken: null,
   };
 }
 
@@ -89,6 +95,7 @@ beforeEach(() => {
   updateDividendTaxRateMock.mockResolvedValue(undefined);
   updateAutoAddDividendsMock.mockResolvedValue(undefined);
   updateAllowNegativeDividendGrowthMock.mockResolvedValue(undefined);
+  updateMediaPrefsMock.mockResolvedValue(undefined);
 });
 
 describe("SettingsPage — Overview section", () => {
@@ -105,17 +112,19 @@ describe("SettingsPage — Overview section", () => {
     expect(screen.getByText("Upcoming card")).toBeInTheDocument();
     expect(screen.getByText("Motion")).toBeInTheDocument();
 
-    // 9 overview rows + "Add dividends automatically" + "Allow negative dividend growth", both in the Dividends section.
+    // 10 overview rows + "Add dividends automatically" + "Allow negative dividend growth"
+    // in Dividends + "Company logos" + "News thumbnails" in Privacy.
     const switches = screen.getAllByRole("switch");
-    expect(switches).toHaveLength(12);
+    expect(switches).toHaveLength(14);
     // The settings query resolves a tick after the static labels render — wait
     // for the load-driven enable before asserting on disabled/checked state.
     await waitFor(() => expect(switches[0]).not.toBeDisabled());
-    // brief, paydayGreeting, marketState, statStrip, goalBand, performanceCard, incomeCard, portfolioCard, upcomingCard, tapeMotion, autoAdd, allowNegativeGrowth
-    const statStripSwitch = switches[3]!; // defaults off
-    expect(statStripSwitch).toHaveAttribute("data-state", "unchecked");
+    // brief, paydayGreeting, marketState, statStrip, goalBand, performanceCard, incomeCard, portfolioCard, upcomingCard, tapeMotion, autoAdd, allowNegativeGrowth, logos, thumbnails
+    // statStrip and both privacy switches default off.
+    const offByDefault = [switches[3]!, switches[12]!, switches[13]!];
+    for (const s of offByDefault) expect(s).toHaveAttribute("data-state", "unchecked");
     for (const s of switches) {
-      if (s === statStripSwitch) continue;
+      if (offByDefault.includes(s)) continue;
       expect(s).toHaveAttribute("data-state", "checked");
     }
     for (const s of switches) {
@@ -389,6 +398,151 @@ describe("SettingsPage — Allow negative dividend growth", () => {
     fireEvent.click(toggle);
     await waitFor(() => expect(updateAllowNegativeDividendGrowthMock).toHaveBeenCalled());
     await waitFor(() => expect(toggle).toBeChecked()); // reverted
+  });
+});
+
+describe("SettingsPage — Privacy", () => {
+  // The page reads the operator's default key to decide whether to warn that
+  // logos will stay initials; pin it so the suite does not depend on a local
+  // .env.
+  beforeEach(() => vi.stubEnv("NEXT_PUBLIC_LOGO_DEV_TOKEN", ""));
+  afterEach(() => vi.unstubAllEnvs());
+
+  async function loaded(name: string) {
+    const toggle = await screen.findByRole("switch", { name });
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+    return toggle;
+  }
+
+  it("renders both switches off by default, with no key field", async () => {
+    render(<SettingsPage />);
+    expect(await loaded("Company logos")).toHaveAttribute("data-state", "unchecked");
+    expect(await loaded("News thumbnails")).toHaveAttribute("data-state", "unchecked");
+    expect(screen.queryByLabelText("logo.dev publishable key")).not.toBeInTheDocument();
+  });
+
+  it("PATCHes each switch and invalidates the settings query", async () => {
+    const qc = makeTestQueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+    renderWithClient(<SettingsPage />, qc);
+
+    fireEvent.click(await loaded("Company logos"));
+    await waitFor(() =>
+      expect(updateMediaPrefsMock).toHaveBeenCalledWith({ showCompanyLogos: true }),
+    );
+    fireEvent.click(await loaded("News thumbnails"));
+    await waitFor(() =>
+      expect(updateMediaPrefsMock).toHaveBeenCalledWith({ showNewsThumbnails: true }),
+    );
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["user-settings"] }),
+    );
+  });
+
+  it("reverts a switch when the PATCH fails", async () => {
+    updateMediaPrefsMock.mockRejectedValueOnce(new Error("fail"));
+    render(<SettingsPage />);
+    const toggle = await loaded("News thumbnails");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(updateMediaPrefsMock).toHaveBeenCalled());
+    await waitFor(() => expect(toggle).toHaveAttribute("data-state", "unchecked"));
+  });
+
+  it("shows the key field once logos are on, and warns while no key exists", async () => {
+    render(<SettingsPage />);
+    fireEvent.click(await loaded("Company logos"));
+
+    const input = await screen.findByLabelText("logo.dev publishable key");
+    expect(input).toHaveValue("");
+    expect(screen.getByText("Logos stay as initials until a key is set.")).toBeInTheDocument();
+  });
+
+  it("does not warn when the operator supplies a default key", async () => {
+    vi.stubEnv("NEXT_PUBLIC_LOGO_DEV_TOKEN", "pk_operator");
+    render(<SettingsPage />);
+    fireEvent.click(await loaded("Company logos"));
+
+    await screen.findByLabelText("logo.dev publishable key");
+    expect(
+      screen.queryByText("Logos stay as initials until a key is set."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a saved key even while logos are off", async () => {
+    getUserSettingsMock.mockResolvedValue({ ...settings(), logoDevToken: "pk_saved" });
+    render(<SettingsPage />);
+    expect(await screen.findByLabelText("logo.dev publishable key")).toHaveValue("pk_saved");
+  });
+
+  it("saves a valid key on blur, trimmed", async () => {
+    getUserSettingsMock.mockResolvedValue({ ...settings(), showCompanyLogos: true });
+    render(<SettingsPage />);
+    const input = await screen.findByLabelText("logo.dev publishable key");
+
+    fireEvent.change(input, { target: { value: "  pk_New-key_1  " } });
+    fireEvent.blur(input);
+
+    await waitFor(() =>
+      expect(updateMediaPrefsMock).toHaveBeenCalledWith({ logoDevToken: "pk_New-key_1" }),
+    );
+    expect(input).toHaveValue("pk_New-key_1");
+    expect(
+      screen.queryByText("Logos stay as initials until a key is set."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reverts an invalid key without saving, and says why", async () => {
+    getUserSettingsMock.mockResolvedValue({
+      ...settings(),
+      showCompanyLogos: true,
+      logoDevToken: "pk_saved",
+    });
+    render(<SettingsPage />);
+    const input = await screen.findByLabelText("logo.dev publishable key");
+    await waitFor(() => expect(input).toHaveValue("pk_saved"));
+
+    fireEvent.change(input, { target: { value: "sk_secret" } });
+    fireEvent.blur(input);
+
+    expect(input).toHaveValue("pk_saved");
+    expect(
+      screen.getByText("That is not a publishable key. It starts with pk_."),
+    ).toBeInTheDocument();
+    expect(updateMediaPrefsMock).not.toHaveBeenCalled();
+  });
+
+  it("clears a saved key when the field is emptied", async () => {
+    getUserSettingsMock.mockResolvedValue({
+      ...settings(),
+      showCompanyLogos: true,
+      logoDevToken: "pk_saved",
+    });
+    render(<SettingsPage />);
+    const input = await screen.findByLabelText("logo.dev publishable key");
+    await waitFor(() => expect(input).toHaveValue("pk_saved"));
+
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(updateMediaPrefsMock).toHaveBeenCalledWith({ logoDevToken: null }));
+  });
+
+  it("reverts the key when the save fails", async () => {
+    updateMediaPrefsMock.mockRejectedValueOnce(new Error("fail"));
+    getUserSettingsMock.mockResolvedValue({
+      ...settings(),
+      showCompanyLogos: true,
+      logoDevToken: "pk_saved",
+    });
+    render(<SettingsPage />);
+    const input = await screen.findByLabelText("logo.dev publishable key");
+    await waitFor(() => expect(input).toHaveValue("pk_saved"));
+
+    fireEvent.change(input, { target: { value: "pk_other" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(updateMediaPrefsMock).toHaveBeenCalled());
+    await waitFor(() => expect(input).toHaveValue("pk_saved"));
   });
 });
 
