@@ -213,21 +213,22 @@ it needs locally.
 **Company logos would name what you hold, so they are off.** Fetching a logo
 means asking a third party for a named company, from your browser, at your
 address; do that for every row and the requests are your holdings list. Sage
-draws ticker initials instead, and asks nobody. Setting
-`NEXT_PUBLIC_LOGO_DEV_TOKEN` turns real logos on through `img.logo.dev`, which
-is a deliberate trade rather than a default:
-[`.env.example`](./.env.example) says what it discloses. The screenshots above
-were taken with it on.
+draws ticker initials instead, and asks nobody. Each user can turn real logos
+on through `img.logo.dev` under Settings → Privacy, which is a deliberate trade
+rather than a default. Logos need a logo.dev publishable key: either one
+entered there, or a default the operator builds in with
+`NEXT_PUBLIC_LOGO_DEV_TOKEN`. That variable only supplies the key; it does not
+turn logos on for anyone. The screenshots above were taken with logos on.
 
 **News thumbnails are off for the same reason.** A story's image lives on the
 publisher's server, so loading one is a request from your browser, at your
 address, made without you clicking anything — down a feed scoped to what you
-own. Sage renders the headlines and skips the pictures.
-`NEXT_PUBLIC_NEWS_THUMBNAILS=true` turns them on. Following a headline still
-goes to the publisher, but that is a choice you make.
+own. Sage renders the headlines and skips the pictures unless you turn
+thumbnails on under Settings → Privacy. Following a headline still goes to the
+publisher, but that is a choice you make.
 
-Those two settings are the only things in Sage that can tell a third party what
-you hold. With both unset, nothing does.
+Those two switches are the only things in Sage that can tell a third party what
+you hold. Both start off for every account, and with both off, nothing does.
 
 Prices and ECB reference rates are stored in your database as they arrive,
 which is why the app still has something to show when a provider is

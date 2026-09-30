@@ -16,8 +16,8 @@ const nextConfig = {
   // contributor's first `git status`.
   agentRules: false,
   images: {
-    // logo.dev only, and only reachable at all when the operator sets
-    // NEXT_PUBLIC_LOGO_DEV_TOKEN. The Google favicon host was removed with the
+    // logo.dev only, and only reachable at all once a user turns on company
+    // logos in Settings → Privacy. The Google favicon host was removed with the
     // ungated fallback that used it (see components/company-logo.tsx).
     remotePatterns: [{ protocol: "https", hostname: "img.logo.dev" }],
   },
