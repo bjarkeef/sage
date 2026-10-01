@@ -1,7 +1,7 @@
 import { it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Hono } from "hono";
 import { FakeMarketDataProvider } from "@sage/provider-interface/testing";
-import { Money } from "@sage/core";
+import { Decimal, Money } from "@sage/core";
 import { describeDb, withTestDb, type TestDb } from "../testing";
 import {
   user,
@@ -83,6 +83,13 @@ describeDb("GET /:slug — position extras and income block", () => {
         assetType: "stock",
       },
       { symbol: "KO", name: "Coca-Cola Co", exchange: "XNYS", currency: "USD", assetType: "stock" },
+      {
+        symbol: "O",
+        name: "Example Realty",
+        exchange: "XNYS",
+        currency: "USD",
+        assetType: "stock",
+      },
     ]);
 
     // Cached profile for KO with a known dividendYield, so the currency-mixed
@@ -132,8 +139,34 @@ describeDb("GET /:slug — position extras and income block", () => {
       { symbol: "KO", exDate: koExNewer, amountPerShare: "0.3", currency: "USD", source: "test" },
     ]);
 
+    // O: a monthly payer with four years of history and four years of weekly
+    // closes at 50, so the five-year yield range has ~36 month-end samples.
+    await tdb.db.insert(dividendHistory).values(
+      Array.from({ length: 48 }, (_, i) => ({
+        symbol: "O",
+        exDate: new Date(Date.now() - (i + 1) * 30 * DAY).toISOString().slice(0, 10),
+        amountPerShare: "0.25",
+        currency: "USD",
+        source: "test",
+      })),
+    );
+
     const provider = new FakeMarketDataProvider({
+      history: {
+        O: Array.from({ length: 4 * 52 }, (_, i) => {
+          const m = Money.of("50", "USD");
+          return {
+            date: new Date(Date.now() - (4 * 52 - 1 - i) * 7 * DAY),
+            open: m,
+            high: m,
+            low: m,
+            close: m,
+            volume: new Decimal(0),
+          };
+        }),
+      },
       quotes: {
+        O: { symbol: "O", price: Money.of("50.00", "USD"), asOf: new Date(), previousClose: null },
         AAPL: {
           symbol: "AAPL",
           price: Money.of("150.25", "USD"),
@@ -215,7 +248,7 @@ describeDb("GET /:slug — position extras and income block", () => {
     expect(body.income.yieldOnCost).toBeNull();
   });
 
-  it("falls back to profile.dividendYield and nulls annualDividend when trailing dividends mix currencies", async () => {
+  it("leaves current yield null — never the provider's gross yield — when trailing dividends mix currencies", async () => {
     const res = await app.request("/KO");
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
@@ -224,11 +257,46 @@ describeDb("GET /:slug — position extras and income block", () => {
     };
 
     expect(body.position.held).toBe(true);
-    // Must equal the cached profile.dividendYield (0.03), not trailing12m
-    // (0.4 USD + 0.3 GBP treated as same-currency) ÷ the $60 live price —
-    // which a per-latest-row-only currency guard would have wrongly allowed.
-    expect(body.income.currentYield).toBeCloseTo(0.03, 6);
+    // The cached profile carries dividendYield 0.03. It used to stand in here;
+    // the page shows Sage's own TTM ÷ price or nothing.
+    expect(body.income.currentYield).toBeNull();
     expect(body.income.annualDividend).toBeNull();
+  });
+
+  it("dates the provider profile and no longer sends the provider's yield fields", async () => {
+    const res = await app.request("/KO");
+    const body = (await res.json()) as {
+      profileAsOf: string | null;
+      profile: Record<string, unknown>;
+    };
+    expect(body.profileAsOf).toBe(new Date().toISOString().slice(0, 10));
+    expect(body.profile).not.toHaveProperty("dividendYield");
+    expect(body.profile).not.toHaveProperty("trailingAnnualDividend");
+  });
+
+  it("has no profile date when the provider profile could not be fetched", async () => {
+    const res = await app.request("/AAPL");
+    const body = (await res.json()) as { profileAsOf: string | null };
+    expect(body.profileAsOf).toBeNull();
+  });
+
+  it("returns a five-year yield range from month-end closes, with the current yield as its marker", async () => {
+    const res = await app.request("/O");
+    const body = (await res.json()) as {
+      income: { currentYield: number | null };
+      yieldRange5y: { low: number; high: number; current: number | null } | null;
+    };
+    expect(body.yieldRange5y).not.toBeNull();
+    // 12 or 13 payments of 0.25 in any 365 days, over a 50 close.
+    expect(body.yieldRange5y!.low).toBeGreaterThanOrEqual(0.059);
+    expect(body.yieldRange5y!.high).toBeLessThanOrEqual(0.066);
+    expect(body.yieldRange5y!.current).toBe(body.income.currentYield);
+  });
+
+  it("returns no yield range without stored closes", async () => {
+    const res = await app.request("/AAPL");
+    const body = (await res.json()) as { yieldRange5y: unknown };
+    expect(body.yieldRange5y).toBeNull();
   });
 
   it("lists this symbol's upcoming payments per share, with certainty and window", async () => {

@@ -74,8 +74,6 @@ const FIXTURE_ASSET: AssetDetailDTO = {
     beta: "1.2",
     fiftyTwoWeekHigh: { amount: "200", currency: "USD" },
     fiftyTwoWeekLow: { amount: "150", currency: "USD" },
-    dividendYield: "0.005",
-    trailingAnnualDividend: { amount: "1", currency: "USD" },
     website: null,
     description: null,
     ceo: null,
@@ -99,6 +97,8 @@ const FIXTURE_ASSET: AssetDetailDTO = {
   },
   custom: null,
   upcoming: [],
+  yieldRange5y: null,
+  profileAsOf: null,
 };
 
 const FIXTURE_CUSTOM_ASSET: AssetDetailDTO = {
@@ -110,8 +110,6 @@ const FIXTURE_CUSTOM_ASSET: AssetDetailDTO = {
     assetType: "other",
     sector: null,
     industry: null,
-    dividendYield: null,
-    trailingAnnualDividend: null,
   },
   custom: {
     holdingType: "savings",

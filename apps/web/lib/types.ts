@@ -301,8 +301,6 @@ export interface AssetProfileDTO {
   beta: string | null;
   fiftyTwoWeekHigh: MoneyDTO | null;
   fiftyTwoWeekLow: MoneyDTO | null;
-  dividendYield: string | null;
-  trailingAnnualDividend: MoneyDTO | null;
   website: string | null;
   description: string | null;
   ceo: string | null;
@@ -328,7 +326,7 @@ export interface AssetPositionDTO {
 }
 
 export interface AssetIncomeDTO {
-  /** Trailing TTM ÷ live price, a fraction; null when unavailable. */
+  /** Trailing TTM ÷ live price, a fraction; null when that can't be computed (no quote, no trailing dividend, or mixed currencies). Never the provider's own yield. */
   currentYield: number | null;
   /** Trailing TTM ÷ average cost, a fraction; null when not held. */
   yieldOnCost: number | null;
@@ -384,6 +382,14 @@ export interface AssetUpcomingDTO {
   window: "next12m" | "longRange";
 }
 
+/** Where today's yield sits in the holding's own five years, gross fractions.
+ *  `current` is the same value as `income.currentYield`. */
+export interface YieldRangeDTO {
+  low: number;
+  high: number;
+  current: number | null;
+}
+
 export interface AssetDetailDTO {
   profile: AssetProfileDTO;
   quote: { price: MoneyDTO; asOf: string } | null;
@@ -393,6 +399,11 @@ export interface AssetDetailDTO {
   income: AssetIncomeDTO;
   /** Per-share forward payments, sorted by cash date. Empty for custom holdings. */
   upcoming: AssetUpcomingDTO[];
+  /** Null under two years of month-end samples, or for a custom holding. */
+  yieldRange5y: YieldRangeDTO | null;
+  /** ISO day the provider profile (market cap, P/E, beta, 52-week range, fund
+   *  data, payout ratio) was fetched; null when it could not be. */
+  profileAsOf: string | null;
   /** Set only for user-defined ("custom") holdings — savings accounts,
    *  pensions, etc. Null for regular market instruments. */
   custom: AssetCustomDTO | null;

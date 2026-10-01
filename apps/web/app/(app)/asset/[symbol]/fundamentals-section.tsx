@@ -23,12 +23,6 @@ export function FundamentalsSection({ profile }: { profile: AssetDetailDTO["prof
             : null,
         },
         {
-          label: "Dividend Yield",
-          value: profile.dividendYield
-            ? `${(Number(profile.dividendYield) * 100).toFixed(2)}%`
-            : null,
-        },
-        {
           label: "Category",
           value: profile.fund.category,
         },
@@ -60,18 +54,6 @@ export function FundamentalsSection({ profile }: { profile: AssetDetailDTO["prof
         {
           label: "52W Low",
           value: profile.fiftyTwoWeekLow ? formatMoney(profile.fiftyTwoWeekLow) : null,
-        },
-        {
-          label: "Dividend Yield",
-          value: profile.dividendYield
-            ? `${(Number(profile.dividendYield) * 100).toFixed(2)}%`
-            : null,
-        },
-        {
-          label: "Annual Dividend",
-          value: profile.trailingAnnualDividend
-            ? formatMoney(profile.trailingAnnualDividend)
-            : null,
         },
         { label: "Sector", value: profile.sector ? prettySector(profile.sector) : null },
       ];
