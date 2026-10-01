@@ -324,7 +324,6 @@ export interface AssetPositionDTO {
   totalDividendIncome?: string;
   yieldOnCost?: number | null;
   feesPaid?: MoneyDTO;
-  forwardAnnualIncome?: MoneyDTO | null;
   trades?: { tradeDate: string; type: "buy" | "sell"; price: string; quantity: string }[];
 }
 
@@ -372,6 +371,19 @@ export interface AssetCustomDTO {
   income: AssetCustomIncomeDTO | null;
 }
 
+/** One forward payment for a symbol, per share and gross, from the same
+ *  schedule the overview sums. */
+export interface AssetUpcomingDTO {
+  exDate: string;
+  paymentDate: string | null;
+  amountPerShare: string;
+  currency: string;
+  certainty: "confirmed" | "estimated";
+  /** "next12m" is what the overview's next-12-months figure counts;
+   *  "longRange" only feeds the forecast-year bar. */
+  window: "next12m" | "longRange";
+}
+
 export interface AssetDetailDTO {
   profile: AssetProfileDTO;
   quote: { price: MoneyDTO; asOf: string } | null;
@@ -379,6 +391,8 @@ export interface AssetDetailDTO {
   dividends: AssetDividendsDTO;
   position: AssetPositionDTO;
   income: AssetIncomeDTO;
+  /** Per-share forward payments, sorted by cash date. Empty for custom holdings. */
+  upcoming: AssetUpcomingDTO[];
   /** Set only for user-defined ("custom") holdings — savings accounts,
    *  pensions, etc. Null for regular market instruments. */
   custom: AssetCustomDTO | null;

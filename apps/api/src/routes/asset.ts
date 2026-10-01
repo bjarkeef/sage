@@ -11,6 +11,7 @@ import {
   computeDividendCAGR,
   computeYieldOnCost,
   projectDividendSchedule,
+  clampDividendGrowth,
   dedupeDividends,
   incomePaymentDates,
   type PositionTransaction,
@@ -24,11 +25,16 @@ import type {
   AssetType,
 } from "@sage/provider-interface";
 import type { Database } from "../db/client";
-import { instrument, transaction, dividendHistory, customHolding } from "../db/schema";
+import { instrument, transaction, dividendHistory, customHolding, user } from "../db/schema";
 import { getUserPortfolio } from "../auth";
 import { forwardFillChart } from "./chart-utils";
 import type { IsinResolver } from "../market-data/isin-resolver";
 import { getCachedOrFetchProfile } from "../market-data/asset-profile-cache";
+import {
+  forwardScheduleForSymbol,
+  toAssetUpcoming,
+  type AssetUpcomingRow,
+} from "../services/forward-schedule";
 
 const rangeSchema = z.enum(["1W", "1M", "3M", "YTD", "1Y", "ALL"]).default("1Y");
 
@@ -176,6 +182,11 @@ export function assetRoutes(
         exDate: d.exDate,
         amountPerShare: d.amountPerShare,
         currency: d.currency,
+        paymentDate: d.paymentDate,
+        paymentDateEstimated: d.paymentDateEstimated,
+        recordDate: d.recordDate,
+        declarationDate: d.declarationDate,
+        period: d.period,
       })),
     );
     const keptExDates = new Set(divHistory.map((d) => d.exDate));
@@ -326,23 +337,6 @@ export function assetRoutes(
         const feeCcy =
           txRows.find((r) => r.feeCurrency)?.feeCurrency ?? txRows[0]?.currency ?? profile.currency;
 
-        // Forward 12-month income for this holding (projected + none announced).
-        const incomeSchedule = projectDividendSchedule({
-          symbol,
-          quantity: pos.quantity,
-          history: divHistory,
-          announced: [],
-          asOf,
-        });
-        const forward = incomeSchedule.reduce(
-          (s, r) => s.plus(new Decimal(r.income)),
-          new Decimal(0),
-        );
-        const forwardAnnualIncome =
-          incomeSchedule.length > 0
-            ? { amount: forward.toFixed(2), currency: incomeSchedule[0]!.currency }
-            : null;
-
         // Buy/sell markers, ascending by trade date (dividends/splits excluded).
         const trades = txRows
           .filter((r) => r.type === "buy" || r.type === "sell")
@@ -367,7 +361,6 @@ export function assetRoutes(
           totalDividendIncome: totalDivIncome.toFixed(),
           yieldOnCost,
           feesPaid: { amount: feesTotal.toFixed(), currency: feeCcy },
-          forwardAnnualIncome,
           trades,
         };
       }
@@ -510,19 +503,31 @@ export function assetRoutes(
       annualDividend = { amount: annualPerShare.toFixed(4), currency: annualCcy };
       if ((positionDTO as { held?: boolean }).held) {
         (positionDTO as { yieldOnCost: number | null }).yieldOnCost = heldYieldOnCost;
-        const qtyStr = (positionDTO as { quantity?: string }).quantity;
-        if (qtyStr) {
-          const forward = new Decimal(qtyStr).times(priceForAnnual).times(rate);
-          (
-            positionDTO as {
-              forwardAnnualIncome: { amount: string; currency: string } | null;
-            }
-          ).forwardAnnualIncome = {
-            amount: forward.toFixed(2),
-            currency: annualCcy,
-          };
-        }
       }
+    }
+
+    // 8. Upcoming payments per share — the income view's own schedule
+    // (forwardScheduleForSymbol), plus payments in flight. Custom holdings
+    // project from their settings and render their own income card instead.
+    let upcoming: AssetUpcomingRow[] = [];
+    if (!customDTO) {
+      const [settings] = await db
+        .select({ allowNegative: user.allowNegativeDividendGrowth })
+        .from(user)
+        .where(eq(user.id, c.get("user").id));
+      const growth = cagr5y ? clampDividendGrowth(cagr5y, settings?.allowNegative ?? true) : null;
+      const schedule = forwardScheduleForSymbol({
+        symbol,
+        quantity: new Decimal(1),
+        history: divHistory,
+        now: asOf,
+        growth,
+      });
+      upcoming = toAssetUpcoming({
+        schedule,
+        history: divHistory,
+        todayIso: asOf.toISOString().slice(0, 10),
+      });
     }
 
     const income = {
@@ -555,6 +560,7 @@ export function assetRoutes(
       position: positionDTO,
       income,
       custom: customDTO,
+      upcoming,
     });
   });
 

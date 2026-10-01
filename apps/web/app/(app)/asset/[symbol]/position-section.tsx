@@ -36,12 +36,6 @@ export function PositionSection({
   const f = netFactor(taxRate);
   const basis = taxRate != null ? "after tax" : "before tax";
   const yieldOnCost = position.yieldOnCost == null ? null : position.yieldOnCost * f;
-  const forwardIncome = position.forwardAnnualIncome
-    ? {
-        amount: (Number(position.forwardAnnualIncome.amount) * f).toFixed(2),
-        currency: position.forwardAnnualIncome.currency,
-      }
-    : null;
   const dividendIncome = position.totalDividendIncome
     ? (Number(position.totalDividendIncome) * f).toFixed(2)
     : null;
@@ -89,11 +83,6 @@ export function PositionSection({
           "—"
         ),
       context: yieldOnCost != null ? basis : undefined,
-    },
-    {
-      label: "Forward income",
-      value: forwardIncome ? formatMoney(forwardIncome) : "—",
-      context: forwardIncome ? `next 12 mo, ${basis}` : undefined,
     },
     { label: "Weight", value: weight != null ? `${(weight * 100).toFixed(1)}%` : "—" },
     { label: "Fees paid", value: position.feesPaid ? formatMoney(position.feesPaid) : "—" },

@@ -98,6 +98,7 @@ const FIXTURE_ASSET: AssetDetailDTO = {
     payoutRatio: null,
   },
   custom: null,
+  upcoming: [],
 };
 
 const FIXTURE_CUSTOM_ASSET: AssetDetailDTO = {
@@ -301,7 +302,6 @@ describe("AssetDetailPage", () => {
         unrealizedGainLoss: { amount: "800", currency: "USD" },
         gainLossPercent: 0.8,
         yieldOnCost: 0.06,
-        forwardAnnualIncome: { amount: "60.00", currency: "USD" },
         totalDividendIncome: "40.00",
         feesPaid: null,
         trades: [],

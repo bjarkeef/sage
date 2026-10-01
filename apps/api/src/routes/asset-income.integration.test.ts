@@ -162,14 +162,14 @@ describeDb("GET /:slug — position extras and income block", () => {
     await tdb?.stop();
   });
 
-  it("returns feesPaid, trades, forwardAnnualIncome and an income block for a held payer", async () => {
+  it("returns feesPaid, trades and an income block for a held payer", async () => {
     const res = await app.request("/AAPL");
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       position: {
         held: boolean;
         feesPaid: { amount: string; currency: string };
-        forwardAnnualIncome: { amount: string; currency: string } | null;
+        forwardAnnualIncome?: unknown;
         trades: { tradeDate: string; type: string; price: string; quantity: string }[];
       };
       income: {
@@ -188,7 +188,9 @@ describeDb("GET /:slug — position extras and income block", () => {
     expect(body.position.trades).toEqual([
       { tradeDate: "2025-01-02", type: "buy", price: "150", quantity: "10" },
     ]);
-    expect(body.position.forwardAnnualIncome).not.toBeNull();
+    // Removed: it was a second producer of "next 12 months" that ignored
+    // declared dividends. The page sums `upcoming` instead.
+    expect(body.position.forwardAnnualIncome).toBeUndefined();
 
     expect(body.income.currentYield).toBeGreaterThan(0);
     expect(body.income.yieldOnCost).toBeGreaterThan(0);
@@ -227,6 +229,39 @@ describeDb("GET /:slug — position extras and income block", () => {
     // which a per-latest-row-only currency guard would have wrongly allowed.
     expect(body.income.currentYield).toBeCloseTo(0.03, 6);
     expect(body.income.annualDividend).toBeNull();
+  });
+
+  it("lists this symbol's upcoming payments per share, with certainty and window", async () => {
+    const res = await app.request("/AAPL");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      upcoming: {
+        exDate: string;
+        paymentDate: string | null;
+        amountPerShare: string;
+        currency: string;
+        certainty: string;
+        window: string;
+      }[];
+    };
+    const today = new Date().toISOString().slice(0, 10);
+
+    expect(body.upcoming.length).toBeGreaterThan(0);
+    expect(body.upcoming.some((u) => u.window === "next12m")).toBe(true);
+    for (const u of body.upcoming) {
+      expect(["confirmed", "estimated"]).toContain(u.certainty);
+      expect(["next12m", "longRange"]).toContain(u.window);
+      // AAPL's own 0.50 — never KO's 0.40 / 0.30 from the same table.
+      expect(Number(u.amountPerShare)).toBeCloseTo(0.5, 6);
+      expect(u.currency).toBe("USD");
+      expect((u.paymentDate ?? u.exDate) > today).toBe(true);
+    }
+  });
+
+  it("lists no upcoming payments for a symbol that has never paid", async () => {
+    const res = await app.request("/MSFT");
+    const body = (await res.json()) as { upcoming: unknown[] };
+    expect(body.upcoming).toEqual([]);
   });
 
   it("returns custom: null for a regular (non-custom) symbol", async () => {
@@ -309,6 +344,9 @@ describeDb("GET /:slug — position extras and income block", () => {
       expect(withIncome.income.annualDividend!.currency).toBe("DKK");
       // price defaults to 1 when no quote → 0.0425 DKK / share / year
       expect(Number(withIncome.income.annualDividend!.amount)).toBeCloseTo(0.0425, 4);
+      // Custom holdings project from their own settings and render their own
+      // income card; the market schedule does not apply to them.
+      expect((withIncome as unknown as { upcoming: unknown[] }).upcoming).toEqual([]);
     } finally {
       vi.useRealTimers();
     }

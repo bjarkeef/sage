@@ -4,7 +4,6 @@ import {
   Money,
   computeRetroactiveIncome,
   buildReceivedDividends,
-  projectDividendSchedule,
   projectionHorizonIso,
   longRangeThroughIso,
   clampDividendGrowth,
@@ -34,6 +33,7 @@ import { loadPortfolioBook, type PortfolioBook } from "./portfolio-book";
 import { resolvePricePoints } from "../market-data/manual-price-provider";
 import { getRatesWithProvenance } from "../market-data/fx-provenance";
 import type { PortfolioViewDeps } from "./portfolio-view";
+import { forwardScheduleForSymbol } from "./forward-schedule";
 
 // Extends the shared deps shape with the optional multi-provider dividend
 // fallback list the route factory accepts today (`dividendProviders ??
@@ -411,29 +411,7 @@ export async function buildDividendIncomeView(
     }
   }
 
-  const scheduleInput = (p: (typeof positions)[number]) => ({
-    symbol: p.symbol,
-    quantity: p.quantity,
-    history: pastRows.filter((d) => d.symbol === p.symbol),
-    announced: (futureBySymbol.get(p.symbol) ?? []).map((d) => ({
-      exDate: d.exDate,
-      paymentDate: d.paymentDate ?? null,
-      paymentDateEstimated: d.paymentDateEstimated ?? false,
-      amountPerShare: d.amountPerShare,
-      currency: d.currency,
-    })),
-    asOf: now,
-  });
-  const scheduleRows = positions
-    .filter((p) => !customBySymbol.has(p.symbol))
-    .flatMap((p) => projectDividendSchedule(scheduleInput(p)))
-    .concat(customScheduleRows);
-  const announcedScheduleRows = scheduleRows.filter((r) => r.kind === "announced");
-  const projectedScheduleRows = scheduleRows.filter((r) => r.kind === "projected");
-
-  // Calendar-only: the same schedule run on to 31 December three years out,
-  // each dividend grown at the rate the Goal uses. Kept apart from `projected`
-  // so nothing that means "the next 12 months" can start summing three years.
+  // Growth first: the long-range schedule grows each dividend by it.
   const projectedThrough = projectionHorizonIso(now);
   const longRangeThrough = longRangeThroughIso(now);
   const growthBySymbol = new Map<string, Decimal | null>();
@@ -451,15 +429,29 @@ export async function buildDividendIncomeView(
     if (cagr && growth && cagr.greaterThan(growth)) cappedFromBySymbol.set(p.symbol, cagr);
   }
 
-  const longRangeRows: ProjectedDividendRow[] = positions
+  // One producer for every market holding's forward schedule: the asset page's
+  // `upcoming` calls the same function, so the two pages cannot disagree.
+  const schedules = positions
     .filter((p) => !customBySymbol.has(p.symbol))
-    .flatMap((p) =>
-      projectDividendSchedule({
-        ...scheduleInput(p),
-        through: longRangeThrough,
-        growth: growthBySymbol.get(p.symbol) ?? undefined,
-      }).filter((r) => r.exDate > projectedThrough),
+    .map((p) =>
+      forwardScheduleForSymbol({
+        symbol: p.symbol,
+        quantity: p.quantity,
+        history: divHistory,
+        now,
+        growth: growthBySymbol.get(p.symbol) ?? null,
+      }),
     );
+  const scheduleRows = schedules
+    .flatMap((s) => [...s.announced, ...s.projected])
+    .concat(customScheduleRows);
+  const announcedScheduleRows = scheduleRows.filter((r) => r.kind === "announced");
+  const projectedScheduleRows = scheduleRows.filter((r) => r.kind === "projected");
+
+  // Calendar-only: the same schedule run on to 31 December three years out.
+  // Kept apart from `projected` so nothing that means "the next 12 months" can
+  // start summing three years.
+  const longRangeRows: ProjectedDividendRow[] = schedules.flatMap((s) => s.longRange);
   for (const p of positions) {
     const holding = customBySymbol.get(p.symbol);
     if (!holding || !p.quantity.greaterThan(0)) continue;
