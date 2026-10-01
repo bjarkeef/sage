@@ -7,7 +7,6 @@ import {
   Decimal,
   Money,
   computePositions,
-  computeRetroactiveIncome,
   computeDividendCAGR,
   computeYieldOnCost,
   projectDividendSchedule,
@@ -34,6 +33,7 @@ import {
   assetProfile,
 } from "../db/schema";
 import { computeYieldRange5y, type YieldRange } from "../services/yield-range";
+import { loadReceivedIncome, receivedTotal } from "../services/received-income";
 import { getUserPortfolio } from "../auth";
 import { forwardFillChart } from "./chart-utils";
 import type { IsinResolver } from "../market-data/isin-resolver";
@@ -310,11 +310,36 @@ export function assetRoutes(
           }
         }
 
-        const retroactive = computeRetroactiveIncome(txs, divHistory);
-        const totalDivIncome = retroactive.reduce(
-          (sum, r) => sum.plus(new Decimal(r.income)),
-          new Decimal(0),
+        // "Received so far": the ledger, through the producer /dividends and
+        // /holdings read. Handed this symbol's rows only — the producer scopes
+        // every query to the symbols it is given. Gross; the page nets it.
+        const receivedRows = await loadReceivedIncome(
+          db,
+          { portfolioId, rows: txRows, txs },
+          asOf.toISOString().slice(0, 10),
         );
+        // A payment recorded in another currency is converted at spot into the
+        // position's currency (getRate(from, to) = units of `to` per 1 `from`);
+        // one without a rate is left out and counted, never summed raw.
+        const receivedRates = new Map<string, Decimal>();
+        if (fxRateService) {
+          const foreign = [
+            ...new Set(receivedRows.map((r) => r.currency).filter((ccy) => ccy !== pos.currency)),
+          ];
+          await Promise.all(
+            foreign.map(async (from) => {
+              try {
+                receivedRates.set(from, await fxRateService.getRate(from, pos.currency));
+              } catch {
+                // no rate: receivedTotal leaves that row out and counts it
+              }
+            }),
+          );
+        }
+        const received = receivedTotal(receivedRows, symbol, pos.currency, (amount, from) => {
+          const rate = receivedRates.get(from);
+          return rate ? amount.times(rate) : null;
+        });
 
         // Optional FX: convert dividend APS into the cost currency when they
         // differ (dual-listed / ADR-style payers). Prefetch pair rates; failure
@@ -377,7 +402,13 @@ export function assetRoutes(
           marketValue: marketValue?.toJSON() ?? null,
           unrealizedGainLoss: gainLoss?.toJSON() ?? null,
           gainLossPercent,
-          totalDividendIncome: totalDivIncome.toFixed(),
+          dividendsReceived: received
+            ? {
+                amount: received.amount.toFixed(2),
+                currency: pos.currency,
+                leftOut: received.leftOut,
+              }
+            : null,
           yieldOnCost,
           feesPaid: { amount: feesTotal.toFixed(), currency: feeCcy },
           trades,

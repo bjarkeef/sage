@@ -5,7 +5,7 @@ import type { Quote } from "@sage/provider-interface";
 import { describeDb, withTestDb, testEnv, signUpTestUser, type TestDb } from "../testing";
 import { createApp } from "../app";
 import { createAuth } from "../auth";
-import { dividendHistory, assetProfile } from "../db/schema";
+import { assetProfile } from "../db/schema";
 
 const apple = {
   symbol: "AAPL",
@@ -198,14 +198,13 @@ describeDb("GET /portfolio", () => {
       { instrument: nvda, type: "buy", quantity: "10", price: "100", tradeDate: "2026-01-01" },
       cookie,
     );
-    // 10 shares held on the ex-date -> $2 * 10 = $20 of retroactive income.
-    await tdb.db.insert(dividendHistory).values({
-      symbol: "NVDA",
-      exDate: "2026-03-01",
-      amountPerShare: "2",
-      currency: "USD",
-      source: "test",
-    });
+    // $2 × 10 recorded in the ledger -> $20 received. Received income is the
+    // ledger now, not provider history × shares.
+    await post(
+      app,
+      { instrument: nvda, type: "dividend", quantity: "10", price: "2", tradeDate: "2026-03-15" },
+      cookie,
+    );
     await tdb.db.insert(assetProfile).values({
       symbol: "NVDA",
       name: "NVIDIA Corp",
@@ -238,7 +237,7 @@ describeDb("GET /portfolio", () => {
     expect(nv.website).toBe("https://nvidia.com");
   });
 
-  it("excludes ex-passed-but-unpaid dividends from received income and total return", async () => {
+  it("counts only ledger dividends whose cash has landed in received income and total return", async () => {
     const realty = {
       symbol: "O",
       name: "Realty Income",
@@ -258,29 +257,18 @@ describeDb("GET /portfolio", () => {
       { instrument: realty, type: "buy", quantity: "10", price: "100", tradeDate: "2026-01-01" },
       cookie,
     );
-    await tdb.db.insert(dividendHistory).values([
-      // Received: ex-date and payment date both in the past -> 10 * 2 = $20.
-      {
-        symbol: "O",
-        exDate: "2026-03-01",
-        amountPerShare: "2",
-        currency: "USD",
-        paymentDate: "2026-03-15",
-        paymentDateEstimated: false,
-        source: "test",
-      },
-      // In-flight: ex-date passed but payment still ahead -> must NOT be counted
-      // as received (would otherwise add 10 * 3 = $30).
-      {
-        symbol: "O",
-        exDate: "2026-07-01",
-        amountPerShare: "3",
-        currency: "USD",
-        paymentDate: "2100-08-15",
-        paymentDateEstimated: false,
-        source: "test",
-      },
-    ]);
+    // Landed: dated in the past -> 10 × 2 = $20.
+    await post(
+      app,
+      { instrument: realty, type: "dividend", quantity: "10", price: "2", tradeDate: "2026-03-15" },
+      cookie,
+    );
+    // Dated ahead: not received yet, so it must NOT count (would add 10 × 3 = $30).
+    await post(
+      app,
+      { instrument: realty, type: "dividend", quantity: "10", price: "3", tradeDate: "2100-08-15" },
+      cookie,
+    );
 
     const res = await app.request("/portfolio", { headers: { cookie } });
     expect(res.status).toBe(200);
@@ -292,7 +280,7 @@ describeDb("GET /portfolio", () => {
       }[];
     };
     const o = body.positions.find((p) => p.symbol === "O")!;
-    // Only the paid $20 counts — the future-dated $30 is excluded.
+    // Only the landed $20 counts — the future-dated $30 is excluded.
     expect(o.dividendIncome).toEqual({ amount: "20", currency: "USD" });
     // Total return = 500 unrealized + 20 received (not 550).
     expect(o.totalReturn).toEqual({ amount: "520", currency: "USD" });

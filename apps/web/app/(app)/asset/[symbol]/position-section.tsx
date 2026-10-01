@@ -36,8 +36,11 @@ export function PositionSection({
   const f = netFactor(taxRate);
   const basis = taxRate != null ? "after tax" : "before tax";
   const yieldOnCost = position.yieldOnCost == null ? null : position.yieldOnCost * f;
-  const dividendIncome = position.totalDividendIncome
-    ? (Number(position.totalDividendIncome) * f).toFixed(2)
+  const received = position.dividendsReceived
+    ? {
+        amount: (Number(position.dividendsReceived.amount) * f).toFixed(2),
+        currency: position.dividendsReceived.currency,
+      }
     : null;
 
   let weight: number | null = null;
@@ -87,9 +90,9 @@ export function PositionSection({
     { label: "Weight", value: weight != null ? `${(weight * 100).toFixed(1)}%` : "—" },
     { label: "Fees paid", value: position.feesPaid ? formatMoney(position.feesPaid) : "—" },
     {
-      label: "Dividend income",
-      value: dividendIncome ? formatMoney({ amount: dividendIncome, currency }) : "—",
-      context: dividendIncome ? basis : undefined,
+      label: "Received so far",
+      value: received ? formatMoney(received) : "—",
+      context: received ? basis : undefined,
     },
   ];
 

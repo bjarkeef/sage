@@ -311,6 +311,15 @@ export interface AssetProfileDTO {
   fund: FundProfileDTO | null;
 }
 
+/** Dividends a holding has actually paid you, GROSS, from the ledger — the rows
+ *  /dividends lists as received, summed in the holding's currency. A row in
+ *  another currency without an FX rate is left out and counted in `leftOut`. */
+export interface ReceivedTotalDTO {
+  amount: string;
+  currency: string;
+  leftOut: number;
+}
+
 export interface AssetPositionDTO {
   held: boolean;
   quantity?: string;
@@ -319,7 +328,8 @@ export interface AssetPositionDTO {
   marketValue?: MoneyDTO | null;
   unrealizedGainLoss?: MoneyDTO | null;
   gainLossPercent?: number | null;
-  totalDividendIncome?: string;
+  /** Null when nothing has been received yet. */
+  dividendsReceived?: ReceivedTotalDTO | null;
   yieldOnCost?: number | null;
   feesPaid?: MoneyDTO;
   trades?: { tradeDate: string; type: "buy" | "sell"; price: string; quantity: string }[];

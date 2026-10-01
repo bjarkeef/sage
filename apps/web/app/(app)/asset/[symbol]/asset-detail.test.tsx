@@ -300,7 +300,7 @@ describe("AssetDetailPage", () => {
         unrealizedGainLoss: { amount: "800", currency: "USD" },
         gainLossPercent: 0.8,
         yieldOnCost: 0.06,
-        totalDividendIncome: "40.00",
+        dividendsReceived: { amount: "40.00", currency: "USD", leftOut: 0 },
         feesPaid: null,
         trades: [],
       },
