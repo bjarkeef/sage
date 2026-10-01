@@ -830,12 +830,19 @@ export async function fetchBenchmarkSeries(
      *  pass a deadline. */
     cacheOnly?: boolean;
   },
-): Promise<{ id: string; name: string; bars: { date: string; close: Decimal }[] }[]> {
+): Promise<
+  { id: string; name: string; currency: string; bars: { date: string; close: Decimal }[] }[]
+> {
   const benchmarkSymbols: { id: string; name: string; symbols: string[] }[] = ids
     .filter((id) => BENCHMARKS[id])
     .map((id) => ({ id, ...BENCHMARKS[id]! }));
 
-  const results: { id: string; name: string; bars: { date: string; close: Decimal }[] }[] = [];
+  const results: {
+    id: string;
+    name: string;
+    currency: string;
+    bars: { date: string; close: Decimal }[];
+  }[] = [];
 
   await Promise.all(
     benchmarkSymbols.map(async ({ id, name, symbols }) => {
@@ -854,7 +861,7 @@ export async function fetchBenchmarkSeries(
             close: bar.close.toDecimal(),
           }));
 
-          results.push({ id, name, bars: mapped });
+          results.push({ id, name, currency: bars[0]!.close.currency, bars: mapped });
           return;
         } catch {
           // Try next symbol variant

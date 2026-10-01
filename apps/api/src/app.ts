@@ -24,6 +24,7 @@ import { importRoutes } from "./routes/import";
 import { diversificationRoutes } from "./routes/diversification";
 import { dashboardRoutes } from "./routes/dashboard";
 import { performanceRoutes } from "./routes/performance";
+import { benchmarksRoutes } from "./routes/benchmarks";
 import { userSettingsRoutes } from "./routes/user-settings";
 import { goalRoutes } from "./routes/goal";
 import { customHoldingsRoutes } from "./routes/custom-holdings";
@@ -164,6 +165,7 @@ export function createApp(
   app.route("/portfolio", portfolioRoutes(db, provider, fxRateService));
   app.route("/dashboard", dashboardRoutes(db, provider, fxRateService, dividendProviders));
   app.route("/performance", performanceRoutes(db, provider, fxRateService));
+  app.route("/benchmarks", benchmarksRoutes(provider, fxRateService));
   app.route("/asset", assetRoutes(db, provider, isinResolver, fxRateService));
   app.route("/import", importRoutes(db, provider, isinResolver, fxRateService));
   app.route("/user/settings", userSettingsRoutes(db));

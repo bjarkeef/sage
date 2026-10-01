@@ -1127,3 +1127,27 @@ export interface CorporateActionsViewDTO {
   actions: CorporateActionDTO[];
   coverage: { checked: number; total: number };
 }
+
+export interface BenchmarkDTO {
+  id: string;
+  /** Always the total-return name, e.g. "S&P 500 (TR)". */
+  name: string;
+}
+
+/** A benchmark's closes in the holding's currency (`currency` is always the one
+ *  asked for), converted server-side at each day's ECB rate. */
+export interface BenchmarkSeriesDTO {
+  id: string;
+  name: string;
+  currency: string;
+  bars: { date: string; close: string }[];
+}
+
+/** Why a series is absent: the index could not be fetched, or no ECB rate
+ *  covers the range start in the holding's currency. */
+export type BenchmarkUnavailable = "no_series" | "no_fx_rate";
+
+export interface BenchmarkSeriesResult {
+  series: BenchmarkSeriesDTO | null;
+  reason: BenchmarkUnavailable | null;
+}
