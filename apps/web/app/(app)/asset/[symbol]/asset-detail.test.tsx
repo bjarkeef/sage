@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { renderWithClient, makeTestQueryClient } from "../../../../lib/test/render-with-client";
 import { qk } from "../../../../lib/query/keys";
 import type { AssetDetailDTO, UserSettingsDTO } from "../../../../lib/types";
 import {
+  TODAY,
   assetDetail as fixtureDetail,
   ratings as fixtureRatings,
 } from "../../../../lib/test/asset-fixtures";
@@ -146,8 +147,17 @@ const FIXTURE_SETTINGS: UserSettingsDTO = {
 };
 
 beforeEach(() => {
+  // The page reads the real clock; the fixtures are built around TODAY. Fake
+  // only Date so "today" is the fixtures' today and timers, React Query and
+  // user-event keep running on real ones.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(`${TODAY}T12:00:00Z`));
   vi.clearAllMocks();
   vi.mocked(api.getInstrumentQuote).mockResolvedValue(null);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("AssetDetailPage", () => {
