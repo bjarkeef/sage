@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -7,6 +8,7 @@ import Link from "next/link";
 import { ChartSkeleton, ErrorState, PageShell } from "@sage/ui";
 import { AssetPageSkeleton } from "../../../../components/skeletons";
 import { getAssetDetail } from "../../../../lib/api";
+import type { ChartReadout } from "../../../../lib/asset-chart/readout";
 import { toSearchResult } from "../../../../lib/instrument";
 import { qk } from "../../../../lib/query/keys";
 import { useDividendTaxRate } from "../../../../lib/dividend-tax-hooks";
@@ -44,6 +46,7 @@ export default function AssetDetailPage() {
     staleTime: 300_000,
   });
   const { rate: dividendTaxRate, isLoading: taxRateLoading } = useDividendTaxRate();
+  const [readout, setReadout] = React.useState<ChartReadout | null>(null);
 
   // OR the loading states together (same pattern as the dividends analytics
   // page): the income section below nets its yields off dividendTaxRate, and
@@ -87,7 +90,13 @@ export default function AssetDetailPage() {
         <CurrencyPicker initialCurrency={currency} />
       </div>
 
-      <AssetHeader profile={profile} quote={quote} held={position.held} custom={custom} />
+      <AssetHeader
+        profile={profile}
+        quote={quote}
+        held={position.held}
+        custom={custom}
+        readout={readout}
+      />
       {(position.held || custom) && (
         <div className="mb-8 flex items-center justify-between gap-3 border-b border-hairline pb-5">
           <div className="flex flex-wrap items-center gap-2">
@@ -103,7 +112,13 @@ export default function AssetDetailPage() {
         </div>
       )}
       <section className="mb-10">
-        <AssetPriceChart slug={slug} initialChart={chart} position={position} />
+        <AssetPriceChart
+          slug={slug}
+          initialChart={chart}
+          position={position}
+          dividends={dividends.history}
+          onReadout={setReadout}
+        />
       </section>
       <PositionSection
         position={position}

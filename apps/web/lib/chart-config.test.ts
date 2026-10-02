@@ -7,6 +7,8 @@ import {
   attachHoverTooltip,
   baseChartOptions,
   comparisonSeriesOptions,
+  lineColorFor,
+  benchmarkSeriesOptions,
   withChartAlpha,
 } from "./chart-config";
 
@@ -27,19 +29,37 @@ const theme = {
   // color of the line they sit on. See tradeMarkers in asset-price-chart.tsx.
   marker: "#0a0a0a",
   markerHalo: "#ffffff",
+  dividend: "#e8cfa6",
 };
 
 describe("chart-config", () => {
   it("area series always uses the theme line color with alpha ramp and no pinned last value", () => {
     const opts = areaSeriesOptions(theme);
     expect(opts.lineColor).toBe("#3d6a4d");
-    expect(opts.topColor).toBe("#3d6a4d2E");
+    expect(opts.topColor).toBe("#3d6a4d2e");
     expect(opts.bottomColor).toBe("#3d6a4d00");
     expect(opts.lineWidth).toBe(2);
     expect(opts.lastValueVisible).toBe(false);
     expect(opts.priceLineVisible).toBe(false);
     expect(opts.crosshairMarkerBackgroundColor).toBe("#3d6a4d");
     expect(opts.crosshairMarkerBorderColor).toBe("#ffffff");
+  });
+
+  it("takes a direction colour when given one, and keeps the accent when not", () => {
+    expect(areaSeriesOptions(theme, theme.loss).lineColor).toBe("#b23b3b");
+    expect(areaSeriesOptions(theme, theme.loss).topColor).toBe("#b23b3b2e");
+    expect(lineColorFor("up", theme)).toBe(theme.gain);
+    expect(lineColorFor("down", theme)).toBe(theme.loss);
+    expect(lineColorFor("flat", theme)).toBe(theme.text);
+  });
+
+  it("draws a benchmark as a thin, neutral, unlabelled line", () => {
+    const opts = benchmarkSeriesOptions(theme);
+    expect(opts.color).toBe(theme.text);
+    expect(opts.lineWidth).toBe(1);
+    expect(opts.lastValueVisible).toBe(false);
+    expect(opts.priceLineVisible).toBe(false);
+    expect(opts.crosshairMarkerVisible).toBe(false);
   });
 
   it("comparison series are muted, thin, dashed, unlabeled", () => {
@@ -119,6 +139,46 @@ describe("chart-config", () => {
 });
 
 describe("attachHoverTooltip", () => {
+  it("can show marker labels only, leaving the hovered price to the page header", () => {
+    let onMove: ((param: unknown) => void) | undefined;
+    const chart = {
+      subscribeCrosshairMove: (fn: (param: unknown) => void) => {
+        onMove = fn;
+      },
+      unsubscribeCrosshairMove: vi.fn(),
+    } as unknown as IChartApi;
+    const series = {} as ISeriesApi<"Area">;
+    const container = document.createElement("div");
+    attachHoverTooltip(
+      chart,
+      series,
+      container,
+      (v) => `$${v}`,
+      (id) =>
+        id === "div-0"
+          ? { primary: "Ex-dividend", secondary: "$0.50 / share", colorClass: "text-foreground" }
+          : null,
+      { showValue: false },
+    );
+    const tip = container.firstElementChild!;
+
+    onMove!({
+      point: { x: 1, y: 1 },
+      time: "2026-07-03",
+      seriesData: new Map([[series, { value: 123 }]]),
+    });
+    expect(tip.classList.contains("hidden")).toBe(true);
+
+    onMove!({
+      point: { x: 1, y: 1 },
+      time: "2026-07-03",
+      hoveredObjectId: "div-0",
+      seriesData: new Map(),
+    });
+    expect(tip.classList.contains("hidden")).toBe(false);
+    expect(tip.textContent).toContain("Ex-dividend");
+  });
+
   it("mounts a tooltip div and cleans up on the returned function", () => {
     const subscribe = vi.fn();
     const unsubscribe = vi.fn();

@@ -36,6 +36,8 @@ export interface ChartTheme {
   costLine: string;
   marker: string;
   markerHalo: string;
+  /** Ex-dividend dots: the paid step of the certainty ramp. */
+  dividend: string;
 }
 
 /** Read chart colors from the active theme's CSS custom properties. Client-only. */
@@ -56,6 +58,7 @@ export function readChartTheme(): ChartTheme {
     costLine: resolve("--muted-foreground"),
     marker: resolve("--chart-marker"),
     markerHalo: resolve("--chart-marker-halo"),
+    dividend: resolve("--certainty-paid"),
   };
 }
 
@@ -132,19 +135,44 @@ export function baseChartOptions(
   };
 }
 
-/** The area line is always the sage accent — direction is carried by Delta, not hue.
- *  No pinned last-price label or price line: the number lives in the page hero. */
-export function areaSeriesOptions(theme: ChartTheme): AreaSeriesPartialOptions {
+/** The area series. With no `color` it is the sage accent, as the overview and
+ *  /performance draw it; the asset chart passes `lineColorFor(direction)`.
+ *  No pinned last-price label or price line: the number lives in the header. */
+export function areaSeriesOptions(
+  theme: ChartTheme,
+  color: string = theme.line,
+): AreaSeriesPartialOptions {
   return {
-    lineColor: theme.line,
-    topColor: `${theme.line}2E`,
-    bottomColor: `${theme.line}00`,
+    lineColor: color,
+    topColor: withChartAlpha(color, 0.18),
+    bottomColor: withChartAlpha(color, 0),
     lineWidth: 2,
     lastValueVisible: false,
     priceLineVisible: false,
     crosshairMarkerRadius: 4,
     crosshairMarkerBorderColor: theme.card,
-    crosshairMarkerBackgroundColor: theme.line,
+    crosshairMarkerBackgroundColor: color,
+  };
+}
+
+/** The asset chart's line colour: how the selected range ended (DESIGN.md
+ *  accent allowlist, "one deliberate departure"). */
+export function lineColorFor(direction: "up" | "down" | "flat", theme: ChartTheme): string {
+  if (direction === "up") return theme.gain;
+  if (direction === "down") return theme.loss;
+  return theme.text;
+}
+
+/** A comparison index on the asset chart: thin and neutral — colour belongs to
+ *  the holding. */
+export function benchmarkSeriesOptions(theme: ChartTheme): LineSeriesPartialOptions {
+  return {
+    color: theme.text,
+    lineWidth: 1,
+    lineStyle: LineStyle.Solid,
+    crosshairMarkerVisible: false,
+    lastValueVisible: false,
+    priceLineVisible: false,
   };
 }
 
@@ -177,7 +205,13 @@ export function attachHoverTooltip(
   container: HTMLElement,
   formatValue: (value: number) => string,
   resolveMarker?: (id: unknown) => MarkerTip | null,
+  opts: {
+    /** false: marker labels only — the asset page reads the hovered price in
+     *  its header instead of a floating tooltip. */
+    showValue?: boolean;
+  } = {},
 ): () => void {
+  const showValue = opts.showValue ?? true;
   const tip = document.createElement("div");
   tip.className =
     "pointer-events-none absolute z-10 hidden rounded-control border border-hairline bg-popover px-2.5 py-1.5 text-popover-foreground font-mono text-xs shadow-md";
@@ -208,7 +242,7 @@ export function attachHoverTooltip(
     }
 
     const data = param.seriesData.get(series) as { value?: number } | undefined;
-    if (!param.point || !param.time || data?.value == null) {
+    if (!showValue || !param.point || !param.time || data?.value == null) {
       tip.classList.add("hidden");
       return;
     }

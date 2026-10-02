@@ -257,6 +257,14 @@ else.**
 | Text links in prose   | `text-primary hover:underline`                    |
 | The brand mark        | `SageMark`                                        |
 
+**One deliberate departure: the asset page's price chart.** Its line and area
+take the direction of the selected range — `--gain` when the range ended up,
+`--loss` when down, `--muted-foreground` when flat — because on that page the
+line answers "how did this range go", and a sage line under a stock that fell
+10% reads as good news. The overview and /performance keep `--chart-line`. A
+benchmark drawn beside it is a thin `--muted-foreground` line: colour belongs to
+the holding.
+
 Everything else is chrome and takes `--foreground`, `--muted-foreground`, or a
 `--surface-*` wash. **Emphasis is carried by weight, not by hue:** `Chip`'s
 `primary` tone is a brighter wash plus full-strength text against `neutral`'s
