@@ -3,12 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import {
   Button,
   Callout,
   Card,
   Chip,
+  cn,
   DataRow,
   EmptyState,
   RowCell,
@@ -55,6 +56,8 @@ export function TransactionsSection({
   const [error, setError] = React.useState<string | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [showAll, setShowAll] = React.useState(false);
+  // Collapsed by default: the ledger is reference, and the page leads with answers.
+  const [expanded, setExpanded] = React.useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: qk.symbolTransactions(symbol),
@@ -131,71 +134,100 @@ export function TransactionsSection({
           <EmptyState message={`No transactions recorded for ${symbol} yet.`} />
         ) : (
           <>
-            <RowGrid columns="110px 100px minmax(0,1fr) 72px">
-              <RowHeader cells={["Date", "Type", "Amount", ""]} align={["left", "left", "right"]} />
-              {visible.map((r) => (
-                <DataRow key={r.id} className="group">
-                  <RowCell variant="text" primary={formatDate(r.tradeDate, { year: "always" })} />
-                  <RowCell
-                    variant="text"
-                    primary={
-                      <span className="flex items-center gap-1">
-                        <Chip tone={typeChipTone[r.type]}>{r.type}</Chip>
-                        {r.source === "auto" && (
-                          <Chip
-                            variant="outline"
-                            className="lowercase tracking-normal"
-                            title="Added automatically from the dividend payment history. Delete to remove — it won't come back."
-                          >
-                            auto
-                          </Chip>
-                        )}
-                      </span>
-                    }
-                  />
-                  <RowCell
-                    align="right"
-                    primary={
-                      r.type === "split" ? `${formatQuantity(r.quantity)} : 1` : totalLabel(r)
-                    }
-                    secondary={
-                      r.type === "split"
-                        ? "split ratio"
-                        : `${formatShares(r.quantity)} sh @ ${formatQuantity(r.price)}`
-                    }
-                  />
-                  <div
-                    role="cell"
-                    className="flex justify-end gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Edit ${r.type} of ${r.instrumentSymbol}`}
-                      onClick={() => setEditingId(r.id)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Delete ${r.type} of ${r.instrumentSymbol}`}
-                      onClick={() => void remove(r)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </Button>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((v) => !v)}
+              className="flex items-center gap-1.5 rounded-control text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {rows.length === 1 ? "1 transaction" : `${rows.length} transactions`}
+              <ChevronDown
+                aria-hidden
+                strokeWidth={1.75}
+                className={cn(
+                  "h-4 w-4 transition-transform duration-200",
+                  expanded && "rotate-180",
+                )}
+              />
+            </button>
+            {expanded && (
+              <div className="mt-4 min-w-0">
+                {/* Three columns, the actions INSIDE the amount cell: a fourth
+                    column for buttons that only show on hover left the amount
+                    stopping short of the card's edge. The grid scrolls inside its
+                    own wrapper so the page never scrolls sideways. */}
+                <div className="min-w-0 overflow-x-auto">
+                  <div className="min-w-[22rem]">
+                    <RowGrid columns="7rem minmax(0,1fr) minmax(0,1.2fr)">
+                      <RowHeader
+                        cells={["Date", "Type", "Amount"]}
+                        align={["left", "left", "right"]}
+                      />
+                      {visible.map((r) => (
+                        <DataRow key={r.id} className="group">
+                          <RowCell
+                            variant="text"
+                            primary={formatDate(r.tradeDate, { year: "always" })}
+                          />
+                          <div role="cell" className="flex min-w-0 flex-wrap items-center gap-1">
+                            <Chip tone={typeChipTone[r.type]}>{r.type}</Chip>
+                            {r.source === "auto" && (
+                              <Chip
+                                variant="outline"
+                                className="lowercase tracking-normal"
+                                title="Added automatically from the dividend payment history. Delete to remove — it won't come back."
+                              >
+                                auto-added
+                              </Chip>
+                            )}
+                          </div>
+                          <div role="cell" className="flex min-w-0 items-center justify-end gap-2">
+                            <div className="min-w-0 text-right">
+                              <div className="truncate font-mono text-data tabular-nums">
+                                {r.type === "split"
+                                  ? `${formatQuantity(r.quantity)} : 1`
+                                  : totalLabel(r)}
+                              </div>
+                              <div className="truncate text-xs text-muted-foreground">
+                                {r.type === "split"
+                                  ? "split ratio"
+                                  : `${formatShares(r.quantity)} sh @ ${formatQuantity(r.price)}`}
+                              </div>
+                            </div>
+                            <div className="flex w-0 shrink-0 gap-1 overflow-hidden group-focus-within:w-auto group-hover:w-auto [@media(hover:none)]:w-auto">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Edit ${r.type} of ${r.instrumentSymbol}`}
+                                onClick={() => setEditingId(r.id)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Delete ${r.type} of ${r.instrumentSymbol}`}
+                                onClick={() => void remove(r)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                              </Button>
+                            </div>
+                          </div>
+                        </DataRow>
+                      ))}
+                    </RowGrid>
                   </div>
-                </DataRow>
-              ))}
-            </RowGrid>
-            {rows.length > PREVIEW && (
-              <button
-                type="button"
-                onClick={() => setShowAll((v) => !v)}
-                className="mt-3 px-3 text-xs text-muted-foreground hover:text-foreground"
-              >
-                {showAll ? "Show less" : `Show all ${rows.length}`}
-              </button>
+                </div>
+                {rows.length > PREVIEW && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAll((v) => !v)}
+                    className="mt-3 px-3 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {showAll ? "Show less" : `Show all ${rows.length}`}
+                  </button>
+                )}
+              </div>
             )}
           </>
         )}
