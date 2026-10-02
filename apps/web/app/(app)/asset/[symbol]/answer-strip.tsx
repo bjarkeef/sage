@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card, Delta, Stat } from "@sage/ui";
+import { Card, cn, Delta, Stat, toneForValue } from "@sage/ui";
 import {
   formatCompactMoney,
   formatDate,
@@ -29,7 +29,7 @@ import {
 } from "../../../../lib/asset-page/labels";
 import { staleAsOf } from "../../../../lib/asset-page/reliability";
 import type { AnalystRatingsDTO, AssetDetailDTO } from "../../../../lib/types";
-import { Missing } from "./reliability-marks";
+import { Missing, StaleNote } from "./reliability-marks";
 
 export interface AnswerStripProps {
   detail: AssetDetailDTO;
@@ -57,9 +57,13 @@ function Tile({
       <Stat
         size="sm"
         label={label}
-        value={value}
+        value={
+          <div data-tile-value="" className="min-w-0 break-words [overflow-wrap:anywhere]">
+            {value}
+          </div>
+        }
         context={
-          <div className="space-y-0.5 break-words">
+          <div className="space-y-0.5 break-words [overflow-wrap:anywhere]">
             {lines.map((line, i) => (
               <div key={i}>{line}</div>
             ))}
@@ -67,6 +71,21 @@ function Tile({
         }
       />
     </Card>
+  );
+}
+
+function SignedPct({ pct }: { pct: number }) {
+  const tone = toneForValue(Number(pct.toFixed(1)));
+  return (
+    <span
+      data-tone={tone}
+      className={cn(
+        "tabular-nums",
+        tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : "text-neutral",
+      )}
+    >
+      {signedPct(pct)}
+    </span>
   );
 }
 
@@ -124,6 +143,7 @@ function PositionTile({
       value={moneyToNumber(p.unrealizedGainLoss)}
       percent={p.gainLossPercent ?? undefined}
       currency={p.unrealizedGainLoss.currency}
+      className="flex-wrap"
     />
   ) : (
     <Missing reason={REASONS.noQuote} />
@@ -158,7 +178,8 @@ function BuyMoreTile({
   detail,
   taxRate,
   ratings,
-}: Pick<AnswerStripProps, "detail" | "taxRate" | "ratings">) {
+  todayISO,
+}: Pick<AnswerStripProps, "detail" | "taxRate" | "ratings" | "todayISO">) {
   const y = currentYield(detail);
   if (!y.ok)
     return <Tile label="Buy more?" value={<Missing reason={y.reason} />} lines={[y.reason]} />;
@@ -166,13 +187,26 @@ function BuyMoreTile({
   const range = detail.yieldRange5y;
   if (range) facts.push(RANGE_PLACE_PHRASE[rangePlace(range.low, range.high, y.value)]);
   const upside = ratings ? analystUpside(ratings.targets.mean, detail.quote) : null;
+  const ratingsStale = ratings ? staleAsOf(ratings.asOf, todayISO) : null;
   return (
     <Tile
       label="Buy more?"
       value={<span className="text-income">{formatPct(y.value * netFactor(taxRate))}</span>}
+      title={
+        ratings && upside?.ok
+          ? `Analyst figures, as of ${formatDate(ratings.asOf.slice(0, 10), { year: "always" })}`
+          : undefined
+      }
       lines={[
         facts.join(" · "),
-        ...(upside?.ok ? [`analysts ${signedPct(upside.value.pct)} to mean target`] : []),
+        ...(upside?.ok
+          ? [
+              <>
+                analysts <SignedPct pct={upside.value.pct} /> to mean target
+                <StaleNote note={ratingsStale} />
+              </>,
+            ]
+          : []),
       ]}
     />
   );
@@ -231,7 +265,12 @@ export function AnswerStrip(props: AnswerStripProps) {
     <section aria-label="At a glance" className="mb-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
       <PaysYouTile detail={props.detail} taxRate={props.taxRate} todayISO={props.todayISO} />
       <PositionTile detail={props.detail} weight={props.weight} addAction={props.addAction} />
-      <BuyMoreTile detail={props.detail} taxRate={props.taxRate} ratings={props.ratings} />
+      <BuyMoreTile
+        detail={props.detail}
+        taxRate={props.taxRate}
+        ratings={props.ratings}
+        todayISO={props.todayISO}
+      />
       <WhatItIsTile detail={props.detail} todayISO={props.todayISO} />
     </section>
   );

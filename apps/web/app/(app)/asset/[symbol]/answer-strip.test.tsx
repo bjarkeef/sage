@@ -11,6 +11,7 @@ import {
   nonPayer,
   notHeld,
   ratings,
+  usd,
 } from "../../../../lib/test/asset-fixtures";
 
 function renderStrip(over: Partial<ComponentProps<typeof AnswerStrip>> = {}) {
@@ -123,5 +124,32 @@ describe("AnswerStrip", () => {
     expect(within(tile("Pays you")).getByText("$200.00")).toBeInTheDocument();
     expect(tile("Pays you").textContent).toContain("next 12 months, before tax");
     expect(tile("Buy more?").textContent).toContain("before tax");
+  });
+
+  it("lets values and the gain Delta wrap, so a narrow tile never pushes the page sideways", () => {
+    const { container } = renderStrip();
+    const values = container.querySelectorAll("[data-tile-value]");
+    expect(values).toHaveLength(4);
+    for (const v of values) expect(v.className).toContain("[overflow-wrap:anywhere]");
+    expect(tile("Your position").querySelector("[data-tone]")).toHaveClass("flex-wrap");
+    for (const c of container.querySelectorAll("[data-card]")) expect(c).toHaveClass("min-w-0");
+  });
+
+  it("tones the analyst upside by its sign", () => {
+    // Header price 60: a mean of 66 is +10.0%, 54 is -10.0%.
+    const { unmount } = renderStrip();
+    expect(screen.getByText("+10.0%")).toHaveAttribute("data-tone", "gain");
+    unmount();
+    renderStrip({ ratings: ratings({ targets: { ...ratings().targets, mean: usd("54") } }) });
+    expect(screen.getByText("−10.0%")).toHaveAttribute("data-tone", "loss");
+  });
+
+  it("dates the analyst figure: on hover, and inline once more than 7 days old", () => {
+    const { unmount } = renderStrip();
+    expect(tile("Buy more?")).toHaveAttribute("title", expect.stringContaining("as of"));
+    expect(tile("Buy more?").textContent).not.toMatch(/as of [A-Z]/);
+    unmount();
+    renderStrip({ ratings: ratings({ asOf: `${day(-10)}T08:00:00.000Z` }) });
+    expect(tile("Buy more?").textContent).toMatch(/as of [A-Z][a-z]{2} \d{1,2}, \d{4}/);
   });
 });
