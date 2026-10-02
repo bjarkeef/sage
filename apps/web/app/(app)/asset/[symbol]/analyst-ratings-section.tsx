@@ -153,9 +153,9 @@ function PriceTargets({
   return (
     <div className="space-y-4">
       <StatStrip>
-        <Stat size="sm" label="Low" value={low ? formatMoney(low) : "—"} />
-        <Stat size="sm" label="Average" value={mean ? formatMoney(mean) : "—"} />
-        <Stat size="sm" label="High" value={high ? formatMoney(high) : "—"} />
+        {low && <Stat size="sm" label="Low" value={formatMoney(low)} />}
+        {mean && <Stat size="sm" label="Average" value={formatMoney(mean)} />}
+        {high && <Stat size="sm" label="High" value={formatMoney(high)} />}
       </StatStrip>
       {showTrack && (
         <div>

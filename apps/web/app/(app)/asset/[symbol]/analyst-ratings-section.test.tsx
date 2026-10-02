@@ -49,4 +49,28 @@ describe("AnalystDetail", () => {
     render(<AnalystDetail ratings={ratings()} quote={null} />);
     expect(screen.queryByText(/^Today/)).not.toBeInTheDocument();
   });
+
+  it("shows only the targets the provider sent, never a bare dash", () => {
+    const { container, rerender } = render(
+      <AnalystDetail
+        ratings={ratings({
+          targets: { low: null, mean: usd("318.25"), high: usd("400"), median: null },
+        })}
+        quote={quote}
+      />,
+    );
+    expect(container.textContent).not.toContain("—");
+    expect(screen.queryByText("Low")).not.toBeInTheDocument();
+    expect(screen.getByText("$318.25")).toBeInTheDocument();
+    expect(screen.getByText("$400.00")).toBeInTheDocument();
+    rerender(
+      <AnalystDetail
+        ratings={ratings({ targets: { low: null, mean: usd("318.25"), high: null, median: null } })}
+        quote={quote}
+      />,
+    );
+    expect(container.textContent).not.toContain("—");
+    expect(screen.getByText("Average")).toBeInTheDocument();
+    expect(screen.getByText("$318.25")).toBeInTheDocument();
+  });
 });
