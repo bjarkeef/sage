@@ -63,17 +63,73 @@ export function readChartTheme(): ChartTheme {
 }
 
 /** Apply an alpha to a resolved CSS colour. Theme tokens resolve to hex or to
- *  rgb()/rgba(), so both are handled — a bare hex suffix on an rgba string is
- *  invalid CSS and is silently ignored by canvas. */
+ *  rgb()/rgba(), so both are handled. When the input color already has an alpha
+ *  channel, the result's alpha is (input alpha) × (requested alpha). For 6-digit
+ *  hex (#rrggbb) with no existing alpha, returns hex format as before; for all
+ *  colors with alpha or other formats, returns rgba(). */
 export function withChartAlpha(color: string, alpha: number): string {
+  // Handle hex colors: #rgb, #rgba, #rrggbb, #rrggbbaa
   if (color.startsWith("#")) {
-    return `${color}${Math.round(alpha * 255)
-      .toString(16)
-      .padStart(2, "0")}`;
+    const hex = color.slice(1);
+    let r: number, g: number, b: number;
+    let inputAlpha = 1;
+    let hasAlpha = false;
+
+    if (hex.length === 3) {
+      // #rgb
+      r = parseInt(hex.slice(0, 1) + hex.slice(0, 1), 16);
+      g = parseInt(hex.slice(1, 2) + hex.slice(1, 2), 16);
+      b = parseInt(hex.slice(2, 3) + hex.slice(2, 3), 16);
+      hasAlpha = true; // Will convert to rgba
+    } else if (hex.length === 4) {
+      // #rgba
+      r = parseInt(hex.slice(0, 1) + hex.slice(0, 1), 16);
+      g = parseInt(hex.slice(1, 2) + hex.slice(1, 2), 16);
+      b = parseInt(hex.slice(2, 3) + hex.slice(2, 3), 16);
+      inputAlpha = parseInt(hex.slice(3, 4) + hex.slice(3, 4), 16) / 255;
+      hasAlpha = true;
+    } else if (hex.length === 6) {
+      // #rrggbb — keep old behavior for backward compatibility
+      return `${color}${Math.round(alpha * 255)
+        .toString(16)
+        .padStart(2, "0")}`;
+    } else if (hex.length === 8) {
+      // #rrggbbaa
+      r = parseInt(hex.slice(0, 2), 16);
+      g = parseInt(hex.slice(2, 4), 16);
+      b = parseInt(hex.slice(4, 6), 16);
+      inputAlpha = parseInt(hex.slice(6, 8), 16) / 255;
+      hasAlpha = true;
+    } else {
+      // Unparseable hex format
+      return color;
+    }
+
+    if (hasAlpha) {
+      const resultAlpha = inputAlpha * alpha;
+      return `rgba(${r}, ${g}, ${b}, ${resultAlpha})`;
+    }
+
+    // Should not reach here, but just in case
+    return color;
   }
-  const nums = color.match(/[\d.]+/g);
-  if (!nums || nums.length < 3) return color;
-  return `rgba(${nums[0]}, ${nums[1]}, ${nums[2]}, ${alpha})`;
+
+  // Handle rgb() / rgba() formats
+  if (color.startsWith("rgb")) {
+    const nums = color.match(/[\d.]+/g);
+    if (!nums || nums.length < 3) return color;
+
+    const r = nums[0];
+    const g = nums[1];
+    const b = nums[2];
+    const inputAlpha = nums.length > 3 ? parseFloat(nums[3] || "1") : 1;
+    const resultAlpha = inputAlpha * alpha;
+
+    return `rgba(${r}, ${g}, ${b}, ${resultAlpha})`;
+  }
+
+  // Unparseable color
+  return color;
 }
 
 export function baseChartOptions(

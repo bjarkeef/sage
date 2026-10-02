@@ -136,6 +136,87 @@ describe("chart-config", () => {
       }
     });
   });
+
+  describe("withChartAlpha", () => {
+    it("appends alpha to 6-digit hex colors", () => {
+      const result = withChartAlpha("#3d6a4d", 0.18);
+      expect(result).toBe("#3d6a4d2e");
+    });
+
+    it("multiplies alpha for 8-digit hex colors", () => {
+      const result = withChartAlpha("#ececeaa3", 0.18);
+      // #ececeaa3: a3 = 163/255 ≈ 0.639; 0.639 * 0.18 ≈ 0.115; should be rgba format
+      expect(result).toMatch(/^rgba\(/);
+      expect(result).not.toContain("2e");
+      // Verify it's a valid rgba format
+      expect(result).toMatch(/rgba\(\d+, \d+, \d+, [\d.]+\)/);
+    });
+
+    it("multiplies alpha for 8-digit hex colors with zero alpha", () => {
+      const result = withChartAlpha("#ececeaa3", 0);
+      // Result should be fully transparent
+      expect(result).toMatch(/rgba\([^,]+, [^,]+, [^,]+, 0\)/);
+    });
+
+    it("multiplies alpha for 8-digit hex colors with strong alpha request", () => {
+      const result = withChartAlpha("#ececeaa3", 0.45);
+      // 0.639 * 0.45 ≈ 0.288; should be a valid rgba
+      expect(result).toMatch(/^rgba\(/);
+      expect(result).not.toContain("a32e");
+    });
+
+    it("multiplies alpha for 4-digit hex colors", () => {
+      const result = withChartAlpha("#f08a", 0.5);
+      expect(result).toMatch(/^rgba\(/);
+      expect(result).toMatch(/rgba\(\d+, \d+, \d+, [\d.]+\)/);
+    });
+
+    it("multiplies alpha for 3-digit hex colors", () => {
+      const result = withChartAlpha("#f0a", 0.5);
+      expect(result).toMatch(/^rgba\(/);
+    });
+
+    it("handles rgb() format with new alpha", () => {
+      const result = withChartAlpha("rgb(61, 106, 77)", 0.18);
+      expect(result).toMatch(/^rgba\(/);
+      expect(result).toContain("0.18");
+    });
+
+    it("multiplies alpha for rgba() format with existing alpha", () => {
+      const result = withChartAlpha("rgba(236, 236, 234, 0.639)", 0.18);
+      // 0.639 * 0.18 ≈ 0.115
+      expect(result).toMatch(/^rgba\(/);
+      expect(result).toMatch(/rgba\(\d+, \d+, \d+, [\d.]+\)/);
+    });
+
+    it("returns unparseable colors unchanged", () => {
+      const unparseable = "invalid-color";
+      expect(withChartAlpha(unparseable, 0.5)).toBe(unparseable);
+    });
+
+    it("produces valid rgba() output for #ececeaa3 with 0.18", () => {
+      const result = withChartAlpha("#ececeaa3", 0.18);
+      // Verify format is valid for canvas
+      expect(result).toMatch(/^rgba\(\d+, \d+, \d+, [\d.]+\)$/);
+      // Verify alpha is between 0 and 1
+      const match = result.match(/rgba\([^,]+, [^,]+, [^,]+, ([\d.]+)\)/);
+      if (match && match[1]) {
+        const alpha = parseFloat(match[1]);
+        expect(alpha).toBeGreaterThanOrEqual(0);
+        expect(alpha).toBeLessThanOrEqual(1);
+      }
+    });
+
+    it("areaSeriesOptions with alpha-containing color returns valid rgba strings", () => {
+      const opts = areaSeriesOptions(theme, "#ececeaa3");
+      // topColor and bottomColor should be valid rgba format, not malformed hex
+      expect(opts.topColor).toMatch(/^rgba\(\d+, \d+, \d+, [\d.]+\)$/);
+      expect(opts.bottomColor).toMatch(/^rgba\(\d+, \d+, \d+, [\d.]+\)$/);
+      // Colors should not contain the malformed pattern
+      expect(opts.topColor).not.toContain("a32e");
+      expect(opts.bottomColor).not.toContain("a300");
+    });
+  });
 });
 
 describe("attachHoverTooltip", () => {
