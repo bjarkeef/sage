@@ -1,7 +1,7 @@
 import { it, expect, beforeAll, afterAll } from "vitest";
 import { Hono } from "hono";
 import { FakeMarketDataProvider } from "@sage/provider-interface/testing";
-import { Money } from "@sage/core";
+import { Decimal, Money } from "@sage/core";
 import { describeDb, withTestDb, type TestDb } from "../testing";
 import { user, portfolio, instrument, transaction, dividendHistory } from "../db/schema";
 import { assetRoutes } from "./asset";
@@ -24,6 +24,7 @@ import type { AppEnv } from "../middleware/session";
 describeDb("received so far — one producer for /dividends, /holdings and the asset page", () => {
   let tdb: TestDb;
   let app: Hono<AppEnv>;
+  let zeroRateApp: Hono<AppEnv>;
   const userId = "received-parity-user";
   const DAY = 24 * 60 * 60 * 1000;
   const iso = (offsetDays: number) =>
@@ -68,6 +69,13 @@ describeDb("received so far — one producer for /dividends, /holdings and the a
         currency: "USD",
         assetType: "stock",
       },
+      {
+        symbol: "NORDA-B",
+        name: "Example Nordic",
+        exchange: "XCSE",
+        currency: "DKK",
+        assetType: "stock",
+      },
     ]);
 
     const tx = (
@@ -98,6 +106,9 @@ describeDb("received so far — one producer for /dividends, /holdings and the a
       tx("O", "buy", "5", "60", iso(-400)),
       tx("O", "dividend", "5", "0.25", iso(-30)),
       tx("MSFT", "buy", "2", "200", iso(-400)),
+      // A DKK holding whose dividend was paid in USD: needs a USD -> DKK rate.
+      { ...tx("NORDA-B", "buy", "10", "100", iso(-400)), currency: "DKK" },
+      tx("NORDA-B", "dividend", "10", "1", iso(-30)),
     ]);
 
     // Provider history that disagrees with the ledger: 4 × 0.50 × 10 = 20.00,
@@ -121,7 +132,12 @@ describeDb("received so far — one producer for /dividends, /holdings and the a
       previousClose: null,
     });
     const provider = new FakeMarketDataProvider({
-      quotes: { KO: quote("KO", "50"), O: quote("O", "60"), MSFT: quote("MSFT", "200") },
+      quotes: {
+        KO: quote("KO", "50"),
+        O: quote("O", "60"),
+        MSFT: quote("MSFT", "200"),
+        "NORDA-B": { ...quote("NORDA-B", "100"), price: Money.of("100", "DKK") },
+      },
     });
 
     app = new Hono<AppEnv>();
@@ -131,6 +147,19 @@ describeDb("received so far — one producer for /dividends, /holdings and the a
       await next();
     });
     app.route("/asset", assetRoutes(tdb.db, provider));
+    zeroRateApp = new Hono<AppEnv>();
+    zeroRateApp.use("*", async (c, next) => {
+      c.set("user", { id: userId });
+      c.set("session", {});
+      await next();
+    });
+    zeroRateApp.route(
+      "/asset",
+      assetRoutes(tdb.db, provider, undefined, {
+        getRate: () => Promise.resolve(new Decimal(0)),
+        getRates: () => Promise.resolve(new Map()),
+      }),
+    );
     app.route("/portfolio", portfolioRoutes(tdb.db, provider));
     app.route("/dividends", dividendsRoutes(tdb.db, provider));
   }, 120_000);
@@ -201,5 +230,14 @@ describeDb("received so far — one producer for /dividends, /holdings and the a
     expect(asset.position.dividendsReceived).toBeNull();
     const body = (await (await app.request("/portfolio")).json()) as PortfolioBody;
     expect(body.positions.find((p) => p.symbol === "MSFT")!.dividendIncome).toBeNull();
+  });
+
+  it("a zero FX rate leaves the row out and counts it — never converts it to nothing", async () => {
+    const asset = (await (await zeroRateApp.request("/asset/NORDA-B")).json()) as AssetBody;
+    expect(asset.position.dividendsReceived).toEqual({
+      amount: "0.00",
+      currency: "DKK",
+      leftOut: 1,
+    });
   });
 });

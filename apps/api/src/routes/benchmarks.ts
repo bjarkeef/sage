@@ -91,7 +91,7 @@ export function benchmarksRoutes(provider: IMarketDataProvider, fxRateService?: 
     const parsed = seriesQuery.safeParse(c.req.query());
     if (!parsed.success) return c.json({ error: "invalid_query" }, 400);
     const { id, from, to, currency } = parsed.data;
-    if (!BENCHMARKS[id]) return c.json({ error: "unknown_benchmark" }, 400);
+    if (!Object.hasOwn(BENCHMARKS, id)) return c.json({ error: "unknown_benchmark" }, 400);
 
     const [fetched] = await fetchBenchmarkSeries(
       provider,

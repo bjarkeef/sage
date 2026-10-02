@@ -834,7 +834,7 @@ export async function fetchBenchmarkSeries(
   { id: string; name: string; currency: string; bars: { date: string; close: Decimal }[] }[]
 > {
   const benchmarkSymbols: { id: string; name: string; symbols: string[] }[] = ids
-    .filter((id) => BENCHMARKS[id])
+    .filter((id) => Object.hasOwn(BENCHMARKS, id))
     .map((id) => ({ id, ...BENCHMARKS[id]! }));
 
   const results: {

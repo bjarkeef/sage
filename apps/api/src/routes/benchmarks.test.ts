@@ -142,6 +142,14 @@ describe("GET /benchmarks/series", () => {
     expect(await res.json()).toEqual({ error: "unknown_benchmark" });
   });
 
+  it("rejects an id that is only an inherited object key", async () => {
+    for (const id of ["constructor", "__proto__", "toString"]) {
+      const res = await app().request(q({ id }));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "unknown_benchmark" });
+    }
+  });
+
   it("rejects malformed or reversed dates and a missing or malformed currency", async () => {
     expect((await app().request(q({ from: "March" }))).status).toBe(400);
     expect((await app().request(q({ from: "2026-03-10", to: "2026-03-01" }))).status).toBe(400);

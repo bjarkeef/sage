@@ -237,7 +237,7 @@ export async function buildPortfolioView(
           const fromRate = from === targetCurrency ? new Decimal(1) : fxRates.get(from);
           const toRate =
             position.currency === targetCurrency ? new Decimal(1) : fxRates.get(position.currency);
-          if (!fromRate || !toRate || fromRate.isZero()) return null;
+          if (!fromRate || !toRate || fromRate.isZero() || toRate.isZero()) return null;
           // rate = units of that currency per 1 display unit.
           return amount.dividedBy(fromRate).times(toRate);
         },

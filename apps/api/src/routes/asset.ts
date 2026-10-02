@@ -338,7 +338,7 @@ export function assetRoutes(
         }
         const received = receivedTotal(receivedRows, symbol, pos.currency, (amount, from) => {
           const rate = receivedRates.get(from);
-          return rate ? amount.times(rate) : null;
+          return rate && !rate.isZero() ? amount.times(rate) : null;
         });
 
         // Optional FX: convert dividend APS into the cost currency when they
