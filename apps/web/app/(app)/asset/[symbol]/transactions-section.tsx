@@ -157,7 +157,7 @@ export function TransactionsSection({
                     stopping short of the card's edge. The grid scrolls inside its
                     own wrapper so the page never scrolls sideways. */}
                 <div className="min-w-0 overflow-x-auto">
-                  <div className="min-w-[22rem]">
+                  <div className="min-w-[24rem]">
                     <RowGrid columns="7rem minmax(0,1fr) minmax(0,1.2fr)">
                       <RowHeader
                         cells={["Date", "Type", "Amount"]}
@@ -181,9 +181,9 @@ export function TransactionsSection({
                               </Chip>
                             )}
                           </div>
-                          <div role="cell" className="flex min-w-0 items-center justify-end gap-2">
+                          <div role="cell" className="relative flex min-w-0 flex-col items-end">
                             <div className="min-w-0 text-right">
-                              <div className="truncate font-mono text-data tabular-nums">
+                              <div className="font-mono text-data tabular-nums">
                                 {r.type === "split"
                                   ? `${formatQuantity(r.quantity)} : 1`
                                   : totalLabel(r)}
@@ -194,7 +194,9 @@ export function TransactionsSection({
                                   : `${formatShares(r.quantity)} sh @ ${formatQuantity(r.price)}`}
                               </div>
                             </div>
-                            <div className="flex w-0 shrink-0 gap-1 overflow-hidden group-focus-within:w-auto group-hover:w-auto [@media(hover:none)]:w-auto">
+                            {/* Hover devices: laid over the right of the cell, revealed by opacity, so
+                                the amount never changes width. Touch: its own line. */}
+                            <div className="pointer-events-none absolute right-0 top-1/2 flex -translate-y-1/2 gap-1 rounded-control bg-surface-hover opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:static [@media(hover:none)]:mt-1 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent [@media(hover:none)]:opacity-100">
                               <Button
                                 variant="ghost"
                                 size="icon"

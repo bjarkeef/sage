@@ -172,4 +172,23 @@ describe("TransactionsSection", () => {
     expect(within(header!).getAllByRole("columnheader")).toHaveLength(3);
     for (const r of rows) expect(within(r).getAllByRole("cell")).toHaveLength(3);
   });
+
+  it("reveals the row actions by opacity over the cell, never by changing the amount's width", async () => {
+    seed([row()]);
+    renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
+    const actions = screen.getByRole("button", { name: /Edit buy of AAPL/ }).parentElement!;
+    expect(actions).toHaveClass("opacity-0", "group-focus-within:opacity-100", "absolute");
+    expect(actions).not.toHaveClass("w-0");
+    expect(actions.className).not.toMatch(/(^|\s)(group-\w+:)?w-auto/);
+    expect(actions.className).not.toContain("overflow-hidden");
+  });
+
+  it("never truncates the money figure", async () => {
+    seed([row()]);
+    renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
+    const figure = screen.getAllByRole("cell")[2]!.querySelector(".font-mono")!;
+    expect(figure).not.toHaveClass("truncate");
+  });
 });
