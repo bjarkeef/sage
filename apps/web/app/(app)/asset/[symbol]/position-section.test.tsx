@@ -44,4 +44,12 @@ describe("PositionSection", () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("lets the gain Delta wrap at narrow widths, so the page never scrolls sideways", () => {
+    const { container } = render(
+      <PositionSection position={position} weight={{ ok: true, value: 0.08 }} />,
+    );
+    const gainDelta = container.querySelector("[data-tone]");
+    expect(gainDelta).toHaveClass("flex-wrap");
+  });
 });

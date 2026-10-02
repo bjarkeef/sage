@@ -49,6 +49,7 @@ export function PositionSection({
           value={moneyToNumber(position.unrealizedGainLoss)}
           percent={position.gainLossPercent ?? undefined}
           currency={position.unrealizedGainLoss.currency}
+          className="flex-wrap"
         />
       ) : (
         <Missing reason={REASONS.noQuote} />
