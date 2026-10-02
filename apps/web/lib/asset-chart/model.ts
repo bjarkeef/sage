@@ -40,6 +40,12 @@ export interface ChartModel {
   direction: Direction;
 }
 
+/** Change of a percent line that starts at 0: its last value is the change. */
+function drawnChange(percentLine: SeriesPoint[]) {
+  const v = percentLine[percentLine.length - 1]?.value;
+  return v === undefined ? null : { abs: v, pct: v };
+}
+
 /**
  * Everything the chart draws, decided in one place.
  *
@@ -97,7 +103,9 @@ export function buildChartModel(input: {
         lineMode: "tr",
         holding: pair.holding,
         benchmark: pair.benchmark,
-        direction: direction(rangeChange(totalReturn)),
+        // From the drawn line: it starts where the benchmark does, not at the
+        // holding's first bar, and its first value is 0 (so rangeChange is null).
+        direction: direction(drawnChange(pair.holding)),
       };
     }
   }

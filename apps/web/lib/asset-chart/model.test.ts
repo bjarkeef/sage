@@ -77,6 +77,31 @@ describe("buildChartModel", () => {
     expect(m.holding[2]!.value).toBeCloseTo((99 / 98 - 1) * 100, 10);
   });
 
+  it("takes a comparison's direction from the drawn line, which starts where the benchmark does", () => {
+    // Full range 100 → 95 is down; from the benchmark's first bar (90 → 95) it is up.
+    const m = buildChartModel({
+      closes: [
+        { date: "2026-03-02", close: 100 },
+        { date: "2026-03-03", close: 90 },
+        { date: "2026-03-04", close: 95 },
+      ],
+      currency: "USD",
+      dividends: [],
+      mode: "price",
+      benchmark: {
+        name: "S&P 500 (TR)",
+        bars: [
+          { date: "2026-03-03", close: 50 },
+          { date: "2026-03-04", close: 55 },
+        ],
+      },
+    });
+    expect(m.axis).toBe("percent");
+    expect(m.holding[0]!.time).toBe("2026-03-03");
+    expect(m.holding.at(-1)!.value).toBeGreaterThan(0);
+    expect(m.direction).toBe("up");
+  });
+
   it("never compares a price line: without total return there is no benchmark", () => {
     const m = buildChartModel({
       closes,
