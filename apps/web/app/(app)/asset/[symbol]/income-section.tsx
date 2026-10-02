@@ -1,134 +1,193 @@
-import { Card, Chip, InfoTooltip, SectionHeader, Stat } from "@sage/ui";
-import { formatMoney, formatDate } from "../../../../lib/format";
+import { Card, CardTitle, SectionHeader, Stat } from "@sage/ui";
+import { formatDate, formatMoney } from "../../../../lib/format";
 import { netFactor } from "../../../../lib/dividend-tax";
-import type { AssetCustomDTO, AssetIncomeDTO } from "../../../../lib/types";
+import {
+  cashDate,
+  nextPayment,
+  nextTwelveMonths,
+  payFrequencyOf,
+} from "../../../../lib/asset-page/figures";
+import { basisWord, formatPct } from "../../../../lib/asset-page/labels";
+import type { AssetDetailDTO } from "../../../../lib/types";
+import { CustomIncomeCard } from "./custom-income-card";
+import { IncomeByYear } from "./income-by-year";
+import { PaymentsList } from "./payments-list";
+import { CheckMark, Missing } from "./reliability-marks";
 
-function pct(fraction: number | null): string {
-  return fraction != null ? `${(fraction * 100).toFixed(2)}%` : "—";
-}
+/** Wide figures wrap inside their cell rather than push the page sideways. */
+const WRAP = "break-words [overflow-wrap:anywhere]";
 
-/** "Every month" / "Every 2 months" — matches the cadence phrasing on the
- *  custom-holding form. */
-function cadenceLabel(unit: string, interval: number): string {
-  if (interval <= 1) return `Every ${unit}`;
-  return `Every ${interval} ${unit}s`;
-}
-
-export function IncomeSection({
-  income,
-  custom,
+/** What this holding pays YOU: amounts for your shares, after tax. */
+export function YourIncome({
+  detail,
   taxRate,
+  todayISO,
 }: {
-  income: AssetIncomeDTO;
-  custom?: AssetCustomDTO | null;
+  detail: AssetDetailDTO;
   taxRate: number | null;
+  todayISO: string;
 }) {
-  const customIncome = custom?.income ?? null;
-  const hasData =
-    income.currentYield != null ||
-    income.yieldOnCost != null ||
-    income.annualDividend != null ||
-    income.dividendGrowth5y != null;
-  if (!hasData && !customIncome) return null;
-
-  const growth = income.dividendGrowth5y != null ? Number(income.dividendGrowth5y) : null;
-
-  // Yields are rates you'd actually receive, so they net. The per-share
-  // dividend below stays gross — it's the issuer's declared figure, which
-  // people cross-check against the announcement.
+  const { position, upcoming, income, dividends } = detail;
+  if (!position.held || !position.quantity) return null;
+  const qty = Number(position.quantity);
   const f = netFactor(taxRate);
-  const taxed = taxRate != null;
-  const currentYield = income.currentYield == null ? null : income.currentYield * f;
-  const yieldOnCost = income.yieldOnCost == null ? null : income.yieldOnCost * f;
+  const basis = basisWord(taxRate);
+
+  const next12 = nextTwelveMonths(upcoming, qty);
+  const next = nextPayment(upcoming, todayISO);
+  const freq = payFrequencyOf(dividends.history, upcoming, todayISO);
+  // Cash that actually landed, from the ledger — the rows /dividends lists as
+  // received, and /holdings' dividend income (Task 3). Gross; netted here.
+  const received = position.dividendsReceived ?? null;
+  const receivedAmount = received ? Number(received.amount) : 0;
+
+  return (
+    <Card className="min-w-0">
+      <CardTitle meta={basis}>Your income</CardTitle>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
+        <Stat
+          size="sm"
+          label="Next payment"
+          value={
+            next ? (
+              <span className={`text-income ${WRAP}`}>
+                {formatMoney({
+                  amount: (Number(next.amountPerShare) * qty * f).toFixed(2),
+                  currency: next.currency,
+                })}
+              </span>
+            ) : (
+              <Missing reason="No payment expected yet" />
+            )
+          }
+          context={
+            next
+              ? `${formatDate(cashDate(next), { year: "always" })} · ${next.certainty}`
+              : undefined
+          }
+        />
+        <Stat
+          size="sm"
+          label="Next 12 months"
+          value={
+            next12.ok ? (
+              <span className={`text-income ${WRAP}`}>
+                {formatMoney({
+                  amount: (Number(next12.value.amount) * f).toFixed(2),
+                  currency: next12.value.currency,
+                })}
+              </span>
+            ) : (
+              <Missing reason={next12.reason} />
+            )
+          }
+          context={basis}
+        />
+        <Stat
+          size="sm"
+          label="Yield on cost"
+          value={
+            income.yieldOnCost != null ? (
+              <span className={WRAP}>{formatPct(income.yieldOnCost * f)}</span>
+            ) : (
+              <Missing reason="No trailing dividend to measure against your cost" />
+            )
+          }
+          context={income.yieldOnCost != null ? basis : undefined}
+        />
+        <Stat
+          size="sm"
+          label="Received so far"
+          value={
+            received && receivedAmount > 0 ? (
+              <>
+                <span className={WRAP}>
+                  {formatMoney({
+                    amount: (receivedAmount * f).toFixed(2),
+                    currency: received.currency,
+                  })}
+                </span>
+                {received.leftOut > 0 && (
+                  <CheckMark
+                    flag={{
+                      reason: `${received.leftOut} payment${received.leftOut === 1 ? " in another currency is" : "s in another currency are"} left out: no exchange rate`,
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              "Nothing yet"
+            )
+          }
+          context={received && receivedAmount > 0 ? basis : undefined}
+        />
+        <Stat
+          size="sm"
+          label="Pays"
+          value={
+            freq ? (
+              freq.replace(/^pays /, "")
+            ) : (
+              <Missing reason="Too few payments to tell its rhythm" />
+            )
+          }
+        />
+      </div>
+      <PaymentsList history={dividends.history} />
+    </Card>
+  );
+}
+
+/**
+ * § 4, "What it pays you": the per-share history and forecast by year beside
+ * what that means for your shares. A custom holding keeps its own income card.
+ * A holding that has never paid has nothing to say here, so nothing mounts.
+ */
+export function IncomeSection({
+  detail,
+  taxRate,
+  todayISO,
+}: {
+  detail: AssetDetailDTO;
+  taxRate: number | null;
+  todayISO: string;
+}) {
+  // A custom holding's income is contractual (annualDividend = price × rate), so
+  // the per-share reliability checks never run for it: it returns here.
+  if (detail.custom) {
+    if (!detail.custom.income) return null;
+    return (
+      <section className="mb-10">
+        <SectionHeader title="What it pays you" />
+        <CustomIncomeCard income={detail.custom.income} />
+      </section>
+    );
+  }
+
+  const { dividends, upcoming, income, profile, position } = detail;
+  if (dividends.history.length === 0 && upcoming.length === 0) return null;
+  const currency =
+    income.annualDividend?.currency ??
+    dividends.history[0]?.currency ??
+    upcoming[0]?.currency ??
+    profile.currency;
+  const held = position.held && position.quantity != null;
 
   return (
     <section className="mb-10">
-      <SectionHeader title="Income" />
-      {customIncome && (
-        <Card className="mb-4">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
-            <Stat size="sm" label="Rate" value={`${customIncome.yearlyPct}%`} />
-            <Stat
-              size="sm"
-              label="Cadence"
-              value={cadenceLabel(customIncome.frequencyUnit, customIncome.frequencyInterval)}
-            />
-            <Stat
-              size="sm"
-              label="Next payment"
-              value={customIncome.nextPaymentDate ? formatDate(customIncome.nextPaymentDate) : "—"}
-            />
-            <Stat
-              size="sm"
-              label="Reinvest"
-              value={
-                <Chip tone={customIncome.reinvest ? "income" : "neutral"}>
-                  {customIncome.reinvest ? "Reinvested" : "Paid as cash"}
-                </Chip>
-              }
-            />
-          </div>
-        </Card>
-      )}
-      {hasData && (
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] sm:items-stretch">
-          <Card className="flex flex-col">
-            <div className="flex items-center gap-1 label-caps text-muted-foreground">
-              <span>Current yield</span>
-              <InfoTooltip label="About this figure">
-                Annual dividends per share ÷ today&apos;s price,{" "}
-                {taxed
-                  ? "after your configured dividend tax rate (a single flat rate, not per-country withholding). Brokers and quote sites publish this figure before tax, so theirs will read higher."
-                  : "before dividend tax. Set a rate in Settings for a net figure."}
-              </InfoTooltip>
-            </div>
-            <div className="hero-num mt-2 text-income">{pct(currentYield)}</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {taxed ? "After tax" : "Before tax"}
-            </div>
-            <div className="mt-1.5 text-xs text-muted-foreground">
-              {income.annualDividend
-                ? `on today's price, ${formatMoney(income.annualDividend)} / share`
-                : "on today's price"}
-            </div>
-            {yieldOnCost != null && (
-              <div className="mt-auto border-t border-hairline-faint pt-4 text-sm text-muted-foreground">
-                Yield on cost{" "}
-                <span className="font-medium tabular-nums text-foreground">{pct(yieldOnCost)}</span>
-              </div>
-            )}
-          </Card>
-          <Card>
-            <div className="grid h-full grid-cols-2 gap-x-8 gap-y-8 sm:content-center">
-              <Stat
-                size="sm"
-                label="Next ex-date"
-                value={income.nextExDate ? formatDate(income.nextExDate) : "—"}
-              />
-              <Stat
-                size="sm"
-                label="5Y growth"
-                value={
-                  growth != null ? (
-                    <span className={growth >= 0 ? "text-gain" : "text-loss"}>
-                      {growth >= 0 ? "+" : "−"}
-                      {Math.abs(growth * 100).toFixed(1)}%
-                    </span>
-                  ) : (
-                    "—"
-                  )
-                }
-              />
-              <Stat
-                size="sm"
-                label="Annual / share"
-                value={income.annualDividend ? formatMoney(income.annualDividend) : "—"}
-              />
-              <Stat size="sm" label="Payout ratio" value={pct(income.payoutRatio)} />
-            </div>
-          </Card>
-        </div>
-      )}
+      <SectionHeader title="What it pays you" />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <IncomeByYear
+          history={dividends.history}
+          upcoming={upcoming}
+          currency={currency}
+          cagr5y={dividends.cagr5y}
+          annualDividend={income.annualDividend}
+          todayISO={todayISO}
+          footer={held ? null : <PaymentsList history={dividends.history} />}
+        />
+        {held && <YourIncome detail={detail} taxRate={taxRate} todayISO={todayISO} />}
+      </div>
     </section>
   );
 }

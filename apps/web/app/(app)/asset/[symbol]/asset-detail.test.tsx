@@ -47,6 +47,9 @@ import AssetDetailPage from "./page";
 import * as api from "../../../../lib/api";
 import { useParams as useParamsMock } from "next/navigation";
 
+// The page reads the real clock for "today"; these fixtures are built from it.
+const fromToday = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
 const FIXTURE_ASSET: AssetDetailDTO = {
   profile: {
     symbol: "AAPL",
@@ -176,8 +179,8 @@ describe("AssetDetailPage", () => {
     // Income settings row, from income-section.tsx.
     expect(screen.getByText("4.25%")).toBeInTheDocument();
     expect(screen.getByText("Every quarter")).toBeInTheDocument();
-    // formatDate omits the year when it matches the current year.
-    expect(screen.getByText(/^Jul 30(, 2026)?$/)).toBeInTheDocument();
+    // Every date on the page carries its year.
+    expect(screen.getByText("Jul 30, 2026")).toBeInTheDocument();
     expect(screen.getByText("Reinvested")).toBeInTheDocument();
 
     // Quick actions.
@@ -291,6 +294,28 @@ describe("AssetDetailPage", () => {
         feesPaid: null,
         trades: [],
       },
+      dividends: {
+        history: [
+          {
+            exDate: fromToday(-40),
+            amountPerShare: "1.00",
+            currency: "USD",
+            paymentDate: fromToday(-26),
+          },
+        ],
+        cagr5y: null,
+        trailingTwelveMonthTotal: "1.00",
+      },
+      upcoming: [
+        {
+          exDate: fromToday(50),
+          paymentDate: fromToday(64),
+          amountPerShare: "1.00",
+          currency: "USD",
+          certainty: "estimated",
+          window: "next12m",
+        },
+      ],
       income: {
         currentYield: 0.05,
         yieldOnCost: 0.06,
@@ -314,6 +339,9 @@ describe("AssetDetailPage", () => {
     // The other two income figures in the strip net on the same rate.
     expect(screen.queryByText("$60.00")).not.toBeInTheDocument();
     expect(screen.queryByText("$40.00")).not.toBeInTheDocument();
+    // Next 12 months is 1.00 × 10 = $10.00 gross; only the net $6.50 may appear.
+    expect(screen.queryByText("$10.00")).not.toBeInTheDocument();
+    expect(screen.getAllByText("$6.50").length).toBeGreaterThanOrEqual(1);
 
     // And the basis is stated on the figures themselves, not only in a caption
     // belonging to a different card.

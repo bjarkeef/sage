@@ -26,7 +26,6 @@ import { IncomeSection } from "./income-section";
 import { AboutSection } from "./about-section";
 import { FundamentalsSection } from "./fundamentals-section";
 import { FundComposition } from "./fund-composition";
-import { DividendHistory } from "./dividend-history";
 import { AnalystRatingsSection } from "./analyst-ratings-section";
 import { NewsSection } from "./news-section";
 
@@ -97,7 +96,7 @@ export default function AssetDetailPage() {
     );
   }
 
-  const { profile, quote, chart, dividends, position, income, custom } = data;
+  const { profile, quote, chart, dividends, position, custom } = data;
   const fund = profile.fund; // const local so narrowing holds inside nested callbacks
 
   return (
@@ -165,7 +164,7 @@ export default function AssetDetailPage() {
         symbol={profile.symbol}
         taxRate={dividendTaxRate}
       />
-      <IncomeSection income={income} custom={custom} taxRate={dividendTaxRate} />
+      <IncomeSection detail={data} taxRate={dividendTaxRate} todayISO={todayISO} />
       <AboutSection profile={profile} />
 
       <FundamentalsSection profile={profile} />
@@ -175,7 +174,6 @@ export default function AssetDetailPage() {
           the two ledgers read together, and both sit below the research
           sections rather than interrupting them. */}
       <TransactionsSection symbol={profile.symbol} held={position.held || custom != null} />
-      <DividendHistory dividends={dividends} currency={profile.currency} />
       <NewsSection slug={slug} />
     </PageShell>
   );
