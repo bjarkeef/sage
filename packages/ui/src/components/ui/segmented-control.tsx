@@ -18,6 +18,9 @@ export interface SegmentedControlProps {
    *  `role="radiogroup"` div — it only binds to labelable elements — so a
    *  caller with a visible label must point this at that label's id instead. */
   "aria-labelledby"?: string;
+  /** Points at visible text that explains the control's state, e.g. why it is
+   *  locked. */
+  "aria-describedby"?: string;
 }
 
 export function SegmentedControl({
@@ -28,6 +31,7 @@ export function SegmentedControl({
   className,
   disabled = false,
   "aria-labelledby": ariaLabelledBy,
+  "aria-describedby": ariaDescribedBy,
 }: SegmentedControlProps) {
   return (
     <div
@@ -37,6 +41,7 @@ export function SegmentedControl({
       )}
       role="radiogroup"
       aria-labelledby={ariaLabelledBy}
+      aria-describedby={ariaDescribedBy}
     >
       {options.map((opt) => {
         const active = opt.value === value;

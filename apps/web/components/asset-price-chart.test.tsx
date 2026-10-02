@@ -256,6 +256,17 @@ describe("AssetPriceChart — total return and compare", () => {
     expect(createPriceLine).toHaveBeenCalledTimes(1);
   });
 
+  it("says on the page, not only on hover, why total return is unavailable", async () => {
+    renderChart({
+      dividends: [{ ...DIVIDENDS[0]!, currency: "GBP" }],
+    });
+    const tr = await screen.findByRole("radio", { name: "Total return" });
+    expect(tr).toBeDisabled();
+    const reason = screen.getByText(/Total return unavailable: dividends are paid in GBP/);
+    expect(reason).toBeVisible();
+    expect(tr.closest("[role=radiogroup]")).toHaveAttribute("aria-describedby", reason.id);
+  });
+
   it("compares on total return against a TR index in the holding's currency: forces TR, locks the control, hides the cost line", async () => {
     vi.mocked(api.getBenchmarks).mockResolvedValue(BENCHMARKS);
     vi.mocked(api.getBenchmarkSeries).mockResolvedValue({

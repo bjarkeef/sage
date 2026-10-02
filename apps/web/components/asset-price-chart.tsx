@@ -437,6 +437,8 @@ export function AssetPriceChart({
     chartRef.current?.applyOptions({});
   }, [showTrades, showDividends, trades]);
 
+  const trReasonId = React.useId();
+
   if (isLoading) return <ChartSkeleton />;
   if (model.holding.length === 0) {
     return <p className="text-sm text-muted-foreground">No price data available for this range.</p>;
@@ -453,21 +455,21 @@ export function AssetPriceChart({
             onChange={(v) => setRange(v as RangeKey)}
             size="sm"
           />
-          <span
-            title={
-              model.trUnavailable ? `Total return unavailable: ${model.trUnavailable}` : undefined
-            }
-          >
-            <SegmentedControl
-              options={MODES}
-              value={model.lineMode}
-              onChange={(v) => setMode(v as ChartMode)}
-              size="sm"
-              // A comparison is always on total return — a price line against
-              // a TR index is the bias Sage removed from /performance.
-              disabled={comparing || model.trUnavailable !== null}
-            />
-          </span>
+          <SegmentedControl
+            options={MODES}
+            value={model.lineMode}
+            onChange={(v) => setMode(v as ChartMode)}
+            size="sm"
+            // A comparison is always on total return — a price line against
+            // a TR index is the bias Sage removed from /performance.
+            disabled={comparing || model.trUnavailable !== null}
+            aria-describedby={model.trUnavailable ? trReasonId : undefined}
+          />
+          {model.trUnavailable && (
+            <span id={trReasonId} className="text-xs text-muted-foreground">
+              Total return unavailable: {model.trUnavailable}
+            </span>
+          )}
           {comparing && (
             <span className="text-xs text-muted-foreground">compared on total return</span>
           )}
