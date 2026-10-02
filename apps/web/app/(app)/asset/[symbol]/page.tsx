@@ -26,6 +26,7 @@ import { IncomeSection } from "./income-section";
 import { BuyMoreSection } from "./buy-more-section";
 import { WhatItIsSection } from "./what-it-is-section";
 import { NewsSection } from "./news-section";
+import { ProviderFootnote } from "./provider-footnote";
 
 // Deferred so lightweight-charts stays out of the asset route's initial JS; the
 // chart is client-only anyway. See components/portfolio-chart-lazy.tsx.
@@ -159,6 +160,8 @@ export default function AssetDetailPage() {
           onReadout={setReadout}
         />
       </section>
+      {/* The detail, in the strip's order. */}
+      <IncomeSection detail={data} taxRate={dividendTaxRate} todayISO={todayISO} />
       <PositionSection position={position} weight={weight} />
       {!custom && (
         <BuyMoreSection
@@ -168,15 +171,17 @@ export default function AssetDetailPage() {
           todayISO={todayISO}
         />
       )}
-      <IncomeSection detail={data} taxRate={dividendTaxRate} todayISO={todayISO} />
       {!custom && (
         <WhatItIsSection profile={profile} profileAsOf={data.profileAsOf} todayISO={todayISO} />
       )}
-      {/* Your own entries, immediately before the payment history they explain:
-          the two ledgers read together, and both sit below the research
-          sections rather than interrupting them. */}
+      {/* Your own entries, then the news, last. Transactions stay on a custom
+          holding too, collapsed: it is the only place on the page to correct an
+          entry (spec decision 4). */}
       <TransactionsSection symbol={profile.symbol} held={position.held || custom != null} />
-      <NewsSection slug={slug} />
+      {!custom && <NewsSection slug={slug} />}
+      {!custom && (
+        <ProviderFootnote profileAsOf={data.profileAsOf} ratingsAsOf={ratings?.asOf ?? null} />
+      )}
     </PageShell>
   );
 }

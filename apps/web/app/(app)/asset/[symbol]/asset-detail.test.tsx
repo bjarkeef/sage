@@ -3,6 +3,10 @@ import { screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { renderWithClient, makeTestQueryClient } from "../../../../lib/test/render-with-client";
 import { qk } from "../../../../lib/query/keys";
 import type { AssetDetailDTO, UserSettingsDTO } from "../../../../lib/types";
+import {
+  assetDetail as fixtureDetail,
+  ratings as fixtureRatings,
+} from "../../../../lib/test/asset-fixtures";
 
 vi.mock("next/navigation", () => ({
   useParams: vi.fn(() => ({ symbol: "AAPL" })),
@@ -368,5 +372,94 @@ describe("AssetDetailPage", () => {
     renderWithClient(<AssetDetailPage />, qc2);
     await screen.findByText("Cash account");
     expect(screen.queryByRole("region", { name: "At a glance" })).not.toBeInTheDocument();
+  });
+
+  it("answers first, then the detail, in the spec's order", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "KO" });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("KO"), fixtureDetail());
+    qc.setQueryData(qk.userSettings(), { ...FIXTURE_SETTINGS, dividendTaxRate: 35 });
+    qc.setQueryData(qk.assetRatings("KO"), fixtureRatings());
+    // Settled and empty, so News is absent rather than showing its loading header.
+    qc.setQueryData(qk.assetNews("KO"), []);
+    renderWithClient(<AssetDetailPage />, qc);
+
+    await screen.findByRole("region", { name: "At a glance" });
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([
+      "What it pays you",
+      "Your position",
+      "Buy more?",
+      "What it is",
+      "Transactions",
+    ]);
+  });
+
+  it("shows one current price: analyst upside is measured from the header's, never the provider's", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "KO" });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("KO"), fixtureDetail());
+    qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+    qc.setQueryData(qk.assetRatings("KO"), fixtureRatings()); // provider currentPrice 64
+    renderWithClient(<AssetDetailPage />, qc);
+
+    await screen.findByRole("region", { name: "At a glance" });
+    expect(document.body.textContent).toContain("analysts +10.0% to mean target");
+    expect(document.body.textContent).not.toContain("$64.00");
+    expect(document.body.textContent).not.toContain("+3.1%");
+    expect(screen.queryByText(/dividend yield/i)).not.toBeInTheDocument();
+  });
+
+  it("dates the provider's figures in a footnote", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "KO" });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("KO"), fixtureDetail());
+    qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+    qc.setQueryData(qk.assetRatings("KO"), fixtureRatings());
+    renderWithClient(<AssetDetailPage />, qc);
+
+    expect(await screen.findByText(/provider's snapshot from Jun 15, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Analyst ratings as of Jun 15, 2026/)).toBeInTheDocument();
+  });
+
+  it("gives a custom holding its header, chart, income, position and transactions — nothing market-only", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "CASH_DKK" });
+    // Spec decision 4: the transactions card stays on a custom holding — the only
+    // place on the page to correct an entry — and starts collapsed. Once: the
+    // factory's empty ledger stays the default for every other test.
+    vi.mocked(api.listTransactions).mockResolvedValueOnce({
+      items: [
+        {
+          id: "c1",
+          instrumentSymbol: "CASH_DKK",
+          name: "Cash account",
+          type: "buy",
+          quantity: "1",
+          price: "5000",
+          currency: "DKK",
+          fee: null,
+          feeCurrency: null,
+          tradeDate: "2026-01-05",
+          source: null,
+        },
+      ],
+      nextCursor: null,
+    });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("CASH_DKK"), {
+      ...FIXTURE_CUSTOM_ASSET,
+      position: { held: true, quantity: "1" },
+    });
+    qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+    renderWithClient(<AssetDetailPage />, qc);
+
+    await screen.findByText("Cash account");
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(["What it pays you", "Your position", "Transactions"]);
+    const toggle = await screen.findByRole("button", { name: "1 transaction" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("region", { name: "At a glance" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Buy more?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "What it is" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/provider's snapshot/)).not.toBeInTheDocument();
   });
 });
