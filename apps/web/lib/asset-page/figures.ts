@@ -133,6 +133,11 @@ export function holdingWeight(
   return ok(Number(mine.amount) / total);
 }
 
+/** A holding's weight as shown: one decimal, "8.0%". */
+export function formatWeight(weight: number): string {
+  return `${(weight * 100).toFixed(1)}%`;
+}
+
 export type RangePlace = "below" | "low" | "middle" | "high" | "above";
 
 /** Where `current` sits in [low, high], in thirds. */

@@ -119,6 +119,31 @@ describe("AnswerStrip", () => {
     expect(what.textContent).toContain("Ireland · AUM $7.79B");
   });
 
+  it("says the next payment of an unheld payer is after tax, like the figure above it", () => {
+    renderStrip({ detail: notHeld() });
+    expect(tile("Pays you").textContent).toMatch(
+      /next payment: .* · \$0\.325\d* \/ share, after tax · /,
+    );
+    renderStrip({ detail: notHeld(), taxRate: null });
+    expect(screen.getAllByText(/next payment:/).at(-1)!.textContent).toContain(
+      "/ share, before tax",
+    );
+  });
+
+  it("never prints a provider's zero as a fact: no '0 employees', no 'AUM $0'", () => {
+    const d = assetDetail();
+    const { unmount } = renderStrip({
+      detail: { ...d, profile: { ...d.profile, fullTimeEmployees: "0" } },
+    });
+    expect(tile("What it is").textContent).not.toMatch(/employees/);
+    unmount();
+    const f = fundDetail();
+    renderStrip({
+      detail: { ...f, profile: { ...f.profile, fund: { ...f.profile.fund!, totalAssets: "0" } } },
+    });
+    expect(tile("What it is").textContent).not.toMatch(/AUM|\$0/);
+  });
+
   it("states 'before tax' when no tax rate is set", () => {
     renderStrip({ taxRate: null });
     expect(within(tile("Pays you")).getByText("$200.00")).toBeInTheDocument();

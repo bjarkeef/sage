@@ -1,6 +1,6 @@
 import { Card, Delta, SectionHeader, Stat } from "@sage/ui";
 import { formatMoney, formatShares, moneyToNumber } from "../../../../lib/format";
-import { REASONS, type Figure } from "../../../../lib/asset-page/figures";
+import { formatWeight, REASONS, type Figure } from "../../../../lib/asset-page/figures";
 import type { AssetPositionDTO } from "../../../../lib/types";
 import { Missing } from "./reliability-marks";
 
@@ -56,7 +56,7 @@ export function PositionSection({
     },
     {
       label: "Weight",
-      value: weight.ok ? `${(weight.value * 100).toFixed(1)}%` : <Missing reason={weight.reason} />,
+      value: weight.ok ? formatWeight(weight.value) : <Missing reason={weight.reason} />,
     },
     {
       label: "Fees paid",

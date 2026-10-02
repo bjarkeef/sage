@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   analystUpside,
   currentYield,
+  formatWeight,
   holdingWeight,
   nextPayment,
   nextTwelveMonths,
@@ -102,6 +103,14 @@ describe("analystUpside — the consistency check that it uses the HEADER price"
       ok: false,
       reason: REASONS.providerNone,
     });
+  });
+});
+
+describe("formatWeight", () => {
+  it("shows a weight as a percent with one decimal", () => {
+    expect(formatWeight(0.08)).toBe("8.0%");
+    expect(formatWeight(0.12345)).toBe("12.3%");
+    expect(formatWeight(1)).toBe("100.0%");
   });
 });
 

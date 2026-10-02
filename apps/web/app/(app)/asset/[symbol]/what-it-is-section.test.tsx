@@ -74,6 +74,50 @@ describe("WhatItIsSection", () => {
     expect(screen.getByRole("button", { name: "less" })).toBeInTheDocument();
   });
 
+  it("hides a zero or non-numeric employee count and a zero AUM instead of printing them", () => {
+    const p = assetDetail().profile;
+    const { unmount } = render(
+      <WhatItIsSection
+        profile={{ ...p, fullTimeEmployees: "0" }}
+        profileAsOf={TODAY}
+        todayISO={TODAY}
+      />,
+    );
+    expect(screen.queryByText("Employees")).not.toBeInTheDocument();
+    unmount();
+    const { unmount: unmount2 } = render(
+      <WhatItIsSection
+        profile={{ ...p, fullTimeEmployees: "NaN" }}
+        profileAsOf={TODAY}
+        todayISO={TODAY}
+      />,
+    );
+    expect(screen.queryByText("Employees")).not.toBeInTheDocument();
+    unmount2();
+    const f = fundDetail().profile;
+    render(
+      <WhatItIsSection
+        profile={{ ...f, fund: { ...f.fund!, totalAssets: "0" } }}
+        profileAsOf={TODAY}
+        todayISO={TODAY}
+      />,
+    );
+    expect(screen.queryByText("Assets under management")).not.toBeInTheDocument();
+  });
+
+  it("hides a dashed sector or website", () => {
+    const p = assetDetail().profile;
+    render(
+      <WhatItIsSection
+        profile={{ ...p, sector: "–", website: " - " }}
+        profileAsOf={TODAY}
+        todayISO={TODAY}
+      />,
+    );
+    expect(screen.queryByText("Sector")).not.toBeInTheDocument();
+    expect(screen.queryByText("Website")).not.toBeInTheDocument();
+  });
+
   it("is absent when the provider gave nothing", () => {
     const p = assetDetail().profile;
     const { container } = render(

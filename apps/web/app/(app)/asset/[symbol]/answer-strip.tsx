@@ -11,6 +11,7 @@ import { netFactor } from "../../../../lib/dividend-tax";
 import {
   analystUpside,
   cashDate,
+  formatWeight,
   currentYield,
   nextPayment,
   nextTwelveMonths,
@@ -24,6 +25,7 @@ import {
   formatPct,
   formatPerShare,
   isFilled,
+  isPositiveFigure,
   prettySector,
 } from "../../../../lib/asset-page/labels";
 import { staleAsOf } from "../../../../lib/asset-page/reliability";
@@ -99,7 +101,7 @@ function PaysYouTile({
           amount: (Number(next.amountPerShare) * qty * f).toFixed(2),
           currency: next.currency,
         })
-      : `${formatPerShare({ amount: (Number(next.amountPerShare) * f).toFixed(4), currency: next.currency })} / share`
+      : `${formatPerShare({ amount: (Number(next.amountPerShare) * f).toFixed(4), currency: next.currency })} / share, ${basisWord(taxRate)}`
     : null;
 
   return (
@@ -139,7 +141,7 @@ function PositionTile({
   // hover, in the same place the percent would stand. Never a sum across
   // currencies, never a zero.
   const share = weight.ok ? (
-    `${(weight.value * 100).toFixed(1)}% of your book`
+    `${formatWeight(weight.value)} of your book`
   ) : (
     <>
       <Missing reason={weight.reason} /> of your book
@@ -204,17 +206,19 @@ function WhatItIsTile({ detail, todayISO }: Pick<AnswerStripProps, "detail" | "t
     ? isFilled(fund.category)
       ? fund.category
       : null
-    : profile.sector
+    : isFilled(profile.sector)
       ? prettySector(profile.sector)
       : null;
   const facts = fund
     ? [
         profile.country,
-        fund.totalAssets ? `AUM ${formatCompactMoney(fund.totalAssets, profile.currency)}` : null,
+        isPositiveFigure(fund.totalAssets)
+          ? `AUM ${formatCompactMoney(fund.totalAssets, profile.currency)}`
+          : null,
       ]
     : [
         profile.country,
-        profile.fullTimeEmployees
+        isPositiveFigure(profile.fullTimeEmployees)
           ? `${Number(profile.fullTimeEmployees).toLocaleString("en-US")} employees`
           : null,
       ];

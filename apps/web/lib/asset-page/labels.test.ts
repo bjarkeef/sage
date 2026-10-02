@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { basisWord, formatPct, formatPerShare, isFilled, prettySector, signedPct } from "./labels";
+import {
+  basisWord,
+  formatPct,
+  formatPerShare,
+  isFilled,
+  isPositiveFigure,
+  prettySector,
+  signedPct,
+} from "./labels";
 
 describe("labels", () => {
   it("formats a per-share dividend as money, 2–4 decimals — never '1.5 EUR'", () => {
@@ -32,5 +40,19 @@ describe("labels", () => {
 
   it("prettifies provider sector keys", () => {
     expect(prettySector("consumer_cyclical")).toBe("Consumer Cyclical");
+  });
+});
+
+describe("isPositiveFigure", () => {
+  it("accepts only a finite number above zero", () => {
+    expect(isPositiveFigure("79000")).toBe(true);
+    expect(isPositiveFigure("7790000000")).toBe(true);
+    expect(isPositiveFigure("0")).toBe(false);
+    expect(isPositiveFigure("0.00")).toBe(false);
+    expect(isPositiveFigure("-5")).toBe(false);
+    expect(isPositiveFigure("NaN")).toBe(false);
+    expect(isPositiveFigure("n/a")).toBe(false);
+    expect(isPositiveFigure(" ")).toBe(false);
+    expect(isPositiveFigure(null)).toBe(false);
   });
 });

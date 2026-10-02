@@ -36,3 +36,12 @@ export function basisWord(taxRate: number | null): "after tax" | "before tax" {
 export function isFilled(v: string | null | undefined): v is string {
   return v != null && !/^\s*[-–—]?\s*$/.test(v);
 }
+
+/** A provider figure sent as a string that is a real, positive number: not
+ *  "0", not "NaN", not blank. A zero count of employees or assets is the
+ *  provider's gap, not a fact. */
+export function isPositiveFigure(v: string | null | undefined): v is string {
+  if (v == null || v.trim() === "") return false;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0;
+}

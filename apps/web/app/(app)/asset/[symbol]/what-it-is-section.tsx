@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Card, SectionHeader, cn } from "@sage/ui";
 import { formatCompactMoney } from "../../../../lib/format";
-import { isFilled, prettySector } from "../../../../lib/asset-page/labels";
+import { isFilled, isPositiveFigure, prettySector } from "../../../../lib/asset-page/labels";
 import type { AssetProfileDTO } from "../../../../lib/types";
 import { FactRow, type Fact } from "./fact-row";
 import { FundComposition } from "./fund-composition";
@@ -61,23 +61,28 @@ export function WhatItIsSection({
           { label: "Legal type", value: isFilled(fund.legalType) ? fund.legalType : null },
           {
             label: "Assets under management",
-            value: fund.totalAssets ? formatCompactMoney(fund.totalAssets, profile.currency) : null,
+            value: isPositiveFigure(fund.totalAssets)
+              ? formatCompactMoney(fund.totalAssets, profile.currency)
+              : null,
           },
           { label: "Category", value: isFilled(fund.category) ? fund.category : null },
         ]
       : [
-          { label: "Sector", value: profile.sector ? prettySector(profile.sector) : null },
+          {
+            label: "Sector",
+            value: isFilled(profile.sector) ? prettySector(profile.sector) : null,
+          },
           { label: "Industry", value: isFilled(profile.industry) ? profile.industry : null },
           { label: "CEO", value: isFilled(profile.ceo) ? profile.ceo : null },
           {
             label: "Employees",
-            value: profile.fullTimeEmployees
+            value: isPositiveFigure(profile.fullTimeEmployees)
               ? Number(profile.fullTimeEmployees).toLocaleString("en-US")
               : null,
           },
           {
             label: "Website",
-            value: profile.website ? (
+            value: isFilled(profile.website) ? (
               <a
                 href={profile.website}
                 target="_blank"
