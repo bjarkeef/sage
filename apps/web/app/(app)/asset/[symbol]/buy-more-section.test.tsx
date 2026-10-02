@@ -40,6 +40,21 @@ describe("BuyMoreSection", () => {
     expect(screen.getByText("High $70.00")).toBeInTheDocument();
   });
 
+  it("hides the 52-week bar when the high is in another currency than the low and the price", () => {
+    const d = assetDetail();
+    renderBuy({
+      detail: {
+        ...d,
+        profile: {
+          ...d.profile,
+          fiftyTwoWeekHigh: { amount: "70.00", currency: "EUR" },
+        },
+      },
+    });
+    expect(screen.queryByText(/^Low \$55\.00$/)).not.toBeInTheDocument();
+    expect(screen.queryByText("52-week range")).not.toBeInTheDocument();
+  });
+
   it("lists payout, P/E, analysts from the header price, market cap with its currency, and beta", () => {
     const { container } = renderBuy();
     expect(screen.getByText("70%")).toBeInTheDocument();
@@ -77,7 +92,7 @@ describe("BuyMoreSection", () => {
       },
     });
     expect(screen.getByRole("note", { name: /0–300%/ })).toBeInTheDocument();
-    expect(screen.getByRole("note", { name: /P\/E at or below zero/ })).toBeInTheDocument();
+    expect(screen.getByRole("note", { name: /P\/E of zero or below/ })).toBeInTheDocument();
     expect(screen.getByRole("note", { name: /more than 5× the low/ })).toBeInTheDocument();
   });
 

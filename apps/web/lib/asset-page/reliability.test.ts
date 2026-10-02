@@ -33,7 +33,10 @@ describe("plausibility flags", () => {
 
   it("flags a P/E at or below zero", () => {
     expect(peFlag(24.5)).toBeNull();
-    expect(peFlag(0)).not.toBeNull();
+    expect(peFlag(0)?.reason).toBe(
+      "A P/E of zero or below: a loss, or no figure from the provider.",
+    );
+    expect(peFlag(0)?.reason).not.toContain("lost money");
     expect(peFlag(-4)).not.toBeNull();
     expect(peFlag(null)).toBeNull();
   });
@@ -48,7 +51,7 @@ describe("plausibility flags", () => {
   it("flags a year paying more than 3× the year before", () => {
     expect(perShareJumpFlag(3.5, 1.2)).toBeNull();
     expect(perShareJumpFlag(3.61, 1.2)).not.toBeNull();
-    expect(perShareJumpFlag(3.6, 1.2)).toBeNull(); // exactly 3�, despite 3 * 1.2 = 3.5999999999999996
+    expect(perShareJumpFlag(3.6, 1.2)).toBeNull(); // exactly 3×, despite 3 * 1.2 = 3.5999999999999996
     expect(perShareJumpFlag(5, 0)).toBeNull();
     expect(perShareJumpFlag(5, null)).toBeNull();
   });

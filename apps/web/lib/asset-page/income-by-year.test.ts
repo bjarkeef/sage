@@ -153,6 +153,19 @@ describe("perShareByYear", () => {
     expect(cutNotes(r.years)).toEqual([]);
   });
 
+  it("does not mark a drop that rounds to 0% as a cut", () => {
+    const r = perShareByYear({
+      history: [...quarterOf(Y - 2, "0.30"), ...quarterOf(Y - 1, "0.2996")],
+      upcoming: [],
+      currency: "USD",
+      todayISO: TODAY,
+    });
+    const bar = r.years.find((b) => b.year === Y - 1)!;
+    expect(bar.total).toBeLessThan(r.years.find((b) => b.year === Y - 2)!.total);
+    expect(bar.cutPct).toBeNull();
+    expect(cutNotes(r.years)).toEqual([]);
+  });
+
   it("marks a new payer's part-year first year partial when the next year is the current one", () => {
     const r = perShareByYear({
       history: [

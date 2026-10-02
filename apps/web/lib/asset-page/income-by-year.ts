@@ -1,5 +1,5 @@
 import { cashDate } from "./figures";
-import { perShareJumpFlag, type Flag } from "./reliability";
+import { perShareJumpFlag, round6, type Flag } from "./reliability";
 import type { AssetDividendsDTO, AssetUpcomingDTO } from "../types";
 
 export const MAX_PAST_YEARS = 10;
@@ -29,9 +29,6 @@ export interface YearBar {
  * so it is skipped here — counted once. Rows in another currency are left out
  * and counted, never added.
  */
-/** Summed decimals drift in binary; every bar is rounded to 6 dp so equal years compare equal. */
-const round6 = (n: number): number => Number(n.toFixed(6));
-
 export function perShareByYear(input: {
   history: AssetDividendsDTO["history"];
   upcoming: AssetUpcomingDTO[];
@@ -115,7 +112,10 @@ export function perShareByYear(input: {
     if (prev.partial || prev.total <= 0) continue;
     cur.flag = perShareJumpFlag(cur.total, prev.total);
     if (cur.kind === "past" && cur.total < prev.total) {
-      cur.cutPct = (cur.total / prev.total - 1) * 100;
+      // A drop that rounds to 0% at the displayed precision is not a cut:
+      // "was cut 0%" in the loss colour would state something false.
+      const pct = (cur.total / prev.total - 1) * 100;
+      if (Math.round(-pct) >= 1) cur.cutPct = pct;
     }
   }
 

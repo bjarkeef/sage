@@ -108,6 +108,7 @@ export function BuyMoreSection({
     high52 != null &&
     quote != null &&
     low52.currency === quote.price.currency &&
+    high52.currency === quote.price.currency &&
     Number(high52.amount) > Number(low52.amount);
   const hasYieldRange = yieldRange5y != null && yieldNow != null;
   const hasAnalysts = ratings != null && ratings.analystCount > 0;

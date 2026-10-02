@@ -44,8 +44,7 @@ export function payoutRatioFlag(ratio: number | null): Flag | null {
 export function peFlag(pe: number | null): Flag | null {
   if (pe == null || pe > 0) return null;
   return {
-    reason:
-      "A P/E at or below zero means the company lost money over the period; the ratio says nothing useful here.",
+    reason: "A P/E of zero or below: a loss, or no figure from the provider.",
   };
 }
 
@@ -57,8 +56,8 @@ export function yieldRangeFlag(range: { low: number; high: number } | null): Fla
   };
 }
 
-/** Sums of decimals drift in binary (3 � 1.2 is 3.5999999999999996); compare at 6 dp. */
-const round6 = (n: number): number => Number(n.toFixed(6));
+/** Sums of decimals drift in binary (3 × 1.2 is 3.5999999999999996); compare at 6 dp. */
+export const round6 = (n: number): number => Number(n.toFixed(6));
 
 export function perShareJumpFlag(total: number, previous: number | null): Flag | null {
   if (previous == null || previous <= 0 || round6(total) <= round6(PER_SHARE_JUMP_MAX * previous))

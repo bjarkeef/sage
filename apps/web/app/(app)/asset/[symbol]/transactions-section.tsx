@@ -157,7 +157,7 @@ export function TransactionsSection({
                     stopping short of the card's edge. The grid scrolls inside its
                     own wrapper so the page never scrolls sideways. */}
                 <div className="min-w-0 overflow-x-auto">
-                  <div className="min-w-[28rem]">
+                  <div className="min-w-[29rem]">
                     <RowGrid columns="7rem minmax(5rem,1fr) minmax(14rem,1.2fr)">
                       <RowHeader
                         cells={["Date", "Type", "Amount"]}
