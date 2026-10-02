@@ -57,8 +57,12 @@ export function yieldRangeFlag(range: { low: number; high: number } | null): Fla
   };
 }
 
+/** Sums of decimals drift in binary (3 � 1.2 is 3.5999999999999996); compare at 6 dp. */
+const round6 = (n: number): number => Number(n.toFixed(6));
+
 export function perShareJumpFlag(total: number, previous: number | null): Flag | null {
-  if (previous == null || previous <= 0 || total <= PER_SHARE_JUMP_MAX * previous) return null;
+  if (previous == null || previous <= 0 || round6(total) <= round6(PER_SHARE_JUMP_MAX * previous))
+    return null;
   return {
     reason:
       "More than 3× the year before: usually a special dividend, a split or a unit error in the provider's data.",

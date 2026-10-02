@@ -29,6 +29,9 @@ export interface YearBar {
  * so it is skipped here — counted once. Rows in another currency are left out
  * and counted, never added.
  */
+/** Summed decimals drift in binary; every bar is rounded to 6 dp so equal years compare equal. */
+const round6 = (n: number): number => Number(n.toFixed(6));
+
 export function perShareByYear(input: {
   history: AssetDividendsDTO["history"];
   upcoming: AssetUpcomingDTO[];
@@ -84,10 +87,10 @@ export function perShareByYear(input: {
     years.push({
       year: y,
       kind: y < thisYear ? "past" : y === thisYear ? "current" : "forecast",
-      paid: s.paid,
-      confirmed: s.confirmed,
-      estimated: s.estimated,
-      total: s.paid + s.confirmed + s.estimated,
+      paid: round6(s.paid),
+      confirmed: round6(s.confirmed),
+      estimated: round6(s.estimated),
+      total: round6(s.paid + s.confirmed + s.estimated),
       payments: s.payments,
       partial: false,
       cutPct: null,
@@ -100,7 +103,7 @@ export function perShareByYear(input: {
   if (
     first &&
     first.year === firstYear &&
-    second?.kind === "past" &&
+    (second?.kind === "past" || second?.kind === "current") &&
     first.payments < second.payments
   ) {
     first.partial = true;

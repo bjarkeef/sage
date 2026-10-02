@@ -139,6 +139,40 @@ describe("perShareByYear", () => {
     expect(r.years[0]!.year).toBe(Y - MAX_PAST_YEARS);
   });
 
+  it("measures no cut between equal years whose payments sum differently in floating point", () => {
+    const r = perShareByYear({
+      history: [
+        ...["02-10", "06-10", "11-10"].map((md) => paid(`${Y - 2}-${md}`, "0.40")),
+        ...quarterOf(Y - 1, "0.30"),
+      ],
+      upcoming: [],
+      currency: "USD",
+      todayISO: TODAY,
+    });
+    expect(r.years.find((b) => b.year === Y - 1)!.cutPct).toBeNull();
+    expect(cutNotes(r.years)).toEqual([]);
+  });
+
+  it("marks a new payer's part-year first year partial when the next year is the current one", () => {
+    const r = perShareByYear({
+      history: [
+        paid(`${Y - 1}-11-10`, "0.40"),
+        paid(`${Y}-02-10`, "0.40"),
+        paid(`${Y}-05-10`, "0.40"),
+      ],
+      upcoming: [
+        ahead(`${Y}-08-10`, "0.40", "confirmed", "next12m"),
+        ahead(`${Y}-11-10`, "0.40", "estimated", "next12m"),
+      ],
+      currency: "USD",
+      todayISO: TODAY,
+    });
+    expect(r.years[0]!.partial).toBe(true);
+    const cur = r.years.find((b) => b.year === Y)!;
+    expect(cur.flag).toBeNull();
+    expect(cur.total).toBeCloseTo(1.6, 10);
+  });
+
   it("has nothing for a holding that never paid", () => {
     expect(
       perShareByYear({ history: [], upcoming: [], currency: "USD", todayISO: TODAY }).years,
