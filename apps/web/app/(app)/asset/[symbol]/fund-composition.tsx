@@ -1,7 +1,9 @@
 import { Card, SectionHeader } from "@sage/ui";
 import { formatDate } from "../../../../lib/format";
 import { prettySector } from "../../../../lib/asset-page/labels";
+import { staleAsOf } from "../../../../lib/asset-page/reliability";
 import type { FundProfileDTO } from "../../../../lib/types";
+import { StaleNote } from "./reliability-marks";
 
 /** A label + horizontal weight bar, scaled so the largest entry fills the track. */
 function WeightRow({ label, weight, max }: { label: string; weight: number; max: number }) {
@@ -23,7 +25,15 @@ function WeightRow({ label, weight, max }: { label: string; weight: number; max:
 
 /** A fund's top holdings and sector weights — both largest first (the provider
  *  sends sectors in its own order, which read as unsorted). */
-export function FundComposition({ fund, asOf }: { fund: FundProfileDTO; asOf: string | null }) {
+export function FundComposition({
+  fund,
+  asOf,
+  todayISO,
+}: {
+  fund: FundProfileDTO;
+  asOf: string | null;
+  todayISO: string;
+}) {
   if (fund.holdings.length === 0 && fund.sectorWeightings.length === 0) return null;
   const holdings = [...fund.holdings].sort((a, b) => b.weight - a.weight);
   const sectors = [...fund.sectorWeightings].sort((a, b) => b.weight - a.weight);
@@ -31,10 +41,18 @@ export function FundComposition({ fund, asOf }: { fund: FundProfileDTO; asOf: st
     ? `Provider figures, as of ${formatDate(asOf.slice(0, 10), { year: "always" })}`
     : "Provider figures";
 
+  const stale = staleAsOf(asOf, todayISO);
+
   return (
     <section className="mb-10">
       <SectionHeader title="Fund composition" />
       <Card title={title}>
+        {stale && (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Provider figures
+            <StaleNote note={stale} />
+          </p>
+        )}
         <div className="grid gap-x-12 gap-y-8 md:grid-cols-2">
           {holdings.length > 0 && (
             <div className="min-w-0">

@@ -113,7 +113,7 @@ export function WhatItIsSection({
           )}
         </Card>
       )}
-      {fund && <FundComposition fund={fund} asOf={profileAsOf} />}
+      {fund && <FundComposition fund={fund} asOf={profileAsOf} todayISO={todayISO} />}
     </section>
   );
 }

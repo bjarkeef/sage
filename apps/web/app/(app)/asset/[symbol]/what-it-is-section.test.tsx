@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { WhatItIsSection } from "./what-it-is-section";
-import { TODAY, assetDetail, fundDetail } from "../../../../lib/test/asset-fixtures";
+import { TODAY, day, assetDetail, fundDetail } from "../../../../lib/test/asset-fixtures";
 
 describe("WhatItIsSection", () => {
   it("describes a stock: sector, industry, CEO, employees, website", () => {
@@ -40,6 +40,22 @@ describe("WhatItIsSection", () => {
       .getAllByText(/^(Technology|Healthcare|Energy)$/)
       .map((el) => el.textContent);
     expect(names).toEqual(["Technology", "Healthcare", "Energy"]);
+  });
+
+  it("dates a stale fund composition inline, and a fresh one only on hover", () => {
+    const stale = day(-30);
+    const { unmount } = render(
+      <WhatItIsSection profile={fundDetail().profile} profileAsOf={stale} todayISO={TODAY} />,
+    );
+    const card = screen.getByText("Sector weights").closest("[title]")!;
+    expect(card).toHaveAttribute("title", expect.stringContaining("as of"));
+    expect(card.textContent).toContain("as of May 16, 2026");
+    unmount();
+
+    render(<WhatItIsSection profile={fundDetail().profile} profileAsOf={TODAY} todayISO={TODAY} />);
+    const fresh = screen.getByText("Sector weights").closest("[title]")!;
+    expect(fresh).toHaveAttribute("title", expect.stringContaining("as of"));
+    expect(fresh.textContent).not.toContain("as of");
   });
 
   it("clamps a long description to three lines behind 'more'", () => {
