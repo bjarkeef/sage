@@ -331,9 +331,10 @@ describe("AssetDetailPage", () => {
 
     await waitFor(() => expect(screen.getByText("Apple Inc.")).toBeInTheDocument());
 
-    // 6.00% netted at 35% is 3.90%, and BOTH renders of yield on cost must say
-    // so. The gross figure must not appear anywhere on the page.
-    expect(screen.getAllByText("3.90%").length).toBeGreaterThanOrEqual(2);
+    // 6.00% netted at 35% is 3.90%. Yield on cost now appears once, in Your
+    // income, and net; the position row no longer repeats it. The gross figure
+    // must not appear anywhere on the page.
+    expect(screen.getAllByText("3.90%")).toHaveLength(1);
     expect(screen.queryByText("6.00%")).not.toBeInTheDocument();
 
     // The other two income figures in the strip net on the same rate.

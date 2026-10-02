@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Delta } from "@sage/ui";
 import type { PositionDTO } from "../lib/types";
 import { formatMoney, formatPercent, formatShares, moneyToNumber } from "../lib/format";
+import { BasisMismatchMark } from "./basis-mismatch-mark";
 import { CompanyLogo } from "./company-logo";
 import { TransactionDialog } from "./transaction-dialog";
 import { toSearchResult } from "../lib/instrument";
@@ -57,14 +58,7 @@ export function HoldingRow({
         <div className="min-w-0">
           <div data-testid="holding-symbol" className="truncate font-medium group-hover:underline">
             {p.symbol}
-            {p.basisMismatch && (
-              <span
-                role="img"
-                aria-label={`Price basis disagrees with your transactions by about ${p.basisMismatch.factor.toFixed(1)}×`}
-                title={`Stored prices for ${p.symbol} are about ${p.basisMismatch.factor.toFixed(1)}× apart from your transactions (${p.basisMismatch.mismatched} of ${p.basisMismatch.samples} checked). Figures including it may be wrong.`}
-                className="ml-1.5 inline-block size-1.5 rounded-full bg-muted-foreground align-middle"
-              />
-            )}
+            {p.basisMismatch && <BasisMismatchMark symbol={p.symbol} finding={p.basisMismatch} />}
           </div>
           {p.name !== p.symbol && (
             <div className="truncate text-xs text-muted-foreground">{p.name}</div>

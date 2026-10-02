@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Chip } from "@sage/ui";
 import { CompanyLogo } from "../../../../components/company-logo";
+import { BasisMismatchMark } from "../../../../components/basis-mismatch-mark";
 import { ChartReadoutLine } from "../../../../components/chart-readout-line";
 import { formatMoney, formatDate } from "../../../../lib/format";
 import type { ChartReadout } from "../../../../lib/asset-chart/readout";
-import type { AssetProfileDTO, AssetDetailDTO } from "../../../../lib/types";
+import type { AssetProfileDTO, AssetDetailDTO, BasisFindingDTO } from "../../../../lib/types";
 
 const HOLDING_TYPE_LABELS: Record<string, string> = {
   savings: "Savings account",
@@ -23,12 +24,14 @@ export function AssetHeader({
   held,
   custom,
   readout,
+  basisMismatch,
 }: {
   profile: AssetProfileDTO;
   quote: AssetDetailDTO["quote"];
   held: boolean;
   custom?: AssetDetailDTO["custom"];
   readout?: ChartReadout | null;
+  basisMismatch?: BasisFindingDTO | null;
 }) {
   const shown =
     readout?.close != null
@@ -42,6 +45,9 @@ export function AssetHeader({
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="font-display text-title font-semibold tracking-[-0.03em]">
               {profile.symbol}
+              {basisMismatch && (
+                <BasisMismatchMark symbol={profile.symbol} finding={basisMismatch} />
+              )}
             </h1>
             {custom ? (
               <Chip variant="outline">

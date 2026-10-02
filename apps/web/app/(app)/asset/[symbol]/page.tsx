@@ -97,6 +97,9 @@ export default function AssetDetailPage() {
   }
 
   const { profile, quote, chart, dividends, position, custom } = data;
+  const weight = holdingWeight(portfolio?.positions, profile.symbol);
+  const basisMismatch =
+    portfolio?.positions.find((p) => p.symbol === profile.symbol)?.basisMismatch ?? null;
   const fund = profile.fund; // const local so narrowing holds inside nested callbacks
 
   return (
@@ -117,6 +120,7 @@ export default function AssetDetailPage() {
         held={position.held}
         custom={custom}
         readout={readout}
+        basisMismatch={basisMismatch}
       />
       {(position.held || custom) && (
         <div className="mb-8 flex items-center justify-between gap-3 border-b border-hairline pb-5">
@@ -137,7 +141,7 @@ export default function AssetDetailPage() {
           detail={data}
           taxRate={dividendTaxRate}
           todayISO={todayISO}
-          weight={holdingWeight(portfolio?.positions, profile.symbol)}
+          weight={weight}
           ratings={ratings}
           addAction={
             <TransactionDialog
@@ -158,12 +162,7 @@ export default function AssetDetailPage() {
           onReadout={setReadout}
         />
       </section>
-      <PositionSection
-        position={position}
-        currency={profile.currency}
-        symbol={profile.symbol}
-        taxRate={dividendTaxRate}
-      />
+      <PositionSection position={position} weight={weight} />
       <IncomeSection detail={data} taxRate={dividendTaxRate} todayISO={todayISO} />
       <AboutSection profile={profile} />
 

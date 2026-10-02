@@ -79,3 +79,30 @@ describe("AssetHeader readout", () => {
     expect(line).toContain("past year");
   });
 });
+
+describe("AssetHeader basis warning", () => {
+  it("shows the holdings row's basis-mismatch warning for this symbol", () => {
+    render(
+      <AssetHeader
+        profile={d.profile}
+        quote={d.quote}
+        held
+        custom={null}
+        readout={null}
+        basisMismatch={{
+          symbol: "KO",
+          factor: 10,
+          mismatched: 3,
+          samples: 4,
+          firstDate: "2025-01-02",
+          lastDate: "2025-03-02",
+        }}
+      />,
+    );
+    expect(
+      screen.getByRole("img", {
+        name: "Price basis disagrees with your transactions by about 10.0×",
+      }),
+    ).toBeInTheDocument();
+  });
+});
