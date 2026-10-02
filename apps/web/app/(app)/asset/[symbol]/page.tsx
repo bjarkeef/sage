@@ -26,7 +26,7 @@ import { IncomeSection } from "./income-section";
 import { AboutSection } from "./about-section";
 import { FundamentalsSection } from "./fundamentals-section";
 import { FundComposition } from "./fund-composition";
-import { AnalystRatingsSection } from "./analyst-ratings-section";
+import { BuyMoreSection } from "./buy-more-section";
 import { NewsSection } from "./news-section";
 
 // Deferred so lightweight-charts stays out of the asset route's initial JS; the
@@ -163,12 +163,19 @@ export default function AssetDetailPage() {
         />
       </section>
       <PositionSection position={position} weight={weight} />
+      {!custom && (
+        <BuyMoreSection
+          detail={data}
+          taxRate={dividendTaxRate}
+          ratings={ratings}
+          todayISO={todayISO}
+        />
+      )}
       <IncomeSection detail={data} taxRate={dividendTaxRate} todayISO={todayISO} />
       <AboutSection profile={profile} />
 
       <FundamentalsSection profile={profile} />
       {fund && <FundComposition fund={fund} />}
-      <AnalystRatingsSection slug={slug} />
       {/* Your own entries, immediately before the payment history they explain:
           the two ledgers read together, and both sit below the research
           sections rather than interrupting them. */}

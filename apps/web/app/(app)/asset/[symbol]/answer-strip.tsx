@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card, cn, Delta, Stat, toneForValue } from "@sage/ui";
+import { Card, Delta, Stat } from "@sage/ui";
 import {
   formatCompactMoney,
   formatDate,
@@ -25,11 +25,11 @@ import {
   formatPerShare,
   isFilled,
   prettySector,
-  signedPct,
 } from "../../../../lib/asset-page/labels";
 import { staleAsOf } from "../../../../lib/asset-page/reliability";
 import type { AnalystRatingsDTO, AssetDetailDTO } from "../../../../lib/types";
 import { Missing, StaleNote } from "./reliability-marks";
+import { SignedPct } from "./signed-pct";
 
 export interface AnswerStripProps {
   detail: AssetDetailDTO;
@@ -71,21 +71,6 @@ function Tile({
         }
       />
     </Card>
-  );
-}
-
-function SignedPct({ pct }: { pct: number }) {
-  const tone = toneForValue(Number(pct.toFixed(1)));
-  return (
-    <span
-      data-tone={tone}
-      className={cn(
-        "tabular-nums",
-        tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : "text-neutral",
-      )}
-    >
-      {signedPct(pct)}
-    </span>
   );
 }
 
