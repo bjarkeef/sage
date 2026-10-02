@@ -5,17 +5,26 @@ import { renderWithClient, makeTestQueryClient } from "../lib/test/render-with-c
 import type { AssetDividendsDTO, AssetPositionDTO } from "../lib/types";
 import type { ChartReadout } from "../lib/asset-chart/readout";
 
-const { createPriceLine, attachPrimitive, addSeries } = vi.hoisted(() => {
-  const createPriceLine = vi.fn();
-  const attachPrimitive = vi.fn();
-  const series = {
-    setData: vi.fn(),
-    createPriceLine,
-    attachPrimitive,
-    priceToCoordinate: vi.fn(() => 17),
-  };
-  return { createPriceLine, attachPrimitive, addSeries: vi.fn(() => series) };
-});
+const { createPriceLine, attachPrimitive, detachPrimitive, subscribeCrosshairMove, addSeries } =
+  vi.hoisted(() => {
+    const createPriceLine = vi.fn();
+    const attachPrimitive = vi.fn();
+    const detachPrimitive = vi.fn();
+    const series = {
+      setData: vi.fn(),
+      createPriceLine,
+      attachPrimitive,
+      detachPrimitive,
+      priceToCoordinate: vi.fn(() => 17),
+    };
+    return {
+      createPriceLine,
+      attachPrimitive,
+      detachPrimitive,
+      subscribeCrosshairMove: vi.fn(),
+      addSeries: vi.fn(() => series),
+    };
+  });
 
 vi.mock("lightweight-charts", () => {
   const LineStyle = { Solid: 0, Dashed: 2 };
@@ -25,7 +34,7 @@ vi.mock("lightweight-charts", () => {
     // timeToCoordinate/priceToCoordinate place the markers; without them the
     // draw throws rather than drawing.
     timeScale: vi.fn(() => ({ fitContent: vi.fn(), timeToCoordinate: vi.fn(() => 42) })),
-    subscribeCrosshairMove: vi.fn(),
+    subscribeCrosshairMove,
     unsubscribeCrosshairMove: vi.fn(),
     applyOptions: vi.fn(),
     remove: vi.fn(),
@@ -48,6 +57,7 @@ vi.mock("../lib/api", () => ({
 import { AssetPriceChart } from "./asset-price-chart";
 import { TradeMarkers } from "./trade-markers";
 import { DividendMarkers } from "./dividend-markers";
+import { EasedCrosshair } from "./charts/eased-crosshair";
 
 // Chart dates are data for the chart, never compared with the real clock.
 const CHART = [
@@ -167,6 +177,36 @@ describe("AssetPriceChart", () => {
     const off = drawTarget();
     dividends.paneViews()[0]!.renderer().draw(off.target);
     expect(off.ctx.arc).not.toHaveBeenCalled();
+  });
+
+  it("says a hovered ex-dividend amount is gross", async () => {
+    const { container } = renderChart();
+    await waitFor(() => expect(subscribeCrosshairMove).toHaveBeenCalled());
+    const handlers = subscribeCrosshairMove.mock.calls.map(
+      (c: unknown[]) => c[0] as (p: unknown) => void,
+    );
+    for (const h of handlers) {
+      h({
+        point: { x: 1, y: 1 },
+        time: "2026-06-15",
+        hoveredObjectId: "div-0",
+        seriesData: new Map(),
+      });
+    }
+    const text = container.textContent;
+    expect(text).toContain("Ex-dividend");
+    expect(text).toMatch(/\/ share, gross · paid Jun 30, 2026/);
+  });
+
+  it("detaches the crosshair primitive on teardown so its animation loop cannot outlive the chart", async () => {
+    const { unmount } = renderChart();
+    await waitFor(() => expect(attachPrimitive).toHaveBeenCalled());
+    const crosshair = attachPrimitive.mock.calls
+      .map((c: unknown[]) => c[0])
+      .find((p: unknown) => p instanceof EasedCrosshair);
+    expect(crosshair).toBeDefined();
+    unmount();
+    expect(detachPrimitive).toHaveBeenCalledWith(crosshair);
   });
 
   it("offers no Dividends toggle when no ex-date falls in range", async () => {

@@ -248,7 +248,7 @@ export function AssetPriceChart({
       if (id.startsWith("div-")) {
         const d = model.dividendsInRange[Number(id.slice("div-".length))];
         if (!d) return null;
-        const amount = `${formatPerShare({ amount: String(d.amountPerShare), currency: d.currency })} / share`;
+        const amount = `${formatPerShare({ amount: String(d.amountPerShare), currency: d.currency })} / share, gross`;
         return {
           primary: "Ex-dividend",
           secondary: d.paymentDate
@@ -290,6 +290,8 @@ export function AssetPriceChart({
       resizeObserver.disconnect();
       chart.unsubscribeCrosshairMove(onMove);
       detachTooltip();
+      // chart.remove() does not detach primitives; the crosshair owns an rAF loop.
+      series.detachPrimitive(crosshair);
       chart.remove();
       chartRef.current = null;
     };
