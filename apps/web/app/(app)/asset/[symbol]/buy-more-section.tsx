@@ -4,7 +4,12 @@ import * as React from "react";
 import { Card, SectionHeader } from "@sage/ui";
 import { formatCompactMoney, formatDate, formatMoney } from "../../../../lib/format";
 import { netFactor } from "../../../../lib/dividend-tax";
-import { analystUpside, currentYield, yieldRangeBasis } from "../../../../lib/asset-page/figures";
+import {
+  analystUpside,
+  currentYield,
+  isFiveYearSpan,
+  yieldRangeBasis,
+} from "../../../../lib/asset-page/figures";
 import { basisWord, formatPct } from "../../../../lib/asset-page/labels";
 import {
   checkCurrentYield,
@@ -20,8 +25,9 @@ import { RangeBar } from "./range-bar";
 import { SignedPct } from "./signed-pct";
 
 function yieldRangeLabel(from: string, todayISO: string): string {
-  const basis = yieldRangeBasis(from, todayISO);
-  return basis === "its 5-yr range" ? "Yield vs its own 5 years" : `Yield vs ${basis}`;
+  return isFiveYearSpan(from, todayISO)
+    ? "Yield vs its own 5 years"
+    : `Yield vs ${yieldRangeBasis(from, todayISO)}`;
 }
 
 /**

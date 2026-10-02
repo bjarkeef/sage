@@ -8,6 +8,7 @@ import {
   nextTwelveMonths,
   payFrequencyOf,
   rangePlace,
+  isFiveYearSpan,
   rangePlacePhrase,
   REASONS,
 } from "./figures";
@@ -159,6 +160,18 @@ describe("rangePlace", () => {
     expect(rangePlace(0.02, 0.05, 0.06)).toBe("above");
     expect(rangePlace(0.02, 0.05, 0.01)).toBe("below");
     expect(rangePlace(0.03, 0.03, 0.03)).toBe("middle");
+  });
+});
+
+describe("isFiveYearSpan", () => {
+  it("is true up to two months after five years back, false beyond", () => {
+    expect(isFiveYearSpan("2021-08-15", "2026-06-15")).toBe(true);
+    expect(isFiveYearSpan("2021-08-16", "2026-06-15")).toBe(false);
+  });
+
+  it("does not overflow for a month-end today (Dec 31 -> end of Feb, not Mar 3)", () => {
+    expect(isFiveYearSpan("2022-02-28", "2026-12-31")).toBe(true);
+    expect(isFiveYearSpan("2022-03-01", "2026-12-31")).toBe(false);
   });
 });
 

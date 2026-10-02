@@ -166,17 +166,19 @@ const FULL_SPAN_SLACK_MONTHS = 2;
 /** The yield range's basis as a noun phrase: "its 5-yr range" only when the
  *  first sample is within two months of five years before today; otherwise
  *  the span it actually covers, "its range since Mar 2024". */
+export function isFiveYearSpan(from: string, todayISO: string): boolean {
+  const y = Number(todayISO.slice(0, 4)) - 5;
+  const m = Number(todayISO.slice(5, 7)) - 1 + FULL_SPAN_SLACK_MONTHS;
+  // Clamp the day: a month-end today must not overflow into the month after.
+  const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const day = Math.min(Number(todayISO.slice(8, 10)), lastDay);
+  return from <= new Date(Date.UTC(y, m, day)).toISOString().slice(0, 10);
+}
+
 export function yieldRangeBasis(from: string, todayISO: string): string {
-  const limit = new Date(
-    Date.UTC(
-      Number(todayISO.slice(0, 4)) - 5,
-      Number(todayISO.slice(5, 7)) - 1 + FULL_SPAN_SLACK_MONTHS,
-      Number(todayISO.slice(8, 10)),
-    ),
-  )
-    .toISOString()
-    .slice(0, 10);
-  return from <= limit ? "its 5-yr range" : `its range since ${formatMonthYear(from)}`;
+  return isFiveYearSpan(from, todayISO)
+    ? "its 5-yr range"
+    : `its range since ${formatMonthYear(from)}`;
 }
 
 /** "middle of its 5-yr range" / "high of its range since Mar 2024". */

@@ -52,7 +52,7 @@ export function yieldRangeFlag(range: { low: number; high: number } | null): Fla
   if (!range || range.high <= YIELD_RANGE_MAX_RATIO * range.low) return null;
   return {
     reason:
-      "The 5-year high is more than 5× the low: usually a special dividend, a split, a suspension or a unit error in the provider's data.",
+      "The high is more than 5× the low: usually a special dividend, a split, a suspension or a unit error in the provider's data.",
   };
 }
 
