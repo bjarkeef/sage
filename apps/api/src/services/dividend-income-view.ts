@@ -5,7 +5,6 @@ import {
   computeRetroactiveIncome,
   projectionHorizonIso,
   longRangeThroughIso,
-  clampDividendGrowth,
   computeDividendCAGR,
   classifyDividendTrend,
   dedupeDividends,
@@ -32,7 +31,7 @@ import { loadReceivedIncome } from "./received-income";
 import { resolvePricePoints } from "../market-data/manual-price-provider";
 import { getRatesWithProvenance } from "../market-data/fx-provenance";
 import type { PortfolioViewDeps } from "./portfolio-view";
-import { forwardScheduleForSymbol } from "./forward-schedule";
+import { forwardGrowth, forwardScheduleForSymbol } from "./forward-schedule";
 
 // Extends the shared deps shape with the optional multi-provider dividend
 // fallback list the route factory accepts today (`dividendProviders ??
@@ -423,9 +422,9 @@ export async function buildDividendIncomeView(
       5,
       now,
     );
-    const growth = cagr ? clampDividendGrowth(cagr, allowNegativeDividendGrowth) : null;
+    const { growth, cappedFrom } = forwardGrowth(cagr, allowNegativeDividendGrowth);
     growthBySymbol.set(p.symbol, growth);
-    if (cagr && growth && cagr.greaterThan(growth)) cappedFromBySymbol.set(p.symbol, cagr);
+    if (cappedFrom) cappedFromBySymbol.set(p.symbol, cappedFrom);
   }
 
   // One producer for every market holding's forward schedule: the asset page's

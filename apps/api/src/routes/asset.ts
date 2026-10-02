@@ -10,7 +10,6 @@ import {
   computeDividendCAGR,
   computeYieldOnCost,
   projectDividendSchedule,
-  clampDividendGrowth,
   dedupeDividends,
   incomePaymentDates,
   type PositionTransaction,
@@ -39,6 +38,7 @@ import { forwardFillChart } from "./chart-utils";
 import type { IsinResolver } from "../market-data/isin-resolver";
 import { getCachedOrFetchProfile } from "../market-data/asset-profile-cache";
 import {
+  forwardGrowth,
   forwardScheduleForSymbol,
   toAssetUpcoming,
   type AssetUpcomingRow,
@@ -563,7 +563,7 @@ export function assetRoutes(
         .select({ allowNegative: user.allowNegativeDividendGrowth })
         .from(user)
         .where(eq(user.id, c.get("user").id));
-      const growth = cagr5y ? clampDividendGrowth(cagr5y, settings?.allowNegative ?? true) : null;
+      const { growth } = forwardGrowth(cagr5y, settings?.allowNegative ?? true);
       const schedule = forwardScheduleForSymbol({
         symbol,
         quantity: new Decimal(1),

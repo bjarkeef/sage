@@ -1,5 +1,6 @@
 import {
   Decimal,
+  clampDividendGrowth,
   projectDividendSchedule,
   projectionHorizonIso,
   longRangeThroughIso,
@@ -15,6 +16,23 @@ export interface ForwardSchedule {
   /** Past the 12-month horizon, through 31 December three years out, grown by
    *  `growth`. Calendar-only: nothing that means "the next 12 months" sums it. */
   longRange: ProjectedDividendRow[];
+}
+
+/**
+ * The growth a forward schedule applies to its long-range payments: the
+ * historical CAGR clamped to the forward cap. The one place that rule lives;
+ * the income view and the asset page both ask it, so they cannot grow the same
+ * dividend by different rates. `cappedFrom` is the historical rate, set only
+ * where the cap actually changed it, so a caller can say what it was capped
+ * from.
+ */
+export function forwardGrowth(
+  cagr: Decimal | null,
+  allowNegative: boolean,
+): { growth: Decimal | null; cappedFrom: Decimal | null } {
+  if (!cagr) return { growth: null, cappedFrom: null };
+  const growth = clampDividendGrowth(cagr, allowNegative);
+  return { growth, cappedFrom: growth && cagr.greaterThan(growth) ? cagr : null };
 }
 
 /**

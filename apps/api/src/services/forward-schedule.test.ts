@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Decimal, type DividendHistoryRow, type ProjectedDividendRow } from "@sage/core";
 import {
+  forwardGrowth,
   forwardScheduleForSymbol,
   toAssetUpcoming,
   type ForwardSchedule,
@@ -171,5 +172,30 @@ describe("toAssetUpcoming", () => {
     });
     const cash = rows.map((r) => r.paymentDate ?? r.exDate);
     expect(cash).toEqual([...cash].sort());
+  });
+});
+
+describe("forwardGrowth", () => {
+  it("has no growth when there is no historical rate", () => {
+    expect(forwardGrowth(null, true)).toEqual({ growth: null, cappedFrom: null });
+  });
+
+  it("passes a rate under the cap through and says nothing was capped", () => {
+    const { growth, cappedFrom } = forwardGrowth(new Decimal("0.05"), true);
+    expect(growth!.toString()).toBe("0.05");
+    expect(cappedFrom).toBeNull();
+  });
+
+  it("caps at 10% and keeps the historical rate it was capped from", () => {
+    const { growth, cappedFrom } = forwardGrowth(new Decimal("0.25"), true);
+    expect(growth!.toString()).toBe("0.1");
+    expect(cappedFrom!.toString()).toBe("0.25");
+  });
+
+  it("floors a decline at zero only when negative growth is off, and that is not a cap", () => {
+    expect(forwardGrowth(new Decimal("-0.04"), true).growth!.toString()).toBe("-0.04");
+    const off = forwardGrowth(new Decimal("-0.04"), false);
+    expect(off.growth!.toString()).toBe("0");
+    expect(off.cappedFrom).toBeNull();
   });
 });
