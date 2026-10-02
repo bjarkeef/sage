@@ -1,6 +1,7 @@
 import { Card, SectionHeader } from "@sage/ui";
+import { formatDate } from "../../../../lib/format";
+import { prettySector } from "../../../../lib/asset-page/labels";
 import type { FundProfileDTO } from "../../../../lib/types";
-import { prettySector } from "./fundamentals-section";
 
 /** A label + horizontal weight bar, scaled so the largest entry fills the track. */
 function WeightRow({ label, weight, max }: { label: string; weight: number; max: number }) {
@@ -20,39 +21,45 @@ function WeightRow({ label, weight, max }: { label: string; weight: number; max:
   );
 }
 
-export function FundComposition({ fund }: { fund: FundProfileDTO }) {
+/** A fund's top holdings and sector weights — both largest first (the provider
+ *  sends sectors in its own order, which read as unsorted). */
+export function FundComposition({ fund, asOf }: { fund: FundProfileDTO; asOf: string | null }) {
   if (fund.holdings.length === 0 && fund.sectorWeightings.length === 0) return null;
+  const holdings = [...fund.holdings].sort((a, b) => b.weight - a.weight);
+  const sectors = [...fund.sectorWeightings].sort((a, b) => b.weight - a.weight);
+  const title = asOf
+    ? `Provider figures, as of ${formatDate(asOf.slice(0, 10), { year: "always" })}`
+    : "Provider figures";
 
   return (
     <section className="mb-10">
       <SectionHeader title="Fund composition" />
-      <Card>
+      <Card title={title}>
         <div className="grid gap-x-12 gap-y-8 md:grid-cols-2">
-          {fund.holdings.length > 0 && (
-            <div>
+          {holdings.length > 0 && (
+            <div className="min-w-0">
               <h3 className="mb-3 text-sm font-medium">Top holdings</h3>
-              {(() => {
-                const max = Math.max(...fund.holdings.map((h) => h.weight));
-                return fund.holdings.map((h) => (
-                  <WeightRow key={h.symbol ?? h.name} label={h.name} weight={h.weight} max={max} />
-                ));
-              })()}
+              {holdings.map((h) => (
+                <WeightRow
+                  key={h.symbol ?? h.name}
+                  label={h.name}
+                  weight={h.weight}
+                  max={holdings[0]!.weight}
+                />
+              ))}
             </div>
           )}
-          {fund.sectorWeightings.length > 0 && (
-            <div>
+          {sectors.length > 0 && (
+            <div className="min-w-0">
               <h3 className="mb-3 text-sm font-medium">Sector weights</h3>
-              {(() => {
-                const max = Math.max(...fund.sectorWeightings.map((s) => s.weight));
-                return fund.sectorWeightings.map((s) => (
-                  <WeightRow
-                    key={s.sector}
-                    label={prettySector(s.sector)}
-                    weight={s.weight}
-                    max={max}
-                  />
-                ));
-              })()}
+              {sectors.map((s) => (
+                <WeightRow
+                  key={s.sector}
+                  label={prettySector(s.sector)}
+                  weight={s.weight}
+                  max={sectors[0]!.weight}
+                />
+              ))}
             </div>
           )}
         </div>

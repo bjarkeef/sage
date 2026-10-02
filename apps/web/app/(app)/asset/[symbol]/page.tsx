@@ -23,10 +23,8 @@ import { AnswerStrip } from "./answer-strip";
 import { PositionSection } from "./position-section";
 import { TransactionsSection } from "./transactions-section";
 import { IncomeSection } from "./income-section";
-import { AboutSection } from "./about-section";
-import { FundamentalsSection } from "./fundamentals-section";
-import { FundComposition } from "./fund-composition";
 import { BuyMoreSection } from "./buy-more-section";
+import { WhatItIsSection } from "./what-it-is-section";
 import { NewsSection } from "./news-section";
 
 // Deferred so lightweight-charts stays out of the asset route's initial JS; the
@@ -100,7 +98,6 @@ export default function AssetDetailPage() {
   const weight = holdingWeight(portfolio?.positions, profile.symbol);
   const basisMismatch =
     portfolio?.positions.find((p) => p.symbol === profile.symbol)?.basisMismatch ?? null;
-  const fund = profile.fund; // const local so narrowing holds inside nested callbacks
 
   return (
     <PageShell>
@@ -172,10 +169,9 @@ export default function AssetDetailPage() {
         />
       )}
       <IncomeSection detail={data} taxRate={dividendTaxRate} todayISO={todayISO} />
-      <AboutSection profile={profile} />
-
-      <FundamentalsSection profile={profile} />
-      {fund && <FundComposition fund={fund} />}
+      {!custom && (
+        <WhatItIsSection profile={profile} profileAsOf={data.profileAsOf} todayISO={todayISO} />
+      )}
       {/* Your own entries, immediately before the payment history they explain:
           the two ledgers read together, and both sit below the research
           sections rather than interrupting them. */}
