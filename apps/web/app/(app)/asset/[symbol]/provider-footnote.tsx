@@ -1,23 +1,36 @@
 import { formatDate } from "../../../../lib/format";
 
+const dated = (iso: string) => formatDate(iso.slice(0, 10), { year: "always" });
+
 /** The page's provider footnote: the market data on it are snapshots, and this
- *  says from when (spec: Data reliability 2). */
+ *  says from when (spec: Data reliability 2). A figure on the page whose date
+ *  is missing says so rather than going unmentioned; nothing renders only when
+ *  no provider figure is shown. */
 export function ProviderFootnote({
+  hasProfileFigures,
   profileAsOf,
+  hasRatings,
   ratingsAsOf,
 }: {
+  hasProfileFigures: boolean;
   profileAsOf: string | null;
+  hasRatings: boolean;
   ratingsAsOf: string | null;
 }) {
   const parts: string[] = [];
-  if (profileAsOf) {
+  if (hasProfileFigures) {
+    const figures = "Market cap, P/E, beta, payout ratio, the 52-week range and fund data";
     parts.push(
-      `Market cap, P/E, beta, payout ratio, the 52-week range and fund data are the market-data provider's snapshot from ${formatDate(profileAsOf.slice(0, 10), { year: "always" })}.`,
+      profileAsOf
+        ? `${figures} are the market-data provider's snapshot from ${dated(profileAsOf)}.`
+        : `${figures} are the market-data provider's snapshot; its date is unknown.`,
     );
   }
-  if (ratingsAsOf) {
+  if (hasRatings) {
     parts.push(
-      `Analyst ratings as of ${formatDate(ratingsAsOf.slice(0, 10), { year: "always" })}.`,
+      ratingsAsOf
+        ? `Analyst ratings as of ${dated(ratingsAsOf)}.`
+        : "Analyst ratings: date unknown.",
     );
   }
   if (parts.length === 0) return null;

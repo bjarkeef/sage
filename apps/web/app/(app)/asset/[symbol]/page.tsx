@@ -99,6 +99,22 @@ export default function AssetDetailPage() {
   const weight = holdingWeight(portfolio?.positions, profile.symbol);
   const basisMismatch =
     portfolio?.positions.find((p) => p.symbol === profile.symbol)?.basisMismatch ?? null;
+  const hasProfileFigures =
+    profile.marketCap != null ||
+    profile.peRatio != null ||
+    profile.beta != null ||
+    profile.fiftyTwoWeekHigh != null ||
+    profile.fiftyTwoWeekLow != null ||
+    profile.fund != null ||
+    data.income.payoutRatio != null;
+  const addTransaction = (
+    <TransactionDialog
+      mode="add"
+      instrument={toSearchResult(profile)}
+      triggerVariant="secondary"
+      triggerSize="sm"
+    />
+  );
 
   return (
     <PageShell>
@@ -121,14 +137,9 @@ export default function AssetDetailPage() {
         basisMismatch={basisMismatch}
       />
       {(position.held || custom) && (
-        <div className="mb-8 flex items-center justify-between gap-3 border-b border-hairline pb-5">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-5">
           <div className="flex flex-wrap items-center gap-2">
-            <TransactionDialog
-              mode="add"
-              instrument={toSearchResult(profile)}
-              triggerVariant="secondary"
-              triggerSize="sm"
-            />
+            {addTransaction}
             {custom && <UpdatePriceDialog symbol={profile.symbol} currency={profile.currency} />}
           </div>
           {position.held && <RemoveHoldingButton symbol={profile.symbol} />}
@@ -141,14 +152,7 @@ export default function AssetDetailPage() {
           todayISO={todayISO}
           weight={weight}
           ratings={ratings}
-          addAction={
-            <TransactionDialog
-              mode="add"
-              instrument={toSearchResult(profile)}
-              triggerVariant="secondary"
-              triggerSize="sm"
-            />
-          }
+          addAction={addTransaction}
         />
       )}
       <section className="mb-10">
@@ -180,7 +184,12 @@ export default function AssetDetailPage() {
       <TransactionsSection symbol={profile.symbol} held={position.held || custom != null} />
       {!custom && <NewsSection slug={slug} />}
       {!custom && (
-        <ProviderFootnote profileAsOf={data.profileAsOf} ratingsAsOf={ratings?.asOf ?? null} />
+        <ProviderFootnote
+          hasProfileFigures={hasProfileFigures}
+          profileAsOf={data.profileAsOf}
+          hasRatings={ratings != null}
+          ratingsAsOf={ratings?.asOf ?? null}
+        />
       )}
     </PageShell>
   );
