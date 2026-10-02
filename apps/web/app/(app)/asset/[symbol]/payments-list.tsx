@@ -28,7 +28,7 @@ export function PaymentsList({ history }: { history: AssetDividendsDTO["history"
           <div className="min-w-[20rem]">
             <RowGrid columns="minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)">
               <RowHeader
-                cells={["Ex-date", "Paid", "Per share"]}
+                cells={["Ex-date", "Paid", "Per share, gross"]}
                 align={["left", "left", "right"]}
               />
               {history.map((d, i) => (

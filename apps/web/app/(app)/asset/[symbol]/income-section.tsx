@@ -14,6 +14,10 @@ import { IncomeByYear } from "./income-by-year";
 import { PaymentsList } from "./payments-list";
 import { CheckMark, Missing } from "./reliability-marks";
 
+function leftOutReason(n: number): string {
+  return `${n} payment${n === 1 ? " in another currency is" : "s in another currency are"} left out: no exchange rate`;
+}
+
 /** Wide figures wrap inside their cell rather than push the page sideways. */
 const WRAP = "break-words [overflow-wrap:anywhere]";
 
@@ -99,20 +103,20 @@ export function YourIncome({
           size="sm"
           label="Received so far"
           value={
-            received && receivedAmount > 0 ? (
+            received && (receivedAmount > 0 || received.leftOut > 0) ? (
               <>
-                <span className={WRAP}>
-                  {formatMoney({
-                    amount: (receivedAmount * f).toFixed(2),
-                    currency: received.currency,
-                  })}
-                </span>
+                {receivedAmount > 0 ? (
+                  <span className={WRAP}>
+                    {formatMoney({
+                      amount: (receivedAmount * f).toFixed(2),
+                      currency: received.currency,
+                    })}
+                  </span>
+                ) : (
+                  <Missing reason={leftOutReason(received.leftOut)} />
+                )}
                 {received.leftOut > 0 && (
-                  <CheckMark
-                    flag={{
-                      reason: `${received.leftOut} payment${received.leftOut === 1 ? " in another currency is" : "s in another currency are"} left out: no exchange rate`,
-                    }}
-                  />
+                  <CheckMark flag={{ reason: leftOutReason(received.leftOut) }} />
                 )}
               </>
             ) : (

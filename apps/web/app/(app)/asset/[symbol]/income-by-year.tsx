@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card, CardTitle } from "@sage/ui";
+import { Card, CardTitle, toneForValue } from "@sage/ui";
 import { CERTAINTY_FILL } from "../../../../components/charts/certainty-bars";
 import { cutNotes, perShareByYear, type YearBar } from "../../../../lib/asset-page/income-by-year";
 import { checkTrailingSum } from "../../../../lib/asset-page/reliability";
@@ -41,8 +41,13 @@ function YearColumn({ bar, max, currency }: { bar: YearBar; max: number; currenc
           style={{ height: h(bar.estimated), background: CERTAINTY_FILL.estimated }}
         />
       </div>
-      <span className="whitespace-nowrap text-xs text-muted-foreground">
-        {`${bar.year}${bar.partial ? "*" : ""}`}
+      <span className="flex flex-col items-center whitespace-nowrap text-xs text-muted-foreground">
+        <span aria-hidden className="sm:hidden" data-testid="year-short">
+          {"'" + String(bar.year).slice(2) + (bar.partial ? "*" : "")}
+        </span>
+        <span className="hidden sm:inline" data-testid="year-full">
+          {String(bar.year) + (bar.partial ? "*" : "")}
+        </span>
         {bar.flag && <CheckMark flag={bar.flag} />}
       </span>
     </div>
@@ -78,6 +83,7 @@ export function IncomeByYear({
   const trailing = checkTrailingSum(history, annualDividend, todayISO);
   const growth = cagr5y != null ? Number(cagr5y) * 100 : null;
   const notes = cutNotes(years);
+  const growthTone = growth != null ? toneForValue(Number(growth.toFixed(1))) : null;
 
   return (
     <Card className="min-w-0">
@@ -132,7 +138,24 @@ export function IncomeByYear({
         {notes.map((n) => (
           <p key={n}>{n}</p>
         ))}
-        {growth != null && <p className="tabular-nums">{`5-yr growth ${signedPct(growth)}/yr`}</p>}
+        {growth != null && (
+          <p className="tabular-nums">
+            5-yr growth{" "}
+            <span
+              data-tone={growthTone}
+              className={
+                growthTone === "gain"
+                  ? "text-gain"
+                  : growthTone === "loss"
+                    ? "text-loss"
+                    : "text-neutral"
+              }
+            >
+              {signedPct(growth)}
+            </span>
+            /yr
+          </p>
+        )}
         {years.some((y) => y.partial) && (
           <p className="text-xs">
             * part year — history starts part-way through it, so no cut is measured from it.

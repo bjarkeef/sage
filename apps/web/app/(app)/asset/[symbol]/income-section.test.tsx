@@ -87,6 +87,36 @@ describe("YourIncome", () => {
     ).toBeInTheDocument();
   });
 
+  it("says what it left out, not 'Nothing yet', when every payment was left out", () => {
+    const d = assetDetail();
+    render(
+      <YourIncome
+        detail={{
+          ...d,
+          position: {
+            ...d.position,
+            dividendsReceived: { amount: "0.00", currency: "USD", leftOut: 2 },
+          },
+        }}
+        taxRate={35}
+        todayISO={TODAY}
+      />,
+    );
+    expect(screen.queryByText("Nothing yet")).not.toBeInTheDocument();
+    expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("note", {
+        name: "Check: 2 payments in another currency are left out: no exchange rate",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("labels the per-share column gross", () => {
+    render(<YourIncome detail={assetDetail()} taxRate={35} todayISO={TODAY} />);
+    fireEvent.click(screen.getByRole("button", { name: "All 4 payments" }));
+    expect(screen.getByText("Per share, gross")).toBeInTheDocument();
+  });
+
   it("says 'before tax' when no rate is set", () => {
     render(<YourIncome detail={assetDetail()} taxRate={null} todayISO={TODAY} />);
     expect(screen.getByText("$200.00")).toBeInTheDocument();

@@ -88,9 +88,27 @@ describe("IncomeByYear", () => {
     );
   });
 
-  it("states five-year growth per year", () => {
+  it("states five-year growth per year, toned by its sign", () => {
+    const { container, unmount } = renderBars();
+    expect(container.textContent).toContain("5-yr growth +5.0%/yr");
+    expect(screen.getByText("+5.0%")).toHaveAttribute("data-tone", "gain");
+    expect(screen.getByText("+5.0%")).toHaveClass("text-gain");
+    unmount();
+    const neg = renderBars({ cagr5y: "-0.032000" });
+    expect(neg.container.textContent).toContain("5-yr growth \u22123.2%/yr");
+    expect(screen.getByText(/3\.2%/)).toHaveAttribute("data-tone", "loss");
+    expect(screen.getByText(/3\.2%/)).toHaveClass("text-loss");
+  });
+
+  it("labels each year in two digits on a phone and four from sm, keeping the marks", () => {
     renderBars();
-    expect(screen.getByText("5-yr growth +5.0%/yr")).toBeInTheDocument();
+    const short = screen.getAllByTestId("year-short");
+    const full = screen.getAllByTestId("year-full");
+    expect(short).toHaveLength(7);
+    expect(short[0]).toHaveTextContent(`'${String(Y - 5).slice(2)}*`);
+    expect(short[0]).toHaveClass("sm:hidden");
+    expect(full[0]).toHaveTextContent(`${Y - 5}*`);
+    expect(full[0]).toHaveClass("hidden", "sm:inline");
   });
 
   it("flags a year paying more than 3× the one before", () => {
