@@ -157,8 +157,8 @@ export function TransactionsSection({
                     stopping short of the card's edge. The grid scrolls inside its
                     own wrapper so the page never scrolls sideways. */}
                 <div className="min-w-0 overflow-x-auto">
-                  <div className="min-w-[24rem]">
-                    <RowGrid columns="7rem minmax(0,1fr) minmax(0,1.2fr)">
+                  <div className="min-w-[28rem]">
+                    <RowGrid columns="7rem minmax(5rem,1fr) minmax(14rem,1.2fr)">
                       <RowHeader
                         cells={["Date", "Type", "Amount"]}
                         align={["left", "left", "right"]}
@@ -194,9 +194,9 @@ export function TransactionsSection({
                                   : `${formatShares(r.quantity)} sh @ ${formatQuantity(r.price)}`}
                               </div>
                             </div>
-                            {/* Hover devices: laid over the right of the cell, revealed by opacity, so
+                            {/* Hover devices: laid over the LEFT of the cell, where the right-aligned figure never reaches: the amount column is at least 14rem, the figure/subline need ~9rem, the actions 4.75rem (2 x h-9 + gap), revealed by opacity, so
                                 the amount never changes width. Touch: its own line. */}
-                            <div className="pointer-events-none absolute right-0 top-1/2 flex -translate-y-1/2 gap-1 rounded-control bg-surface-hover opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:static [@media(hover:none)]:mt-1 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent [@media(hover:none)]:opacity-100">
+                            <div className="pointer-events-none absolute left-0 top-1/2 flex -translate-y-1/2 gap-1 rounded-control bg-surface-card opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:bg-surface-hover group-hover:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:static [@media(hover:none)]:mt-1 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent [@media(hover:none)]:opacity-100">
                               <Button
                                 variant="ghost"
                                 size="icon"

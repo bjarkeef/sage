@@ -178,7 +178,13 @@ describe("TransactionsSection", () => {
     renderWithClient(<TransactionsSection symbol="AAPL" held />);
     await expand();
     const actions = screen.getByRole("button", { name: /Edit buy of AAPL/ }).parentElement!;
-    expect(actions).toHaveClass("opacity-0", "group-focus-within:opacity-100", "absolute");
+    expect(actions).toHaveClass(
+      "opacity-0",
+      "group-focus-within:opacity-100",
+      "absolute",
+      "left-0",
+    );
+    expect(actions).not.toHaveClass("right-0");
     expect(actions).not.toHaveClass("w-0");
     expect(actions.className).not.toMatch(/(^|\s)(group-\w+:)?w-auto/);
     expect(actions.className).not.toContain("overflow-hidden");
@@ -190,5 +196,18 @@ describe("TransactionsSection", () => {
     await expand();
     const figure = screen.getAllByRole("cell")[2]!.querySelector(".font-mono")!;
     expect(figure).not.toHaveClass("truncate");
+  });
+
+  it("puts the touch actions on their own static, visible line", async () => {
+    seed([row()]);
+    renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
+    const actions = screen.getByRole("button", { name: /Edit buy of AAPL/ }).parentElement!;
+    expect(actions).toHaveClass(
+      "[@media(hover:none)]:static",
+      "[@media(hover:none)]:opacity-100",
+      "[@media(hover:none)]:pointer-events-auto",
+      "[@media(hover:none)]:mt-1",
+    );
   });
 });
