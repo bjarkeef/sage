@@ -46,6 +46,28 @@ describe("computeYieldRange5y", () => {
     expect(r).toBeNull();
   });
 
+  it("reports the span it covers: a store holding ~30 months starts ~30 months back, not five years", () => {
+    const r = computeYieldRange5y({
+      closes: dailyCloses(shift(TODAY, -915)),
+      dividends: quarterly(Y - 4),
+      todayIso: TODAY,
+      currentYield: null,
+    });
+    expect(r).not.toBeNull();
+    // First month-end on or after 915 days back: 2023-12-31.
+    expect(r!.from).toBe(`${Y - 3}-12-31`);
+  });
+
+  it("starts within the first month of five years back when the store covers all five", () => {
+    const r = computeYieldRange5y({
+      closes: dailyCloses(`${Y - 5}-06-15`),
+      dividends: quarterly(Y - 6),
+      todayIso: TODAY,
+      currentYield: null,
+    });
+    expect(r!.from).toBe(`${Y - 5}-06-30`);
+  });
+
   it("samples the close at each month-end: trailing 3.00 over a 50 close is 6%", () => {
     const r = computeYieldRange5y({
       closes: dailyCloses(`${Y - 5}-06-15`),

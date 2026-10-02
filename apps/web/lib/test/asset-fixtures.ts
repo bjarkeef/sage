@@ -106,7 +106,7 @@ export function assetDetail(over: Partial<AssetDetailDTO> = {}): AssetDetailDTO 
       upcomingRow(334),
       upcomingRow(425, { window: "longRange" }),
     ],
-    yieldRange5y: { low: 0.02, high: 0.05, current: 0.033333 },
+    yieldRange5y: { low: 0.02, high: 0.05, current: 0.033333, from: day(-1826) },
     profileAsOf: TODAY,
     custom: null,
     ...over,

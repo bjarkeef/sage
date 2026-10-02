@@ -54,6 +54,16 @@ describe("AnswerStrip", () => {
     expect(what.textContent).toContain("United States · 79,000 employees");
   });
 
+  it("says the span actually covered, not 5-yr, when the yield range is shorter", () => {
+    const d = assetDetail();
+    renderStrip({
+      detail: { ...d, yieldRange5y: { ...d.yieldRange5y!, from: "2024-03-31" } },
+    });
+    const buy = tile("Buy more?");
+    expect(buy.textContent).toContain("after tax · middle of its range since Mar 2024");
+    expect(buy.textContent).not.toContain("5-yr");
+  });
+
   it("measures analyst upside from the header price, never the provider's currentPrice", () => {
     // ratings().currentPrice is 64: from it the upside would read +3.1%.
     renderStrip();

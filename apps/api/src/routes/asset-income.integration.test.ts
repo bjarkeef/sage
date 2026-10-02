@@ -284,13 +284,14 @@ describeDb("GET /:slug — position extras and income block", () => {
     const res = await app.request("/O");
     const body = (await res.json()) as {
       income: { currentYield: number | null };
-      yieldRange5y: { low: number; high: number; current: number | null } | null;
+      yieldRange5y: { low: number; high: number; current: number | null; from: string } | null;
     };
     expect(body.yieldRange5y).not.toBeNull();
     // 12 or 13 payments of 0.25 in any 365 days, over a 50 close.
     expect(body.yieldRange5y!.low).toBeGreaterThanOrEqual(0.059);
     expect(body.yieldRange5y!.high).toBeLessThanOrEqual(0.066);
     expect(body.yieldRange5y!.current).toBe(body.income.currentYield);
+    expect(body.yieldRange5y!.from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it("returns no yield range without stored closes", async () => {

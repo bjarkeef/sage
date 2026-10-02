@@ -16,7 +16,7 @@ import {
   nextPayment,
   nextTwelveMonths,
   rangePlace,
-  RANGE_PLACE_PHRASE,
+  rangePlacePhrase,
   REASONS,
   type Figure,
 } from "../../../../lib/asset-page/figures";
@@ -172,7 +172,8 @@ function BuyMoreTile({
     return <Tile label="Buy more?" value={<Missing reason={y.reason} />} lines={[y.reason]} />;
   const facts: string[] = [basisWord(taxRate)];
   const range = detail.yieldRange5y;
-  if (range) facts.push(RANGE_PLACE_PHRASE[rangePlace(range.low, range.high, y.value)]);
+  if (range)
+    facts.push(rangePlacePhrase(rangePlace(range.low, range.high, y.value), range.from, todayISO));
   const upside = ratings ? analystUpside(ratings.targets.mean, detail.quote) : null;
   const ratingsStale = ratings ? staleAsOf(ratings.asOf, todayISO) : null;
   return (

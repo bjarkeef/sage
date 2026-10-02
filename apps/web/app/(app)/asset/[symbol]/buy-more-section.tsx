@@ -4,7 +4,7 @@ import * as React from "react";
 import { Card, SectionHeader } from "@sage/ui";
 import { formatCompactMoney, formatDate, formatMoney } from "../../../../lib/format";
 import { netFactor } from "../../../../lib/dividend-tax";
-import { analystUpside, currentYield } from "../../../../lib/asset-page/figures";
+import { analystUpside, currentYield, yieldRangeBasis } from "../../../../lib/asset-page/figures";
 import { basisWord, formatPct } from "../../../../lib/asset-page/labels";
 import {
   checkCurrentYield,
@@ -18,6 +18,11 @@ import { AnalystDetail, CONSENSUS } from "./analyst-ratings-section";
 import { FactRow, type Fact } from "./fact-row";
 import { RangeBar } from "./range-bar";
 import { SignedPct } from "./signed-pct";
+
+function yieldRangeLabel(from: string, todayISO: string): string {
+  const basis = yieldRangeBasis(from, todayISO);
+  return basis === "its 5-yr range" ? "Yield vs its own 5 years" : `Yield vs ${basis}`;
+}
 
 /**
  * § 6, "Buy more?": facts, no verdict and no score — where today's yield and
@@ -129,7 +134,7 @@ export function BuyMoreSection({
           <div className="min-w-0 space-y-8">
             {hasYieldRange && (
               <RangeBar
-                label="Yield vs its own 5 years"
+                label={yieldRangeLabel(yieldRange5y.from, todayISO)}
                 context={basisWord(taxRate)}
                 low={yieldRange5y.low * f}
                 high={yieldRange5y.high * f}

@@ -392,12 +392,14 @@ export interface AssetUpcomingDTO {
   window: "next12m" | "longRange";
 }
 
-/** Where today's yield sits in the holding's own five years, gross fractions.
- *  `current` is the same value as `income.currentYield`. */
+/** Where today's yield sits in the holding's own history, gross fractions.
+ *  `current` is the same value as `income.currentYield`. `from` is the first
+ *  month-end sampled: the range is five years only when it is about five years back. */
 export interface YieldRangeDTO {
   low: number;
   high: number;
   current: number | null;
+  from: string;
 }
 
 export interface AssetDetailDTO {

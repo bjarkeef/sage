@@ -8,6 +8,9 @@ export interface YieldRange {
   /** The asset endpoint's `income.currentYield` (TTM ÷ live price), passed
    *  through so the marker and the strip read one producer. */
   current: number | null;
+  /** ISO date of the first month-end sampled. The range covers `from` to today,
+   *  which is less than five years whenever the price store is short. */
+  from: string;
 }
 
 /** Two years of monthly samples; below that a "range" is mostly noise. */
@@ -64,6 +67,7 @@ export function computeYieldRange5y(input: {
   const firstEx = divs[0]!.exDate;
   const fiveYearsAgo = `${Number(todayIso.slice(0, 4)) - 5}${todayIso.slice(4)}`;
   const samples: number[] = [];
+  let from: string | null = null;
   let ci = -1;
 
   for (const end of monthEndsBetween(fiveYearsAgo, todayIso)) {
@@ -78,12 +82,14 @@ export function computeYieldRange5y(input: {
     if (inWindow.some((d) => d.currency !== bar.currency)) continue;
     const ttm = inWindow.reduce((s, d) => s + Number(d.amountPerShare), 0);
     samples.push(ttm / bar.close);
+    from ??= end;
   }
 
-  if (samples.length < MIN_YIELD_SAMPLES) return null;
+  if (samples.length < MIN_YIELD_SAMPLES || from === null) return null;
   return {
     low: Number(Math.min(...samples).toFixed(6)),
     high: Number(Math.max(...samples).toFixed(6)),
     current: input.currentYield,
+    from,
   };
 }

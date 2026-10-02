@@ -33,6 +33,15 @@ describe("BuyMoreSection", () => {
     expect(screen.getByText("after tax")).toBeInTheDocument();
   });
 
+  it("names the span it covers, not five years, when the range starts later", () => {
+    const d = assetDetail();
+    renderBuy({
+      detail: { ...d, yieldRange5y: { ...d.yieldRange5y!, from: "2024-03-31" } },
+    });
+    expect(screen.getByText("Yield vs its range since Mar 2024")).toBeInTheDocument();
+    expect(screen.queryByText(/5 years/)).not.toBeInTheDocument();
+  });
+
   it("sets the header price in its 52-week range", () => {
     renderBuy();
     expect(screen.getByText("Low $55.00")).toBeInTheDocument();
@@ -88,7 +97,7 @@ describe("BuyMoreSection", () => {
         ...d,
         income: { ...d.income, payoutRatio: 3.5 },
         profile: { ...d.profile, peRatio: "-4" },
-        yieldRange5y: { low: 0.01, high: 0.08, current: 0.033333 },
+        yieldRange5y: { low: 0.01, high: 0.08, current: 0.033333, from: day(-1826) },
       },
     });
     expect(screen.getByRole("note", { name: /0–300%/ })).toBeInTheDocument();

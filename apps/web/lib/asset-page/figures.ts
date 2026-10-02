@@ -1,3 +1,4 @@
+import { formatMonthYear } from "../format";
 import { payFrequency } from "../income-tape/aggregates";
 import type {
   AssetDetailDTO,
@@ -151,10 +152,34 @@ export function rangePlace(low: number, high: number, current: number): RangePla
   return "middle";
 }
 
-export const RANGE_PLACE_PHRASE: Record<RangePlace, string> = {
-  below: "below its 5-yr range",
-  low: "low of its 5-yr range",
-  middle: "middle of its 5-yr range",
-  high: "high of its 5-yr range",
-  above: "above its 5-yr range",
+const PLACE_WORDS: Record<RangePlace, string> = {
+  below: "below",
+  low: "low of",
+  middle: "middle of",
+  high: "high of",
+  above: "above",
 };
+
+/** How close to five years back the first sample must be to call it five years. */
+const FULL_SPAN_SLACK_MONTHS = 2;
+
+/** The yield range's basis as a noun phrase: "its 5-yr range" only when the
+ *  first sample is within two months of five years before today; otherwise
+ *  the span it actually covers, "its range since Mar 2024". */
+export function yieldRangeBasis(from: string, todayISO: string): string {
+  const limit = new Date(
+    Date.UTC(
+      Number(todayISO.slice(0, 4)) - 5,
+      Number(todayISO.slice(5, 7)) - 1 + FULL_SPAN_SLACK_MONTHS,
+      Number(todayISO.slice(8, 10)),
+    ),
+  )
+    .toISOString()
+    .slice(0, 10);
+  return from <= limit ? "its 5-yr range" : `its range since ${formatMonthYear(from)}`;
+}
+
+/** "middle of its 5-yr range" / "high of its range since Mar 2024". */
+export function rangePlacePhrase(place: RangePlace, from: string, todayISO: string): string {
+  return `${PLACE_WORDS[place]} ${yieldRangeBasis(from, todayISO)}`;
+}

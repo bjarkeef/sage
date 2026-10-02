@@ -8,7 +8,7 @@ import {
   nextTwelveMonths,
   payFrequencyOf,
   rangePlace,
-  RANGE_PLACE_PHRASE,
+  rangePlacePhrase,
   REASONS,
 } from "./figures";
 import {
@@ -159,6 +159,19 @@ describe("rangePlace", () => {
     expect(rangePlace(0.02, 0.05, 0.06)).toBe("above");
     expect(rangePlace(0.02, 0.05, 0.01)).toBe("below");
     expect(rangePlace(0.03, 0.03, 0.03)).toBe("middle");
-    expect(RANGE_PLACE_PHRASE.high).toBe("high of its 5-yr range");
+  });
+});
+
+describe("rangePlacePhrase", () => {
+  const TODAY = "2026-06-15";
+  it("says 5-yr only when the first sample is within two months of five years back", () => {
+    expect(rangePlacePhrase("high", "2021-06-30", TODAY)).toBe("high of its 5-yr range");
+    expect(rangePlacePhrase("middle", "2021-08-15", TODAY)).toBe("middle of its 5-yr range");
+    expect(rangePlacePhrase("low", "2021-09-30", TODAY)).toBe("low of its range since Sep 2021");
+  });
+
+  it("names the actual span, with the year, for a short store", () => {
+    expect(rangePlacePhrase("high", "2024-03-31", TODAY)).toBe("high of its range since Mar 2024");
+    expect(rangePlacePhrase("above", "2024-03-31", TODAY)).toBe("above its range since Mar 2024");
   });
 });
