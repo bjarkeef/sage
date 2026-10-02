@@ -4,6 +4,7 @@ import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithClient, makeTestQueryClient } from "../lib/test/render-with-client";
 import type { AssetDividendsDTO, AssetPositionDTO } from "../lib/types";
 import type { ChartReadout } from "../lib/asset-chart/readout";
+import * as api from "../lib/api";
 
 const { createPriceLine, attachPrimitive, detachPrimitive, subscribeCrosshairMove, addSeries } =
   vi.hoisted(() => {
@@ -232,5 +233,100 @@ describe("AssetPriceChart", () => {
     await waitFor(() => expect(addSeries).toHaveBeenCalled());
     const box = container.querySelector(".h-60");
     expect(box?.className).toContain("md:h-80");
+  });
+});
+
+const BENCHMARKS = [
+  { id: "sp500", name: "S&P 500 (TR)" },
+  { id: "msci-world", name: "MSCI World (TR)" },
+];
+
+describe("AssetPriceChart — total return and compare", () => {
+  it("switches the line to total return and reads it beside the price change", async () => {
+    const onReadout = vi.fn<(r: ChartReadout | null) => void>();
+    renderChart({ onReadout });
+    fireEvent.click(await screen.findByRole("radio", { name: "Total return" }));
+    await waitFor(() =>
+      expect(onReadout.mock.calls.at(-1)![0]!.totalReturnPct).toBeCloseTo(
+        ((180 * (1 + 1 / 180)) / 170 - 1) * 100,
+        10,
+      ),
+    );
+    // The average cost is a price; the total-return line rebuilds without it.
+    expect(createPriceLine).toHaveBeenCalledTimes(1);
+  });
+
+  it("compares on total return against a TR index in the holding's currency: forces TR, locks the control, hides the cost line", async () => {
+    vi.mocked(api.getBenchmarks).mockResolvedValue(BENCHMARKS);
+    vi.mocked(api.getBenchmarkSeries).mockResolvedValue({
+      series: {
+        id: "sp500",
+        name: "S&P 500 (TR)",
+        currency: "USD",
+        bars: [
+          { date: "2026-06-01", close: "100" },
+          { date: "2026-07-01", close: "103" },
+        ],
+      },
+      reason: null,
+    });
+    const onReadout = vi.fn<(r: ChartReadout | null) => void>();
+    renderChart({ dividends: [], onReadout });
+    await waitFor(() => expect(createPriceLine).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Compare" }));
+    fireEvent.click(await screen.findByRole("radio", { name: "S&P 500 (TR)" }));
+
+    await waitFor(() => expect(addSeries).toHaveBeenCalledWith("Line", expect.anything()));
+    // Asked for in the holding's currency: the server converts, the client only rebases.
+    expect(api.getBenchmarkSeries).toHaveBeenCalledWith("sp500", "2026-06-01", "2026-07-01", "USD");
+    const tr = screen.getByRole("radio", { name: "Total return" });
+    expect(tr).toHaveAttribute("aria-checked", "true");
+    expect(tr).toBeDisabled();
+    expect(screen.getByText("compared on total return")).toBeInTheDocument();
+    expect(createPriceLine).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => expect(onReadout.mock.calls.at(-1)![0]!.compare?.status).toBe("ready"));
+    const r = onReadout.mock.calls.at(-1)![0]!;
+    expect(r.compare!.name).toBe("S&P 500 (TR), in USD");
+    expect(r.compare!.benchmarkPct).toBeCloseTo(3, 10);
+    expect(r.compare!.youPct).toBeCloseTo((180 / 170 - 1) * 100, 10);
+  });
+
+  it("says a benchmark it can't fetch is unavailable and stays a single line", async () => {
+    vi.mocked(api.getBenchmarks).mockResolvedValue(BENCHMARKS);
+    vi.mocked(api.getBenchmarkSeries).mockResolvedValue({ series: null, reason: "no_series" });
+    const onReadout = vi.fn<(r: ChartReadout | null) => void>();
+    renderChart({ onReadout });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Compare" }));
+    fireEvent.click(await screen.findByRole("radio", { name: "S&P 500 (TR)" }));
+
+    await waitFor(() =>
+      expect(onReadout.mock.calls.at(-1)![0]!.compare).toMatchObject({
+        status: "unavailable",
+        reason: "S&P 500 (TR) unavailable",
+      }),
+    );
+    expect(addSeries).not.toHaveBeenCalledWith("Line", expect.anything());
+    expect(screen.getByRole("radio", { name: "Total return" })).not.toBeDisabled();
+  });
+
+  it("says the index is unavailable in the holding's currency when no rate covers the range start — never an unconverted line", async () => {
+    vi.mocked(api.getBenchmarks).mockResolvedValue(BENCHMARKS);
+    vi.mocked(api.getBenchmarkSeries).mockResolvedValue({ series: null, reason: "no_fx_rate" });
+    const onReadout = vi.fn<(r: ChartReadout | null) => void>();
+    renderChart({ onReadout });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Compare" }));
+    fireEvent.click(await screen.findByRole("radio", { name: "S&P 500 (TR)" }));
+
+    await waitFor(() =>
+      expect(onReadout.mock.calls.at(-1)![0]!.compare).toMatchObject({
+        status: "unavailable",
+        reason: "S&P 500 (TR) unavailable in USD",
+      }),
+    );
+    expect(addSeries).not.toHaveBeenCalledWith("Line", expect.anything());
   });
 });

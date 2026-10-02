@@ -26,7 +26,7 @@ import type {
   NewsArticleDTO,
   AnalystRatingsDTO,
   CorporateActionsViewDTO,
-  BenchmarkDTO,
+  BenchmarkOptionDTO,
   BenchmarkSeriesResult,
 } from "./types";
 
@@ -622,10 +622,10 @@ export async function getAssetRatings(slug: string): Promise<AnalystRatingsDTO |
   return (await res.json()) as AnalystRatingsDTO | null;
 }
 
-export async function getBenchmarks(): Promise<BenchmarkDTO[]> {
+export async function getBenchmarks(): Promise<BenchmarkOptionDTO[]> {
   const res = await apiFetch(`/benchmarks`);
   if (!res.ok) throw new Error(`benchmarks fetch failed: ${res.status}`);
-  return ((await res.json()) as { benchmarks: BenchmarkDTO[] }).benchmarks;
+  return ((await res.json()) as { benchmarks: BenchmarkOptionDTO[] }).benchmarks;
 }
 
 /** One total-return benchmark over [from, to], converted into `currency` (the

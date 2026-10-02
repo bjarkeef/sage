@@ -5,16 +5,29 @@ import { useQuery } from "@tanstack/react-query";
 import {
   createChart,
   AreaSeries,
+  LineSeries,
   LineStyle,
   type IChartApi,
   type MouseEventParams,
 } from "lightweight-charts";
 import { useTheme } from "next-themes";
-import { SegmentedControl, ChartSkeleton, Button } from "@sage/ui";
-import { getAssetChart } from "../lib/api";
+import {
+  SegmentedControl,
+  ChartSkeleton,
+  Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@sage/ui";
+import { getAssetChart, getBenchmarks, getBenchmarkSeries } from "../lib/api";
 import { qk } from "../lib/query/keys";
 import { formatDate } from "../lib/format";
-import type { AssetDividendsDTO, AssetPositionDTO, MoneyDTO } from "../lib/types";
+import type {
+  AssetDividendsDTO,
+  AssetPositionDTO,
+  BenchmarkOptionDTO,
+  MoneyDTO,
+} from "../lib/types";
 import { TradeMarkers, type TradeMark } from "./trade-markers";
 import { DividendMarkers, type DividendMark } from "./dividend-markers";
 import { EasedCrosshair } from "./charts/eased-crosshair";
@@ -22,6 +35,7 @@ import {
   readChartTheme,
   baseChartOptions,
   areaSeriesOptions,
+  benchmarkSeriesOptions,
   attachHoverTooltip,
   lineColorFor,
   withChartAlpha,
@@ -52,6 +66,64 @@ const RANGES: { label: string; value: RangeKey }[] = [
   { label: "1Y", value: "1Y" },
   { label: "All", value: "ALL" },
 ];
+
+const MODES = [
+  { label: "Price", value: "price" },
+  { label: "Total return", value: "tr" },
+];
+
+/** "S&P 500 (TR), in EUR": the index's own name from the API, and the currency
+ *  the server converted it into — the holding's (spec decision 2). */
+function benchmarkLabel(name: string, currency: string): string {
+  return `${name}, in ${currency}`;
+}
+
+/** One benchmark at a time, or none. The names come from the API's
+ *  BENCHMARKS — this file holds no copy of them. */
+function CompareControl({
+  options,
+  value,
+  onChange,
+}: {
+  options: BenchmarkOptionDTO[];
+  value: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const active = options.find((o) => o.id === value) ?? null;
+  const choices: { id: string | null; name: string }[] = [
+    { id: null, name: "No comparison" },
+    ...options,
+  ];
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant={active ? "default" : "outline"} size="sm">
+          {active ? `vs ${active.name}` : "Compare"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-56 p-1.5">
+        <div role="radiogroup" aria-label="Compare with" className="flex flex-col">
+          {choices.map((o) => (
+            <button
+              key={o.id ?? "none"}
+              type="button"
+              role="radio"
+              aria-checked={value === o.id}
+              onClick={() => {
+                onChange(o.id);
+                setOpen(false);
+              }}
+              className="rounded-control px-2.5 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-checked:font-medium aria-checked:text-foreground"
+            >
+              {o.name}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const INITIAL_RANGE: RangeKey = "1Y";
 
@@ -117,14 +189,72 @@ export function AssetPriceChart({
     [rawChart],
   );
 
-  // Task 8 turns these into state (Price / Total return, Compare).
-  const mode: ChartMode = "price";
-  const compare: CompareContext | null = null;
+  const [mode, setMode] = React.useState<ChartMode>("price");
+  const [compareId, setCompareId] = React.useState<string | null>(null);
+  const { data: benchmarks } = useQuery({
+    queryKey: qk.benchmarks(),
+    queryFn: () => getBenchmarks(),
+    staleTime: Infinity,
+  });
+  const from = rawChart[0]?.date ?? null;
+  const to = rawChart[rawChart.length - 1]?.date ?? null;
+  // The index comes back already in the holding's currency (`currency`, the
+  // chart's own): the server converts at each day's ECB rate, the client only
+  // rebases to % change.
+  const benchQuery = useQuery({
+    queryKey: qk.benchmarkSeries(compareId ?? "", from ?? "", to ?? "", currency),
+    queryFn: () => getBenchmarkSeries(compareId!, from!, to!, currency),
+    enabled: compareId !== null && from !== null && to !== null,
+    staleTime: 300_000,
+    retry: false,
+  });
+  const baseName = benchmarks?.find((b) => b.id === compareId)?.name ?? null;
+  const compareName = baseName ? benchmarkLabel(baseName, currency) : null;
+  const benchSeries = benchQuery.data?.series ?? null;
+  const benchmark = React.useMemo(
+    () =>
+      benchSeries && compareName
+        ? {
+            name: compareName,
+            bars: benchSeries.bars.map((b) => ({ date: b.date, close: Number(b.close) })),
+          }
+        : null,
+    [benchSeries, compareName],
+  );
+  // Never a silent fallback: a series that failed or came back null is
+  // "unavailable" — "unavailable in <CCY>" when the reason is a missing rate —
+  // and the chart stays on the holding's own line, never an unconverted one.
+  const compare = React.useMemo<CompareContext | null>(() => {
+    if (compareId === null || baseName === null || compareName === null) return null;
+    if (benchQuery.isPending) return { name: compareName, status: "pending", reason: null };
+    if (benchSeries) return { name: compareName, status: "ready", reason: null };
+    const reason =
+      benchQuery.data?.reason === "no_fx_rate"
+        ? `${baseName} unavailable in ${currency}`
+        : `${baseName} unavailable`;
+    return { name: compareName, status: "unavailable", reason };
+  }, [
+    compareId,
+    baseName,
+    compareName,
+    currency,
+    benchQuery.isPending,
+    benchQuery.data,
+    benchSeries,
+  ]);
 
   const model = React.useMemo(
-    () => buildChartModel({ closes, currency, dividends, mode, benchmark: null }),
-    [closes, currency, dividends, mode],
+    () =>
+      buildChartModel({
+        closes,
+        currency,
+        dividends,
+        mode,
+        benchmark,
+      }),
+    [closes, currency, dividends, mode, benchmark],
   );
+  const comparing = model.axis === "percent";
 
   const readoutCtx = React.useMemo(
     () => ({ rangePhrase: RANGE_PHRASE[range], currency, compare }),
@@ -164,6 +294,10 @@ export function AssetPriceChart({
       crosshairMarkerVisible: false,
     });
     series.setData(model.holding);
+    if (model.benchmark) {
+      const bm = chart.addSeries(LineSeries, benchmarkSeriesOptions(theme));
+      bm.setData(model.benchmark);
+    }
 
     const formatValue = (v: number) =>
       new Intl.NumberFormat("en-US", {
@@ -319,6 +453,27 @@ export function AssetPriceChart({
             onChange={(v) => setRange(v as RangeKey)}
             size="sm"
           />
+          <span
+            title={
+              model.trUnavailable ? `Total return unavailable: ${model.trUnavailable}` : undefined
+            }
+          >
+            <SegmentedControl
+              options={MODES}
+              value={model.lineMode}
+              onChange={(v) => setMode(v as ChartMode)}
+              size="sm"
+              // A comparison is always on total return — a price line against
+              // a TR index is the bias Sage removed from /performance.
+              disabled={comparing || model.trUnavailable !== null}
+            />
+          </span>
+          {comparing && (
+            <span className="text-xs text-muted-foreground">compared on total return</span>
+          )}
+          {benchmarks && benchmarks.length > 0 && (
+            <CompareControl options={benchmarks} value={compareId} onChange={setCompareId} />
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">

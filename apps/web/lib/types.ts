@@ -1128,7 +1128,7 @@ export interface CorporateActionsViewDTO {
   coverage: { checked: number; total: number };
 }
 
-export interface BenchmarkDTO {
+export interface BenchmarkOptionDTO {
   id: string;
   /** Always the total-return name, e.g. "S&P 500 (TR)". */
   name: string;
