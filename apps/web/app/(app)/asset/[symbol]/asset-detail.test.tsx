@@ -33,6 +33,13 @@ vi.mock("../../../../lib/api", () => ({
   // .then(...) as soon as it opens; a bare vi.fn() returns undefined here,
   // which throws. Resolved value doesn't matter for the tests in this file.
   getInstrumentQuote: vi.fn(),
+  getAssetRatings: vi.fn(() => Promise.resolve(null)),
+  // Pending forever: the page renders with the book still loading, and says so.
+  getPortfolio: vi.fn(() => new Promise(() => {})),
+  getBenchmarks: vi.fn(() => Promise.resolve([])),
+  getBenchmarkSeries: vi.fn(),
+  getAssetNews: vi.fn(() => Promise.resolve([])),
+  listTransactions: vi.fn(() => Promise.resolve({ items: [], nextCursor: null })),
 }));
 
 // Import after the mocks above so AssetDetailPage's transitive deps pick them up.
@@ -311,5 +318,26 @@ describe("AssetDetailPage", () => {
     // And the basis is stated on the figures themselves, not only in a caption
     // belonging to a different card.
     expect(screen.getAllByText(/after tax/i).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("leads a market holding with the four answers, and leaves them off a custom holding", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "AAPL" });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("AAPL"), FIXTURE_ASSET);
+    qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+    const { unmount } = renderWithClient(<AssetDetailPage />, qc);
+    const strip = await screen.findByRole("region", { name: "At a glance" });
+    for (const label of ["Pays you", "Your position", "Buy more?", "What it is"]) {
+      expect(within(strip).getByText(label)).toBeInTheDocument();
+    }
+    unmount();
+
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "CASH_DKK" });
+    const qc2 = makeTestQueryClient();
+    qc2.setQueryData(qk.assetDetail("CASH_DKK"), FIXTURE_CUSTOM_ASSET);
+    qc2.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+    renderWithClient(<AssetDetailPage />, qc2);
+    await screen.findByText("Cash account");
+    expect(screen.queryByRole("region", { name: "At a glance" })).not.toBeInTheDocument();
   });
 });

@@ -7,7 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { ChartSkeleton, ErrorState, PageShell } from "@sage/ui";
 import { AssetPageSkeleton } from "../../../../components/skeletons";
-import { getAssetDetail } from "../../../../lib/api";
+import { getAssetDetail, getAssetRatings, getPortfolio } from "../../../../lib/api";
+import { holdingWeight } from "../../../../lib/asset-page/figures";
 import type { ChartReadout } from "../../../../lib/asset-chart/readout";
 import { toSearchResult } from "../../../../lib/instrument";
 import { qk } from "../../../../lib/query/keys";
@@ -18,6 +19,7 @@ import { RemoveHoldingButton } from "../../../../components/remove-holding-butto
 import { CurrencyPicker } from "../../../../components/currency-picker";
 import { useDisplayCurrency } from "../../../../components/display-currency-context";
 import { AssetHeader } from "./asset-header";
+import { AnswerStrip } from "./answer-strip";
 import { PositionSection } from "./position-section";
 import { TransactionsSection } from "./transactions-section";
 import { IncomeSection } from "./income-section";
@@ -47,6 +49,26 @@ export default function AssetDetailPage() {
   });
   const { rate: dividendTaxRate, isLoading: taxRateLoading } = useDividendTaxRate();
   const [readout, setReadout] = React.useState<ChartReadout | null>(null);
+
+  // One fetch each, read by every section that needs them (spec: one source
+  // per figure). The book only matters for a held symbol; ratings only for a
+  // market instrument.
+  const held = data?.position.held ?? false;
+  const isCustom = data?.custom != null;
+  const { data: portfolio } = useQuery({
+    queryKey: qk.portfolio(),
+    queryFn: () => getPortfolio(),
+    staleTime: 300_000,
+    enabled: held,
+  });
+  const { data: ratings } = useQuery({
+    queryKey: qk.assetRatings(slug),
+    queryFn: () => getAssetRatings(slug),
+    staleTime: 300_000,
+    enabled: data != null && !isCustom,
+  });
+  // "Today" for every date rule on the page, read once per mount.
+  const todayISO = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   // OR the loading states together (same pattern as the dividends analytics
   // page): the income section below nets its yields off dividendTaxRate, and
@@ -110,6 +132,23 @@ export default function AssetDetailPage() {
           </div>
           {position.held && <RemoveHoldingButton symbol={profile.symbol} />}
         </div>
+      )}
+      {!custom && (
+        <AnswerStrip
+          detail={data}
+          taxRate={dividendTaxRate}
+          todayISO={todayISO}
+          weight={holdingWeight(portfolio?.positions, profile.symbol)}
+          ratings={ratings}
+          addAction={
+            <TransactionDialog
+              mode="add"
+              instrument={toSearchResult(profile)}
+              triggerVariant="secondary"
+              triggerSize="sm"
+            />
+          }
+        />
       )}
       <section className="mb-10">
         <AssetPriceChart
