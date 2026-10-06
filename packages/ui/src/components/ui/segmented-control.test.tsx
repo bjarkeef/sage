@@ -78,4 +78,29 @@ describe("SegmentedControl", () => {
     );
     expect(screen.getByRole("radiogroup", { name: "Type" })).toBeInTheDocument();
   });
+
+  it("takes a description via aria-describedby", () => {
+    render(
+      <div>
+        <span id="why">Locked because of reasons</span>
+        <SegmentedControl
+          options={options}
+          value="buy"
+          onChange={() => {}}
+          aria-describedby="why"
+        />
+      </div>,
+    );
+    expect(screen.getByRole("radiogroup")).toHaveAccessibleDescription("Locked because of reasons");
+  });
+
+  it("can be locked on its value: every option disabled, clicks ignored, the value still announced", () => {
+    const onChange = vi.fn();
+    render(<SegmentedControl options={options} value="sell" onChange={onChange} disabled />);
+    const buy = screen.getByRole("radio", { name: "Buy" });
+    expect(buy).toBeDisabled();
+    fireEvent.click(buy);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("radio", { name: "Sell" })).toHaveAttribute("aria-checked", "true");
+  });
 });

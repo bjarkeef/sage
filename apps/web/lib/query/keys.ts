@@ -8,6 +8,9 @@ export const qk = {
   assetChart: (slug: string, range: string) => ["asset-chart", slug, range] as const,
   assetNews: (slug: string) => ["asset-news", slug] as const,
   assetRatings: (slug: string) => ["asset-ratings", slug] as const,
+  benchmarks: () => ["benchmarks"] as const,
+  benchmarkSeries: (id: string, from: string, to: string, currency: string) =>
+    ["benchmark-series", id, from, to, currency] as const,
   dividendIncome: () => ["dividend-income"] as const,
   diversification: (currency?: string | null) => ["diversification", currency ?? null] as const,
   portfolioNews: () => ["portfolio-news"] as const,

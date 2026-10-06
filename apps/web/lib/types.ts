@@ -301,8 +301,6 @@ export interface AssetProfileDTO {
   beta: string | null;
   fiftyTwoWeekHigh: MoneyDTO | null;
   fiftyTwoWeekLow: MoneyDTO | null;
-  dividendYield: string | null;
-  trailingAnnualDividend: MoneyDTO | null;
   website: string | null;
   description: string | null;
   ceo: string | null;
@@ -313,6 +311,15 @@ export interface AssetProfileDTO {
   fund: FundProfileDTO | null;
 }
 
+/** Dividends a holding has actually paid you, GROSS, from the ledger — the rows
+ *  /dividends lists as received, summed in the holding's currency. A row in
+ *  another currency without an FX rate is left out and counted in `leftOut`. */
+export interface ReceivedTotalDTO {
+  amount: string;
+  currency: string;
+  leftOut: number;
+}
+
 export interface AssetPositionDTO {
   held: boolean;
   quantity?: string;
@@ -321,15 +328,15 @@ export interface AssetPositionDTO {
   marketValue?: MoneyDTO | null;
   unrealizedGainLoss?: MoneyDTO | null;
   gainLossPercent?: number | null;
-  totalDividendIncome?: string;
+  /** Null when nothing has been received yet. */
+  dividendsReceived?: ReceivedTotalDTO | null;
   yieldOnCost?: number | null;
   feesPaid?: MoneyDTO;
-  forwardAnnualIncome?: MoneyDTO | null;
   trades?: { tradeDate: string; type: "buy" | "sell"; price: string; quantity: string }[];
 }
 
 export interface AssetIncomeDTO {
-  /** Trailing TTM ÷ live price, a fraction; null when unavailable. */
+  /** Trailing TTM ÷ live price, a fraction; null when that can't be computed (no quote, no trailing dividend, or mixed currencies). Never the provider's own yield. */
   currentYield: number | null;
   /** Trailing TTM ÷ average cost, a fraction; null when not held. */
   yieldOnCost: number | null;
@@ -372,6 +379,29 @@ export interface AssetCustomDTO {
   income: AssetCustomIncomeDTO | null;
 }
 
+/** One forward payment for a symbol, per share and gross, from the same
+ *  schedule the overview sums. */
+export interface AssetUpcomingDTO {
+  exDate: string;
+  paymentDate: string | null;
+  amountPerShare: string;
+  currency: string;
+  certainty: "confirmed" | "estimated";
+  /** "next12m" is what the overview's next-12-months figure counts;
+   *  "longRange" only feeds the forecast-year bar. */
+  window: "next12m" | "longRange";
+}
+
+/** Where today's yield sits in the holding's own history, gross fractions.
+ *  `current` is the same value as `income.currentYield`. `from` is the first
+ *  month-end sampled: the range is five years only when it is about five years back. */
+export interface YieldRangeDTO {
+  low: number;
+  high: number;
+  current: number | null;
+  from: string;
+}
+
 export interface AssetDetailDTO {
   profile: AssetProfileDTO;
   quote: { price: MoneyDTO; asOf: string } | null;
@@ -379,6 +409,13 @@ export interface AssetDetailDTO {
   dividends: AssetDividendsDTO;
   position: AssetPositionDTO;
   income: AssetIncomeDTO;
+  /** Per-share forward payments, sorted by cash date. Empty for custom holdings. */
+  upcoming: AssetUpcomingDTO[];
+  /** Null under two years of month-end samples, or for a custom holding. */
+  yieldRange5y: YieldRangeDTO | null;
+  /** ISO day the provider profile (market cap, P/E, beta, 52-week range, fund
+   *  data, payout ratio) was fetched; null when it could not be. */
+  profileAsOf: string | null;
   /** Set only for user-defined ("custom") holdings — savings accounts,
    *  pensions, etc. Null for regular market instruments. */
   custom: AssetCustomDTO | null;
@@ -1091,4 +1128,28 @@ export interface CorporateActionDTO {
 export interface CorporateActionsViewDTO {
   actions: CorporateActionDTO[];
   coverage: { checked: number; total: number };
+}
+
+export interface BenchmarkOptionDTO {
+  id: string;
+  /** Always the total-return name, e.g. "S&P 500 (TR)". */
+  name: string;
+}
+
+/** A benchmark's closes in the holding's currency (`currency` is always the one
+ *  asked for), converted server-side at each day's ECB rate. */
+export interface BenchmarkSeriesDTO {
+  id: string;
+  name: string;
+  currency: string;
+  bars: { date: string; close: string }[];
+}
+
+/** Why a series is absent: the index could not be fetched, or no ECB rate
+ *  covers the range start in the holding's currency. */
+export type BenchmarkUnavailable = "no_series" | "no_fx_rate";
+
+export interface BenchmarkSeriesResult {
+  series: BenchmarkSeriesDTO | null;
+  reason: BenchmarkUnavailable | null;
 }

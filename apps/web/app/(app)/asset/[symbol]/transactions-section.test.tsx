@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { renderWithClient } from "../../../../lib/test/render-with-client";
 import { qk } from "../../../../lib/query/keys";
 import { TransactionsSection } from "./transactions-section";
@@ -35,6 +35,11 @@ function seed(rows: TransactionRow[]) {
   vi.mocked(api.listTransactions).mockResolvedValue({ items: rows, nextCursor: null });
 }
 
+/** The list starts collapsed; open it the way a reader would. */
+async function expand() {
+  fireEvent.click(await screen.findByRole("button", { name: /^\d+ transactions?$/ }));
+}
+
 beforeEach(() => vi.clearAllMocks());
 
 describe("TransactionsSection", () => {
@@ -56,6 +61,7 @@ describe("TransactionsSection", () => {
       row({ id: "new", tradeDate: "2026-06-14", price: "150" }),
     ]);
     renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
     const dates = (await screen.findAllByRole("row"))
       .map((r) => r.textContent ?? "")
       .filter((t) => t.includes("2026"));
@@ -69,6 +75,7 @@ describe("TransactionsSection", () => {
     seed([row()]);
     vi.mocked(api.deleteTransaction).mockResolvedValueOnce(undefined);
     renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
 
     fireEvent.click(await screen.findByRole("button", { name: /Delete buy of AAPL/ }));
 
@@ -80,6 +87,7 @@ describe("TransactionsSection", () => {
     seed([row()]);
     vi.mocked(api.deleteTransaction).mockRejectedValueOnce(new Error("nope"));
     renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
 
     fireEvent.click(await screen.findByRole("button", { name: /Delete buy of AAPL/ }));
 
@@ -90,6 +98,7 @@ describe("TransactionsSection", () => {
   it("opens the edit dialog for a row", async () => {
     seed([row()]);
     renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
     fireEvent.click(await screen.findByRole("button", { name: /Edit buy of AAPL/ }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
@@ -129,10 +138,76 @@ describe("TransactionsSection", () => {
       Array.from({ length: 12 }, (_, i) => row({ id: String(i), tradeDate: `2026-06-${i + 1}` })),
     );
     renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
 
     const toggle = await screen.findByRole("button", { name: "Show all 12" });
     expect(screen.getAllByRole("button", { name: /Delete buy of AAPL/ })).toHaveLength(8);
     fireEvent.click(toggle);
     expect(screen.getAllByRole("button", { name: /Delete buy of AAPL/ })).toHaveLength(12);
+  });
+
+  it("is collapsed by default, naming how many entries it holds", async () => {
+    seed([row({ id: "a" }), row({ id: "b", tradeDate: "2026-05-02" })]);
+    renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    const toggle = await screen.findByRole("button", { name: "2 transactions" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: /Delete buy of AAPL/ })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByRole("button", { name: /Delete buy of AAPL/ })).toHaveLength(2);
+  });
+
+  it("says 'auto-added' in words on an entry added from the payment history", async () => {
+    seed([row({ type: "dividend", source: "auto" })]);
+    renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    fireEvent.click(await screen.findByRole("button", { name: "1 transaction" }));
+    expect(screen.getByText("auto-added")).toBeInTheDocument();
+  });
+
+  it("keeps the row actions inside the amount cell, so the amount column runs to the card's edge", async () => {
+    seed([row()]);
+    renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
+    const [header, ...rows] = screen.getAllByRole("row");
+    expect(within(header!).getAllByRole("columnheader")).toHaveLength(3);
+    for (const r of rows) expect(within(r).getAllByRole("cell")).toHaveLength(3);
+  });
+
+  it("reveals the row actions by opacity over the cell, never by changing the amount's width", async () => {
+    seed([row()]);
+    renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
+    const actions = screen.getByRole("button", { name: /Edit buy of AAPL/ }).parentElement!;
+    expect(actions).toHaveClass(
+      "opacity-0",
+      "group-focus-within:opacity-100",
+      "absolute",
+      "left-0",
+    );
+    expect(actions).not.toHaveClass("right-0");
+    expect(actions).not.toHaveClass("w-0");
+    expect(actions.className).not.toMatch(/(^|\s)(group-\w+:)?w-auto/);
+    expect(actions.className).not.toContain("overflow-hidden");
+  });
+
+  it("never truncates the money figure", async () => {
+    seed([row()]);
+    renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
+    const figure = screen.getAllByRole("cell")[2]!.querySelector(".font-mono")!;
+    expect(figure).not.toHaveClass("truncate");
+  });
+
+  it("puts the touch actions on their own static, visible line", async () => {
+    seed([row()]);
+    renderWithClient(<TransactionsSection symbol="AAPL" held />);
+    await expand();
+    const actions = screen.getByRole("button", { name: /Edit buy of AAPL/ }).parentElement!;
+    expect(actions).toHaveClass(
+      "[@media(hover:none)]:static",
+      "[@media(hover:none)]:opacity-100",
+      "[@media(hover:none)]:pointer-events-auto",
+      "[@media(hover:none)]:mt-1",
+    );
   });
 });

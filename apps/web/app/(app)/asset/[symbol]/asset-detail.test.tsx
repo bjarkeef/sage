@@ -1,8 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { renderWithClient, makeTestQueryClient } from "../../../../lib/test/render-with-client";
 import { qk } from "../../../../lib/query/keys";
 import type { AssetDetailDTO, UserSettingsDTO } from "../../../../lib/types";
+import {
+  TODAY,
+  assetDetail as fixtureDetail,
+  ratings as fixtureRatings,
+} from "../../../../lib/test/asset-fixtures";
 
 vi.mock("next/navigation", () => ({
   useParams: vi.fn(() => ({ symbol: "AAPL" })),
@@ -12,29 +17,9 @@ vi.mock("next/navigation", () => ({
   useRouter: vi.fn(() => ({ push: vi.fn() })),
 }));
 
-vi.mock("lightweight-charts", () => {
-  const LineStyle = { Solid: 0, Dotted: 1, Dashed: 2, LargeDashed: 3, SparseDotted: 4 };
-  const ColorType = { Solid: "solid", VerticalGradient: "gradient" };
-  const chartStub = {
-    addSeries: vi.fn(() => ({
-      setData: vi.fn(),
-      createPriceLine: vi.fn(),
-      attachPrimitive: vi.fn(),
-    })),
-    timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
-    subscribeCrosshairMove: vi.fn(),
-    unsubscribeCrosshairMove: vi.fn(),
-    applyOptions: vi.fn(),
-    remove: vi.fn(),
-  };
-  return {
-    createChart: vi.fn(() => chartStub),
-    createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn() })),
-    AreaSeries: "Area",
-    LineSeries: "Line",
-    LineStyle,
-    ColorType,
-  };
+vi.mock("lightweight-charts", async () => {
+  const { lightweightChartsStub } = await import("../../../../lib/test/lightweight-charts-stub");
+  return lightweightChartsStub();
 });
 
 vi.mock("next-themes", () => ({
@@ -53,12 +38,22 @@ vi.mock("../../../../lib/api", () => ({
   // .then(...) as soon as it opens; a bare vi.fn() returns undefined here,
   // which throws. Resolved value doesn't matter for the tests in this file.
   getInstrumentQuote: vi.fn(),
+  getAssetRatings: vi.fn(() => Promise.resolve(null)),
+  // Pending forever: the page renders with the book still loading, and says so.
+  getPortfolio: vi.fn(() => new Promise(() => {})),
+  getBenchmarks: vi.fn(() => Promise.resolve([])),
+  getBenchmarkSeries: vi.fn(),
+  getAssetNews: vi.fn(() => Promise.resolve([])),
+  listTransactions: vi.fn(() => Promise.resolve({ items: [], nextCursor: null })),
 }));
 
 // Import after the mocks above so AssetDetailPage's transitive deps pick them up.
 import AssetDetailPage from "./page";
 import * as api from "../../../../lib/api";
 import { useParams as useParamsMock } from "next/navigation";
+
+// The page reads the real clock for "today"; these fixtures are built from it.
+const fromToday = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 
 const FIXTURE_ASSET: AssetDetailDTO = {
   profile: {
@@ -74,8 +69,6 @@ const FIXTURE_ASSET: AssetDetailDTO = {
     beta: "1.2",
     fiftyTwoWeekHigh: { amount: "200", currency: "USD" },
     fiftyTwoWeekLow: { amount: "150", currency: "USD" },
-    dividendYield: "0.005",
-    trailingAnnualDividend: { amount: "1", currency: "USD" },
     website: null,
     description: null,
     ceo: null,
@@ -98,6 +91,9 @@ const FIXTURE_ASSET: AssetDetailDTO = {
     payoutRatio: null,
   },
   custom: null,
+  upcoming: [],
+  yieldRange5y: null,
+  profileAsOf: null,
 };
 
 const FIXTURE_CUSTOM_ASSET: AssetDetailDTO = {
@@ -109,8 +105,6 @@ const FIXTURE_CUSTOM_ASSET: AssetDetailDTO = {
     assetType: "other",
     sector: null,
     industry: null,
-    dividendYield: null,
-    trailingAnnualDividend: null,
   },
   custom: {
     holdingType: "savings",
@@ -153,8 +147,17 @@ const FIXTURE_SETTINGS: UserSettingsDTO = {
 };
 
 beforeEach(() => {
+  // The page reads the real clock; the fixtures are built around TODAY. Fake
+  // only Date so "today" is the fixtures' today and timers, React Query and
+  // user-event keep running on real ones.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(`${TODAY}T12:00:00Z`));
   vi.clearAllMocks();
   vi.mocked(api.getInstrumentQuote).mockResolvedValue(null);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("AssetDetailPage", () => {
@@ -190,8 +193,8 @@ describe("AssetDetailPage", () => {
     // Income settings row, from income-section.tsx.
     expect(screen.getByText("4.25%")).toBeInTheDocument();
     expect(screen.getByText("Every quarter")).toBeInTheDocument();
-    // formatDate omits the year when it matches the current year.
-    expect(screen.getByText(/^Jul 30(, 2026)?$/)).toBeInTheDocument();
+    // Every date on the page carries its year.
+    expect(screen.getByText("Jul 30, 2026")).toBeInTheDocument();
     expect(screen.getByText("Reinvested")).toBeInTheDocument();
 
     // Quick actions.
@@ -301,11 +304,32 @@ describe("AssetDetailPage", () => {
         unrealizedGainLoss: { amount: "800", currency: "USD" },
         gainLossPercent: 0.8,
         yieldOnCost: 0.06,
-        forwardAnnualIncome: { amount: "60.00", currency: "USD" },
-        totalDividendIncome: "40.00",
+        dividendsReceived: { amount: "40.00", currency: "USD", leftOut: 0 },
         feesPaid: null,
         trades: [],
       },
+      dividends: {
+        history: [
+          {
+            exDate: fromToday(-40),
+            amountPerShare: "1.00",
+            currency: "USD",
+            paymentDate: fromToday(-26),
+          },
+        ],
+        cagr5y: null,
+        trailingTwelveMonthTotal: "1.00",
+      },
+      upcoming: [
+        {
+          exDate: fromToday(50),
+          paymentDate: fromToday(64),
+          amountPerShare: "1.00",
+          currency: "USD",
+          certainty: "estimated",
+          window: "next12m",
+        },
+      ],
       income: {
         currentYield: 0.05,
         yieldOnCost: 0.06,
@@ -321,17 +345,131 @@ describe("AssetDetailPage", () => {
 
     await waitFor(() => expect(screen.getByText("Apple Inc.")).toBeInTheDocument());
 
-    // 6.00% netted at 35% is 3.90%, and BOTH renders of yield on cost must say
-    // so. The gross figure must not appear anywhere on the page.
-    expect(screen.getAllByText("3.90%").length).toBeGreaterThanOrEqual(2);
+    // 6.00% netted at 35% is 3.90%. Yield on cost now appears once, in Your
+    // income, and net; the position row no longer repeats it. The gross figure
+    // must not appear anywhere on the page.
+    expect(screen.getAllByText("3.90%")).toHaveLength(1);
     expect(screen.queryByText("6.00%")).not.toBeInTheDocument();
 
     // The other two income figures in the strip net on the same rate.
     expect(screen.queryByText("$60.00")).not.toBeInTheDocument();
     expect(screen.queryByText("$40.00")).not.toBeInTheDocument();
+    // Next 12 months is 1.00 × 10 = $10.00 gross; only the net $6.50 may appear.
+    expect(screen.queryByText("$10.00")).not.toBeInTheDocument();
+    expect(screen.getAllByText("$6.50").length).toBeGreaterThanOrEqual(1);
 
     // And the basis is stated on the figures themselves, not only in a caption
     // belonging to a different card.
     expect(screen.getAllByText(/after tax/i).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("leads a market holding with the four answers, and leaves them off a custom holding", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "AAPL" });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("AAPL"), FIXTURE_ASSET);
+    qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+    const { unmount } = renderWithClient(<AssetDetailPage />, qc);
+    const strip = await screen.findByRole("region", { name: "At a glance" });
+    for (const label of ["Pays you", "Your position", "Buy more?", "What it is"]) {
+      expect(within(strip).getByText(label)).toBeInTheDocument();
+    }
+    unmount();
+
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "CASH_DKK" });
+    const qc2 = makeTestQueryClient();
+    qc2.setQueryData(qk.assetDetail("CASH_DKK"), FIXTURE_CUSTOM_ASSET);
+    qc2.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+    renderWithClient(<AssetDetailPage />, qc2);
+    await screen.findByText("Cash account");
+    expect(screen.queryByRole("region", { name: "At a glance" })).not.toBeInTheDocument();
+  });
+
+  it("answers first, then the detail, in the spec's order", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "KO" });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("KO"), fixtureDetail());
+    qc.setQueryData(qk.userSettings(), { ...FIXTURE_SETTINGS, dividendTaxRate: 35 });
+    qc.setQueryData(qk.assetRatings("KO"), fixtureRatings());
+    // Settled and empty, so News is absent rather than showing its loading header.
+    qc.setQueryData(qk.assetNews("KO"), []);
+    renderWithClient(<AssetDetailPage />, qc);
+
+    await screen.findByRole("region", { name: "At a glance" });
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([
+      "What it pays you",
+      "Your position",
+      "Buy more?",
+      "What it is",
+      "Transactions",
+    ]);
+  });
+
+  it("shows one current price: analyst upside is measured from the header's, never the provider's", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "KO" });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("KO"), fixtureDetail());
+    qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+    qc.setQueryData(qk.assetRatings("KO"), fixtureRatings()); // provider currentPrice 64
+    renderWithClient(<AssetDetailPage />, qc);
+
+    await screen.findByRole("region", { name: "At a glance" });
+    expect(document.body.textContent).toContain("analysts +10.0% to mean target");
+    expect(document.body.textContent).not.toContain("$64.00");
+    expect(document.body.textContent).not.toContain("+3.1%");
+    expect(screen.queryByText(/dividend yield/i)).not.toBeInTheDocument();
+  });
+
+  it("dates the provider's figures in a footnote", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "KO" });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("KO"), fixtureDetail());
+    qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+    qc.setQueryData(qk.assetRatings("KO"), fixtureRatings());
+    renderWithClient(<AssetDetailPage />, qc);
+
+    expect(await screen.findByText(/provider's snapshot from Jun 15, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Analyst ratings as of Jun 15, 2026/)).toBeInTheDocument();
+  });
+
+  it("gives a custom holding its header, chart, income, position and transactions — nothing market-only", async () => {
+    vi.mocked(useParamsMock).mockReturnValue({ symbol: "CASH_DKK" });
+    // Spec decision 4: the transactions card stays on a custom holding — the only
+    // place on the page to correct an entry — and starts collapsed. Once: the
+    // factory's empty ledger stays the default for every other test.
+    vi.mocked(api.listTransactions).mockResolvedValueOnce({
+      items: [
+        {
+          id: "c1",
+          instrumentSymbol: "CASH_DKK",
+          name: "Cash account",
+          type: "buy",
+          quantity: "1",
+          price: "5000",
+          currency: "DKK",
+          fee: null,
+          feeCurrency: null,
+          tradeDate: "2026-01-05",
+          source: null,
+        },
+      ],
+      nextCursor: null,
+    });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(qk.assetDetail("CASH_DKK"), {
+      ...FIXTURE_CUSTOM_ASSET,
+      position: { held: true, quantity: "1" },
+    });
+    qc.setQueryData(qk.userSettings(), FIXTURE_SETTINGS);
+    renderWithClient(<AssetDetailPage />, qc);
+
+    await screen.findByText("Cash account");
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(["What it pays you", "Your position", "Transactions"]);
+    const toggle = await screen.findByRole("button", { name: "1 transaction" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("region", { name: "At a glance" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Buy more?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "What it is" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/provider's snapshot/)).not.toBeInTheDocument();
   });
 });

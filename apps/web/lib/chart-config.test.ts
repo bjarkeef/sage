@@ -7,6 +7,8 @@ import {
   attachHoverTooltip,
   baseChartOptions,
   comparisonSeriesOptions,
+  lineColorFor,
+  benchmarkSeriesOptions,
   withChartAlpha,
 } from "./chart-config";
 
@@ -27,19 +29,37 @@ const theme = {
   // color of the line they sit on. See tradeMarkers in asset-price-chart.tsx.
   marker: "#0a0a0a",
   markerHalo: "#ffffff",
+  dividend: "#e8cfa6",
 };
 
 describe("chart-config", () => {
   it("area series always uses the theme line color with alpha ramp and no pinned last value", () => {
     const opts = areaSeriesOptions(theme);
     expect(opts.lineColor).toBe("#3d6a4d");
-    expect(opts.topColor).toBe("#3d6a4d2E");
+    expect(opts.topColor).toBe("#3d6a4d2e");
     expect(opts.bottomColor).toBe("#3d6a4d00");
     expect(opts.lineWidth).toBe(2);
     expect(opts.lastValueVisible).toBe(false);
     expect(opts.priceLineVisible).toBe(false);
     expect(opts.crosshairMarkerBackgroundColor).toBe("#3d6a4d");
     expect(opts.crosshairMarkerBorderColor).toBe("#ffffff");
+  });
+
+  it("takes a direction colour when given one, and keeps the accent when not", () => {
+    expect(areaSeriesOptions(theme, theme.loss).lineColor).toBe("#b23b3b");
+    expect(areaSeriesOptions(theme, theme.loss).topColor).toBe("#b23b3b2e");
+    expect(lineColorFor("up", theme)).toBe(theme.gain);
+    expect(lineColorFor("down", theme)).toBe(theme.loss);
+    expect(lineColorFor("flat", theme)).toBe(theme.text);
+  });
+
+  it("draws a benchmark as a thin, neutral, unlabelled line", () => {
+    const opts = benchmarkSeriesOptions(theme);
+    expect(opts.color).toBe(theme.text);
+    expect(opts.lineWidth).toBe(1);
+    expect(opts.lastValueVisible).toBe(false);
+    expect(opts.priceLineVisible).toBe(false);
+    expect(opts.crosshairMarkerVisible).toBe(false);
   });
 
   it("comparison series are muted, thin, dashed, unlabeled", () => {
@@ -116,9 +136,130 @@ describe("chart-config", () => {
       }
     });
   });
+
+  describe("withChartAlpha", () => {
+    it("appends alpha to 6-digit hex colors", () => {
+      const result = withChartAlpha("#3d6a4d", 0.18);
+      expect(result).toBe("#3d6a4d2e");
+    });
+
+    it("multiplies alpha for 8-digit hex colors", () => {
+      const result = withChartAlpha("#ececeaa3", 0.18);
+      // #ececeaa3: a3 = 163/255 ≈ 0.639; 0.639 * 0.18 ≈ 0.115; should be rgba format
+      expect(result).toMatch(/^rgba\(/);
+      expect(result).not.toContain("2e");
+      // Verify it's a valid rgba format
+      expect(result).toMatch(/rgba\(\d+, \d+, \d+, [\d.]+\)/);
+    });
+
+    it("multiplies alpha for 8-digit hex colors with zero alpha", () => {
+      const result = withChartAlpha("#ececeaa3", 0);
+      // Result should be fully transparent
+      expect(result).toMatch(/rgba\([^,]+, [^,]+, [^,]+, 0\)/);
+    });
+
+    it("multiplies alpha for 8-digit hex colors with strong alpha request", () => {
+      const result = withChartAlpha("#ececeaa3", 0.45);
+      // 0.639 * 0.45 ≈ 0.288; should be a valid rgba
+      expect(result).toMatch(/^rgba\(/);
+      expect(result).not.toContain("a32e");
+    });
+
+    it("multiplies alpha for 4-digit hex colors", () => {
+      const result = withChartAlpha("#f08a", 0.5);
+      expect(result).toMatch(/^rgba\(/);
+      expect(result).toMatch(/rgba\(\d+, \d+, \d+, [\d.]+\)/);
+    });
+
+    it("multiplies alpha for 3-digit hex colors", () => {
+      const result = withChartAlpha("#f0a", 0.5);
+      expect(result).toMatch(/^rgba\(/);
+    });
+
+    it("handles rgb() format with new alpha", () => {
+      const result = withChartAlpha("rgb(61, 106, 77)", 0.18);
+      expect(result).toMatch(/^rgba\(/);
+      expect(result).toContain("0.18");
+    });
+
+    it("multiplies alpha for rgba() format with existing alpha", () => {
+      const result = withChartAlpha("rgba(236, 236, 234, 0.639)", 0.18);
+      // 0.639 * 0.18 ≈ 0.115
+      expect(result).toMatch(/^rgba\(/);
+      expect(result).toMatch(/rgba\(\d+, \d+, \d+, [\d.]+\)/);
+    });
+
+    it("returns unparseable colors unchanged", () => {
+      const unparseable = "invalid-color";
+      expect(withChartAlpha(unparseable, 0.5)).toBe(unparseable);
+    });
+
+    it("produces valid rgba() output for #ececeaa3 with 0.18", () => {
+      const result = withChartAlpha("#ececeaa3", 0.18);
+      // Verify format is valid for canvas
+      expect(result).toMatch(/^rgba\(\d+, \d+, \d+, [\d.]+\)$/);
+      // Verify alpha is between 0 and 1
+      const match = result.match(/rgba\([^,]+, [^,]+, [^,]+, ([\d.]+)\)/);
+      if (match && match[1]) {
+        const alpha = parseFloat(match[1]);
+        expect(alpha).toBeGreaterThanOrEqual(0);
+        expect(alpha).toBeLessThanOrEqual(1);
+      }
+    });
+
+    it("areaSeriesOptions with alpha-containing color returns valid rgba strings", () => {
+      const opts = areaSeriesOptions(theme, "#ececeaa3");
+      // topColor and bottomColor should be valid rgba format, not malformed hex
+      expect(opts.topColor).toMatch(/^rgba\(\d+, \d+, \d+, [\d.]+\)$/);
+      expect(opts.bottomColor).toMatch(/^rgba\(\d+, \d+, \d+, [\d.]+\)$/);
+      // Colors should not contain the malformed pattern
+      expect(opts.topColor).not.toContain("a32e");
+      expect(opts.bottomColor).not.toContain("a300");
+    });
+  });
 });
 
 describe("attachHoverTooltip", () => {
+  it("can show marker labels only, leaving the hovered price to the page header", () => {
+    let onMove: ((param: unknown) => void) | undefined;
+    const chart = {
+      subscribeCrosshairMove: (fn: (param: unknown) => void) => {
+        onMove = fn;
+      },
+      unsubscribeCrosshairMove: vi.fn(),
+    } as unknown as IChartApi;
+    const series = {} as ISeriesApi<"Area">;
+    const container = document.createElement("div");
+    attachHoverTooltip(
+      chart,
+      series,
+      container,
+      (v) => `$${v}`,
+      (id) =>
+        id === "div-0"
+          ? { primary: "Ex-dividend", secondary: "$0.50 / share", colorClass: "text-foreground" }
+          : null,
+      { showValue: false },
+    );
+    const tip = container.firstElementChild!;
+
+    onMove!({
+      point: { x: 1, y: 1 },
+      time: "2026-07-03",
+      seriesData: new Map([[series, { value: 123 }]]),
+    });
+    expect(tip.classList.contains("hidden")).toBe(true);
+
+    onMove!({
+      point: { x: 1, y: 1 },
+      time: "2026-07-03",
+      hoveredObjectId: "div-0",
+      seriesData: new Map(),
+    });
+    expect(tip.classList.contains("hidden")).toBe(false);
+    expect(tip.textContent).toContain("Ex-dividend");
+  });
+
   it("mounts a tooltip div and cleans up on the returned function", () => {
     const subscribe = vi.fn();
     const unsubscribe = vi.fn();

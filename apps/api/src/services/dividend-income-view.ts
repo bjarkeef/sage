@@ -3,11 +3,8 @@ import {
   Decimal,
   Money,
   computeRetroactiveIncome,
-  buildReceivedDividends,
-  projectDividendSchedule,
   projectionHorizonIso,
   longRangeThroughIso,
-  clampDividendGrowth,
   computeDividendCAGR,
   classifyDividendTrend,
   dedupeDividends,
@@ -26,14 +23,15 @@ import {
   assetProfile,
   user,
   customHolding,
-  customIncome,
   portfolio,
 } from "../db/schema";
 import { triggerStaleDividendSync } from "../market-data/stale-sync";
 import { loadPortfolioBook, type PortfolioBook } from "./portfolio-book";
+import { loadReceivedIncome } from "./received-income";
 import { resolvePricePoints } from "../market-data/manual-price-provider";
 import { getRatesWithProvenance } from "../market-data/fx-provenance";
 import type { PortfolioViewDeps } from "./portfolio-view";
+import { forwardGrowth, forwardScheduleForSymbol } from "./forward-schedule";
 
 // Extends the shared deps shape with the optional multi-provider dividend
 // fallback list the route factory accepts today (`dividendProviders ??
@@ -411,29 +409,7 @@ export async function buildDividendIncomeView(
     }
   }
 
-  const scheduleInput = (p: (typeof positions)[number]) => ({
-    symbol: p.symbol,
-    quantity: p.quantity,
-    history: pastRows.filter((d) => d.symbol === p.symbol),
-    announced: (futureBySymbol.get(p.symbol) ?? []).map((d) => ({
-      exDate: d.exDate,
-      paymentDate: d.paymentDate ?? null,
-      paymentDateEstimated: d.paymentDateEstimated ?? false,
-      amountPerShare: d.amountPerShare,
-      currency: d.currency,
-    })),
-    asOf: now,
-  });
-  const scheduleRows = positions
-    .filter((p) => !customBySymbol.has(p.symbol))
-    .flatMap((p) => projectDividendSchedule(scheduleInput(p)))
-    .concat(customScheduleRows);
-  const announcedScheduleRows = scheduleRows.filter((r) => r.kind === "announced");
-  const projectedScheduleRows = scheduleRows.filter((r) => r.kind === "projected");
-
-  // Calendar-only: the same schedule run on to 31 December three years out,
-  // each dividend grown at the rate the Goal uses. Kept apart from `projected`
-  // so nothing that means "the next 12 months" can start summing three years.
+  // Growth first: the long-range schedule grows each dividend by it.
   const projectedThrough = projectionHorizonIso(now);
   const longRangeThrough = longRangeThroughIso(now);
   const growthBySymbol = new Map<string, Decimal | null>();
@@ -446,20 +422,34 @@ export async function buildDividendIncomeView(
       5,
       now,
     );
-    const growth = cagr ? clampDividendGrowth(cagr, allowNegativeDividendGrowth) : null;
+    const { growth, cappedFrom } = forwardGrowth(cagr, allowNegativeDividendGrowth);
     growthBySymbol.set(p.symbol, growth);
-    if (cagr && growth && cagr.greaterThan(growth)) cappedFromBySymbol.set(p.symbol, cagr);
+    if (cappedFrom) cappedFromBySymbol.set(p.symbol, cappedFrom);
   }
 
-  const longRangeRows: ProjectedDividendRow[] = positions
+  // One producer for every market holding's forward schedule: the asset page's
+  // `upcoming` calls the same function, so the two pages cannot disagree.
+  const schedules = positions
     .filter((p) => !customBySymbol.has(p.symbol))
-    .flatMap((p) =>
-      projectDividendSchedule({
-        ...scheduleInput(p),
-        through: longRangeThrough,
-        growth: growthBySymbol.get(p.symbol) ?? undefined,
-      }).filter((r) => r.exDate > projectedThrough),
+    .map((p) =>
+      forwardScheduleForSymbol({
+        symbol: p.symbol,
+        quantity: p.quantity,
+        history: divHistory,
+        now,
+        growth: growthBySymbol.get(p.symbol) ?? null,
+      }),
     );
+  const scheduleRows = schedules
+    .flatMap((s) => [...s.announced, ...s.projected])
+    .concat(customScheduleRows);
+  const announcedScheduleRows = scheduleRows.filter((r) => r.kind === "announced");
+  const projectedScheduleRows = scheduleRows.filter((r) => r.kind === "projected");
+
+  // Calendar-only: the same schedule run on to 31 December three years out.
+  // Kept apart from `projected` so nothing that means "the next 12 months" can
+  // start summing three years.
+  const longRangeRows: ProjectedDividendRow[] = schedules.flatMap((s) => s.longRange);
   for (const p of positions) {
     const holding = customBySymbol.get(p.symbol);
     if (!holding || !p.quantity.greaterThan(0)) continue;
@@ -490,115 +480,11 @@ export async function buildDividendIncomeView(
     .filter((t) => t.type === "dividend" && t.tradeDate <= todayIso)
     .map((t) => t.currency);
 
-  // Reinvested custom-income payments (holding.reinvest === true in
-  // custom-income-sync) are credited to the ledger as a price-0 `buy` — cost
-  // basis must stay untouched, so the transaction row itself carries no
-  // recoverable dollar amount — with the actual GROSS income fact recorded
-  // only in the paired `dividend_history` row (`source: "custom"`, same
-  // symbol + date) that custom-income-sync also writes. buildReceivedDividends
-  // only recognizes `type: "dividend"` ledger rows, so it structurally cannot
-  // see these payments, and they must NOT be reconstructed the normal
-  // synthetic way either — that path is discarded once past-dated by design
-  // (the ledger owns history). So they're rebuilt here specifically: GROSS =
-  // amountPerShare x shares held on the payment date, using the FULL ledger
-  // timeline (`txs`, unscoped by current positions) so a since-sold-out
-  // custom holding's history survives too, exactly like the ledger-based
-  // reconstruction above.
-  //
-  // Bounded to REINVESTING custom holdings only (via `customHolding.reinvest`)
-  // — a non-reinvest custom holding's cash dividend already lands as a real
-  // ledger `dividend` transaction, read directly via `buildReceivedDividends`
-  // below; treating its `dividend_history` row as fair game here too would
-  // silently resurrect a payment the user deliberately deleted. `custom_income`
-  // persists as a tombstone (`transactionId = null`) when its ledger
-  // transaction is deleted (see db/schema/custom-holding.ts), but the paired
-  // `dividend_history` row is untouched by that delete — so tombstoned
-  // (symbol, payDate) pairs are excluded below too. That also covers a
-  // REINVEST holding's own deleted payment: its ledger row is a `buy`, not a
-  // `dividend`, so the `dividendTxDates` exclusion further below never catches
-  // it on its own.
-  //
-  // Computed here — ahead of the FX-rate lookup below, not after it — so a
-  // fully-sold reinvesting holding in a currency no other holding uses still
-  // gets a rate. Without this, `convertAmount` returns such amounts
-  // unconverted and every `inDisplay` aggregation downstream silently drops
-  // them; the same class of bug `ledgerDividendCurrencies` above exists to fix
-  // for the plain ledger path.
-  const reinvestCustomHoldingRows =
-    nameSymbols.length > 0
-      ? await db
-          .select({ symbol: customHolding.symbol })
-          .from(customHolding)
-          .where(and(eq(customHolding.portfolioId, portfolioId), eq(customHolding.reinvest, true)))
-      : [];
-  const reinvestSymbols = new Set(reinvestCustomHoldingRows.map((h) => h.symbol));
-
-  const customDividendHistoryRows =
-    reinvestSymbols.size > 0
-      ? await db
-          .select()
-          .from(dividendHistory)
-          .where(
-            and(
-              inArray(dividendHistory.symbol, [...reinvestSymbols]),
-              eq(dividendHistory.source, "custom"),
-            ),
-          )
-      : [];
-
-  const customIncomeRows =
-    reinvestSymbols.size > 0
-      ? await db
-          .select({
-            symbol: customIncome.symbol,
-            payDate: customIncome.payDate,
-            transactionId: customIncome.transactionId,
-          })
-          .from(customIncome)
-          .where(
-            and(
-              eq(customIncome.portfolioId, portfolioId),
-              inArray(customIncome.symbol, [...reinvestSymbols]),
-            ),
-          )
-      : [];
-  const tombstonedPaymentDates = new Set(
-    customIncomeRows.filter((r) => r.transactionId === null).map((r) => `${r.symbol}|${r.payDate}`),
-  );
-
-  // Excluded below: any `source: custom` history row that already has a
-  // matching ledger `dividend` transaction — the non-reinvest case, whose row
-  // is already gross and read directly from the ledger — so nothing here is
-  // ever double counted. Redundant with the `reinvest`-only bound above for a
-  // holding whose flag has never changed (reinvest holdings never write
-  // `dividend`-type rows), but kept as a second guard in case `reinvest` is
-  // toggled after history already exists under the other convention.
-  const dividendTxDates = new Set(
-    ledgerRows
-      .filter((t) => t.type === "dividend")
-      .map((t) => `${t.instrumentSymbol}|${t.tradeDate}`),
-  );
-  const reinvestDividendHistory: DividendHistoryRow[] = customDividendHistoryRows
-    .filter((d) => !dividendTxDates.has(`${d.symbol}|${d.exDate}`))
-    .filter((d) => !tombstonedPaymentDates.has(`${d.symbol}|${d.exDate}`))
-    .map((d) => ({
-      symbol: d.symbol,
-      exDate: d.exDate,
-      amountPerShare: d.amountPerShare,
-      currency: d.currency,
-      paymentDate: d.paymentDate,
-      paymentDateEstimated: d.paymentDateEstimated,
-    }));
-  const reinvestReceived = computeRetroactiveIncome(txs, reinvestDividendHistory)
-    .filter((r) => (r.paymentDate ?? r.exDate) <= todayIso)
-    .map((r) => ({
-      symbol: r.symbol,
-      cashDate: r.paymentDate ?? r.exDate,
-      income: r.income,
-      currency: r.currency,
-      amountPerShare: r.amountPerShare,
-      sharesHeld: r.sharesHeld,
-    }));
+  // Everything received — ledger `dividend` rows plus reinvested custom-income
+  // payments — from the one producer /holdings and the asset page also read.
+  // Loaded here, ahead of the FX lookup, so a sold-out holding's currency still
+  // gets a rate (the same reason `ledgerDividendCurrencies` exists above).
+  const receivedRows = await loadReceivedIncome(db, book, todayIso);
 
   const fxRates = new Map<string, Decimal>();
   let fxStale = false;
@@ -609,7 +495,7 @@ export async function buildDividendIncomeView(
       ...scheduleRows.map((r) => r.currency),
       ...longRangeRows.map((r) => r.currency),
       ...ledgerDividendCurrencies,
-      ...reinvestReceived.map((r) => r.currency),
+      ...receivedRows.map((r) => r.currency),
     ]);
     const toConvert = [...allCurrencies].filter((c) => c !== targetCurrency);
     if (toConvert.length > 0) {
@@ -711,41 +597,23 @@ export async function buildDividendIncomeView(
   });
 
   // HISTORY comes from the ledger — what actually landed, including payments
-  // from holdings since fully sold, which the synthetic reconstruction below
-  // structurally cannot see (its symbol list is today's positions). Reinvested
-  // custom-income payments (no ledger `dividend` row — see above) are folded
-  // in from `reinvestReceived`.
-  const receivedDTO = [
-    ...buildReceivedDividends(
-      ledgerRows.map((t) => ({
-        symbol: t.instrumentSymbol,
-        type: t.type,
-        quantity: t.quantity,
-        price: t.price,
-        currency: t.currency,
-        tradeDate: t.tradeDate,
-        source: t.source ?? null,
-      })),
-      todayIso,
-    ),
-    ...reinvestReceived,
-  ]
-    .sort((a, b) => a.cashDate.localeCompare(b.cashDate) || a.symbol.localeCompare(b.symbol))
-    .map((r) => {
-      const conv = convertAmount(r.income, r.currency);
-      return {
-        symbol: r.symbol,
-        name: nameBySymbol.get(r.symbol) ?? r.symbol,
-        exDate: r.cashDate,
-        paymentDate: r.cashDate,
-        paymentDateEstimated: false,
-        amountPerShare:
-          r.amountPerShare == null ? null : convertAmount(r.amountPerShare, r.currency).amount,
-        sharesHeld: r.sharesHeld,
-        income: conv.amount,
-        currency: conv.currency,
-      };
-    });
+  // from holdings since fully sold — through `loadReceivedIncome`, the same
+  // producer /holdings and the asset page read.
+  const receivedDTO = receivedRows.map((r) => {
+    const conv = convertAmount(r.income, r.currency);
+    return {
+      symbol: r.symbol,
+      name: nameBySymbol.get(r.symbol) ?? r.symbol,
+      exDate: r.cashDate,
+      paymentDate: r.cashDate,
+      paymentDateEstimated: false,
+      amountPerShare:
+        r.amountPerShare == null ? null : convertAmount(r.amountPerShare, r.currency).amount,
+      sharesHeld: r.sharesHeld,
+      income: conv.amount,
+      currency: conv.currency,
+    };
+  });
 
   // The synthetic reconstruction survives ONLY for cash that has not landed:
   // an ex-date that has passed with a payment still pending has no ledger row.

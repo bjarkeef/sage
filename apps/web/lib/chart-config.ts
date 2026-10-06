@@ -36,6 +36,8 @@ export interface ChartTheme {
   costLine: string;
   marker: string;
   markerHalo: string;
+  /** Ex-dividend dots: the paid step of the certainty ramp. */
+  dividend: string;
 }
 
 /** Read chart colors from the active theme's CSS custom properties. Client-only. */
@@ -56,21 +58,78 @@ export function readChartTheme(): ChartTheme {
     costLine: resolve("--muted-foreground"),
     marker: resolve("--chart-marker"),
     markerHalo: resolve("--chart-marker-halo"),
+    dividend: resolve("--certainty-paid"),
   };
 }
 
 /** Apply an alpha to a resolved CSS colour. Theme tokens resolve to hex or to
- *  rgb()/rgba(), so both are handled — a bare hex suffix on an rgba string is
- *  invalid CSS and is silently ignored by canvas. */
+ *  rgb()/rgba(), so both are handled. When the input color already has an alpha
+ *  channel, the result's alpha is (input alpha) × (requested alpha). For 6-digit
+ *  hex (#rrggbb) with no existing alpha, returns hex format as before; for all
+ *  colors with alpha or other formats, returns rgba(). */
 export function withChartAlpha(color: string, alpha: number): string {
+  // Handle hex colors: #rgb, #rgba, #rrggbb, #rrggbbaa
   if (color.startsWith("#")) {
-    return `${color}${Math.round(alpha * 255)
-      .toString(16)
-      .padStart(2, "0")}`;
+    const hex = color.slice(1);
+    let r: number, g: number, b: number;
+    let inputAlpha = 1;
+    let hasAlpha = false;
+
+    if (hex.length === 3) {
+      // #rgb
+      r = parseInt(hex.slice(0, 1) + hex.slice(0, 1), 16);
+      g = parseInt(hex.slice(1, 2) + hex.slice(1, 2), 16);
+      b = parseInt(hex.slice(2, 3) + hex.slice(2, 3), 16);
+      hasAlpha = true; // Will convert to rgba
+    } else if (hex.length === 4) {
+      // #rgba
+      r = parseInt(hex.slice(0, 1) + hex.slice(0, 1), 16);
+      g = parseInt(hex.slice(1, 2) + hex.slice(1, 2), 16);
+      b = parseInt(hex.slice(2, 3) + hex.slice(2, 3), 16);
+      inputAlpha = parseInt(hex.slice(3, 4) + hex.slice(3, 4), 16) / 255;
+      hasAlpha = true;
+    } else if (hex.length === 6) {
+      // #rrggbb — keep old behavior for backward compatibility
+      return `${color}${Math.round(alpha * 255)
+        .toString(16)
+        .padStart(2, "0")}`;
+    } else if (hex.length === 8) {
+      // #rrggbbaa
+      r = parseInt(hex.slice(0, 2), 16);
+      g = parseInt(hex.slice(2, 4), 16);
+      b = parseInt(hex.slice(4, 6), 16);
+      inputAlpha = parseInt(hex.slice(6, 8), 16) / 255;
+      hasAlpha = true;
+    } else {
+      // Unparseable hex format
+      return color;
+    }
+
+    if (hasAlpha) {
+      const resultAlpha = inputAlpha * alpha;
+      return `rgba(${r}, ${g}, ${b}, ${resultAlpha})`;
+    }
+
+    // Should not reach here, but just in case
+    return color;
   }
-  const nums = color.match(/[\d.]+/g);
-  if (!nums || nums.length < 3) return color;
-  return `rgba(${nums[0]}, ${nums[1]}, ${nums[2]}, ${alpha})`;
+
+  // Handle rgb() / rgba() formats
+  if (color.startsWith("rgb")) {
+    const nums = color.match(/[\d.]+/g);
+    if (!nums || nums.length < 3) return color;
+
+    const r = nums[0];
+    const g = nums[1];
+    const b = nums[2];
+    const inputAlpha = nums.length > 3 ? parseFloat(nums[3] || "1") : 1;
+    const resultAlpha = inputAlpha * alpha;
+
+    return `rgba(${r}, ${g}, ${b}, ${resultAlpha})`;
+  }
+
+  // Unparseable color
+  return color;
 }
 
 export function baseChartOptions(
@@ -132,19 +191,44 @@ export function baseChartOptions(
   };
 }
 
-/** The area line is always the sage accent — direction is carried by Delta, not hue.
- *  No pinned last-price label or price line: the number lives in the page hero. */
-export function areaSeriesOptions(theme: ChartTheme): AreaSeriesPartialOptions {
+/** The area series. With no `color` it is the sage accent, as the overview and
+ *  /performance draw it; the asset chart passes `lineColorFor(direction)`.
+ *  No pinned last-price label or price line: the number lives in the header. */
+export function areaSeriesOptions(
+  theme: ChartTheme,
+  color: string = theme.line,
+): AreaSeriesPartialOptions {
   return {
-    lineColor: theme.line,
-    topColor: `${theme.line}2E`,
-    bottomColor: `${theme.line}00`,
+    lineColor: color,
+    topColor: withChartAlpha(color, 0.18),
+    bottomColor: withChartAlpha(color, 0),
     lineWidth: 2,
     lastValueVisible: false,
     priceLineVisible: false,
     crosshairMarkerRadius: 4,
     crosshairMarkerBorderColor: theme.card,
-    crosshairMarkerBackgroundColor: theme.line,
+    crosshairMarkerBackgroundColor: color,
+  };
+}
+
+/** The asset chart's line colour: how the selected range ended (DESIGN.md
+ *  accent allowlist, "one deliberate departure"). */
+export function lineColorFor(direction: "up" | "down" | "flat", theme: ChartTheme): string {
+  if (direction === "up") return theme.gain;
+  if (direction === "down") return theme.loss;
+  return theme.text;
+}
+
+/** A comparison index on the asset chart: thin and neutral — colour belongs to
+ *  the holding. */
+export function benchmarkSeriesOptions(theme: ChartTheme): LineSeriesPartialOptions {
+  return {
+    color: theme.text,
+    lineWidth: 1,
+    lineStyle: LineStyle.Solid,
+    crosshairMarkerVisible: false,
+    lastValueVisible: false,
+    priceLineVisible: false,
   };
 }
 
@@ -177,7 +261,13 @@ export function attachHoverTooltip(
   container: HTMLElement,
   formatValue: (value: number) => string,
   resolveMarker?: (id: unknown) => MarkerTip | null,
+  opts: {
+    /** false: marker labels only — the asset page reads the hovered price in
+     *  its header instead of a floating tooltip. */
+    showValue?: boolean;
+  } = {},
 ): () => void {
+  const showValue = opts.showValue ?? true;
   const tip = document.createElement("div");
   tip.className =
     "pointer-events-none absolute z-10 hidden rounded-control border border-hairline bg-popover px-2.5 py-1.5 text-popover-foreground font-mono text-xs shadow-md";
@@ -208,7 +298,7 @@ export function attachHoverTooltip(
     }
 
     const data = param.seriesData.get(series) as { value?: number } | undefined;
-    if (!param.point || !param.time || data?.value == null) {
+    if (!showValue || !param.point || !param.time || data?.value == null) {
       tip.classList.add("hidden");
       return;
     }

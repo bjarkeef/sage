@@ -18,6 +18,7 @@ import { vi } from "vitest";
 export function lightweightChartsStub() {
   const seriesStub = {
     setData: vi.fn(),
+    createPriceLine: vi.fn(),
     attachPrimitive: vi.fn(),
     detachPrimitive: vi.fn(),
     priceScale: vi.fn(() => ({ setAutoScale: vi.fn(), applyOptions: vi.fn() })),

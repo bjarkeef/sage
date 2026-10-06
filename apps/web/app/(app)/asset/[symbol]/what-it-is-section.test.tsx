@@ -1,0 +1,140 @@
+import { describe, it, expect } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { WhatItIsSection } from "./what-it-is-section";
+import { TODAY, day, assetDetail, fundDetail } from "../../../../lib/test/asset-fixtures";
+
+describe("WhatItIsSection", () => {
+  it("describes a stock: sector, industry, CEO, employees, website", () => {
+    render(
+      <WhatItIsSection profile={assetDetail().profile} profileAsOf={TODAY} todayISO={TODAY} />,
+    );
+    expect(screen.getByRole("heading", { name: "What it is" })).toBeInTheDocument();
+    expect(screen.getByText("Consumer Defensive")).toBeInTheDocument();
+    expect(screen.getByText("Beverages")).toBeInTheDocument();
+    expect(screen.getByText("A. Person")).toBeInTheDocument();
+    expect(screen.getByText("79,000")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "example.com" })).toHaveAttribute(
+      "href",
+      "https://example.com",
+    );
+    expect(screen.getByText("Sector").parentElement).toHaveAttribute(
+      "title",
+      expect.stringContaining("as of"),
+    );
+  });
+
+  it("describes a fund, hiding rows the provider left empty or dashed", () => {
+    render(<WhatItIsSection profile={fundDetail().profile} profileAsOf={TODAY} todayISO={TODAY} />);
+    expect(screen.getByText("Example Funds")).toBeInTheDocument();
+    expect(screen.getByText("$7.79B")).toBeInTheDocument();
+    expect(screen.getByText("Global Large-Cap Blend Equity")).toBeInTheDocument();
+    // The fixture's legalType is "–": hidden, never printed.
+    expect(screen.queryByText("Legal type")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sector")).not.toBeInTheDocument();
+    expect(screen.queryByText("–")).not.toBeInTheDocument();
+  });
+
+  it("sorts a fund's sector weights, largest first", () => {
+    render(<WhatItIsSection profile={fundDetail().profile} profileAsOf={TODAY} todayISO={TODAY} />);
+    const names = screen
+      .getAllByText(/^(Technology|Healthcare|Energy)$/)
+      .map((el) => el.textContent);
+    expect(names).toEqual(["Technology", "Healthcare", "Energy"]);
+  });
+
+  it("dates a stale fund composition inline, and a fresh one only on hover", () => {
+    const stale = day(-30);
+    const { unmount } = render(
+      <WhatItIsSection profile={fundDetail().profile} profileAsOf={stale} todayISO={TODAY} />,
+    );
+    const card = screen.getByText("Sector weights").closest("[title]")!;
+    expect(card).toHaveAttribute("title", expect.stringContaining("as of"));
+    expect(card.textContent).toContain("as of May 16, 2026");
+    unmount();
+
+    render(<WhatItIsSection profile={fundDetail().profile} profileAsOf={TODAY} todayISO={TODAY} />);
+    const fresh = screen.getByText("Sector weights").closest("[title]")!;
+    expect(fresh).toHaveAttribute("title", expect.stringContaining("as of"));
+    expect(fresh.textContent).not.toContain("as of");
+  });
+
+  it("clamps a long description to three lines behind 'more'", () => {
+    const long = "Makes and sells drinks in many countries. ".repeat(12);
+    render(
+      <WhatItIsSection
+        profile={{ ...assetDetail().profile, description: long }}
+        profileAsOf={TODAY}
+        todayISO={TODAY}
+      />,
+    );
+    const text = screen.getByText(long.trim());
+    expect(text.className).toContain("line-clamp-3");
+    fireEvent.click(screen.getByRole("button", { name: "more" }));
+    expect(text.className).not.toContain("line-clamp-3");
+    expect(screen.getByRole("button", { name: "less" })).toBeInTheDocument();
+  });
+
+  it("hides a zero or non-numeric employee count and a zero AUM instead of printing them", () => {
+    const p = assetDetail().profile;
+    const { unmount } = render(
+      <WhatItIsSection
+        profile={{ ...p, fullTimeEmployees: "0" }}
+        profileAsOf={TODAY}
+        todayISO={TODAY}
+      />,
+    );
+    expect(screen.queryByText("Employees")).not.toBeInTheDocument();
+    unmount();
+    const { unmount: unmount2 } = render(
+      <WhatItIsSection
+        profile={{ ...p, fullTimeEmployees: "NaN" }}
+        profileAsOf={TODAY}
+        todayISO={TODAY}
+      />,
+    );
+    expect(screen.queryByText("Employees")).not.toBeInTheDocument();
+    unmount2();
+    const f = fundDetail().profile;
+    render(
+      <WhatItIsSection
+        profile={{ ...f, fund: { ...f.fund!, totalAssets: "0" } }}
+        profileAsOf={TODAY}
+        todayISO={TODAY}
+      />,
+    );
+    expect(screen.queryByText("Assets under management")).not.toBeInTheDocument();
+  });
+
+  it("hides a dashed sector or website", () => {
+    const p = assetDetail().profile;
+    render(
+      <WhatItIsSection
+        profile={{ ...p, sector: "–", website: " - " }}
+        profileAsOf={TODAY}
+        todayISO={TODAY}
+      />,
+    );
+    expect(screen.queryByText("Sector")).not.toBeInTheDocument();
+    expect(screen.queryByText("Website")).not.toBeInTheDocument();
+  });
+
+  it("is absent when the provider gave nothing", () => {
+    const p = assetDetail().profile;
+    const { container } = render(
+      <WhatItIsSection
+        profile={{
+          ...p,
+          sector: null,
+          industry: null,
+          ceo: null,
+          fullTimeEmployees: null,
+          website: null,
+          description: null,
+        }}
+        profileAsOf={null}
+        todayISO={TODAY}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+});

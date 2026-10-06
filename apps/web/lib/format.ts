@@ -89,6 +89,13 @@ export function formatDate(iso: string, opts?: { year?: "always" | "auto" }): st
   });
 }
 
+/** Display-only: "Mar 2024". The year is always shown. */
+export function formatMonthYear(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
+
 /** Display-only: compact "time ago" from a full ISO timestamp — "just now",
  *  "12m ago", "3h ago", "2d ago" — falling back to an absolute human date once
  *  it's a week or more old. `now` is injectable for deterministic tests. */

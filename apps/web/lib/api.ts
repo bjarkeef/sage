@@ -26,6 +26,8 @@ import type {
   NewsArticleDTO,
   AnalystRatingsDTO,
   CorporateActionsViewDTO,
+  BenchmarkOptionDTO,
+  BenchmarkSeriesResult,
 } from "./types";
 
 export type PublicConfigDTO = {
@@ -618,6 +620,28 @@ export async function getAssetRatings(slug: string): Promise<AnalystRatingsDTO |
   const res = await apiFetch(`/asset/${encodeURIComponent(slug)}/ratings`);
   if (!res.ok) throw new Error(`asset ratings fetch failed: ${res.status}`);
   return (await res.json()) as AnalystRatingsDTO | null;
+}
+
+export async function getBenchmarks(): Promise<BenchmarkOptionDTO[]> {
+  const res = await apiFetch(`/benchmarks`);
+  if (!res.ok) throw new Error(`benchmarks fetch failed: ${res.status}`);
+  return ((await res.json()) as { benchmarks: BenchmarkOptionDTO[] }).benchmarks;
+}
+
+/** One total-return benchmark over [from, to], converted into `currency` (the
+ *  holding's). `series` is null with a `reason` when it cannot be fetched or
+ *  converted — the caller says so; it never draws a price index or an
+ *  unconverted line instead. */
+export async function getBenchmarkSeries(
+  id: string,
+  from: string,
+  to: string,
+  currency: string,
+): Promise<BenchmarkSeriesResult> {
+  const params = new URLSearchParams({ id, from, to, currency });
+  const res = await apiFetch(`/benchmarks/series?${params}`);
+  if (!res.ok) throw new Error(`benchmark series fetch failed: ${res.status}`);
+  return (await res.json()) as BenchmarkSeriesResult;
 }
 
 export async function getPortfolioNews(): Promise<NewsArticleDTO[]> {

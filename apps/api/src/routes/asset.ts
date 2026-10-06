@@ -7,7 +7,6 @@ import {
   Decimal,
   Money,
   computePositions,
-  computeRetroactiveIncome,
   computeDividendCAGR,
   computeYieldOnCost,
   projectDividendSchedule,
@@ -24,11 +23,26 @@ import type {
   AssetType,
 } from "@sage/provider-interface";
 import type { Database } from "../db/client";
-import { instrument, transaction, dividendHistory, customHolding } from "../db/schema";
+import {
+  instrument,
+  transaction,
+  dividendHistory,
+  customHolding,
+  user,
+  assetProfile,
+} from "../db/schema";
+import { computeYieldRange5y, type YieldRange } from "../services/yield-range";
+import { loadReceivedIncome, receivedTotal } from "../services/received-income";
 import { getUserPortfolio } from "../auth";
 import { forwardFillChart } from "./chart-utils";
 import type { IsinResolver } from "../market-data/isin-resolver";
 import { getCachedOrFetchProfile } from "../market-data/asset-profile-cache";
+import {
+  forwardGrowth,
+  forwardScheduleForSymbol,
+  toAssetUpcoming,
+  type AssetUpcomingRow,
+} from "../services/forward-schedule";
 
 const rangeSchema = z.enum(["1W", "1M", "3M", "YTD", "1Y", "ALL"]).default("1Y");
 
@@ -68,10 +82,12 @@ export function assetRoutes(
     // 1. Profile (cached or fetched; fall back to primary listing or instrument row)
     const [inst] = await db.select().from(instrument).where(eq(instrument.symbol, symbol));
 
+    let profileFromProvider = true;
     let profile: AssetProfile;
     try {
       profile = await getCachedOrFetchProfile(db, provider, symbol);
     } catch {
+      profileFromProvider = false;
       if (!inst) return c.json({ error: "not_found" }, 404);
       profile = {
         symbol: inst.symbol,
@@ -130,6 +146,17 @@ export function assetRoutes(
       }
     }
 
+    // When the provider figures on this page were fetched. They are snapshots,
+    // not live values, and the page dates them (spec: Data reliability 2).
+    let profileAsOf: string | null = null;
+    if (profileFromProvider) {
+      const [row] = await db
+        .select({ fetchedAt: assetProfile.fetchedAt })
+        .from(assetProfile)
+        .where(eq(assetProfile.symbol, symbol));
+      profileAsOf = row?.fetchedAt.toISOString().slice(0, 10) ?? null;
+    }
+
     // Lazy ISIN resolution: trigger in background if ISIN is null
     if (inst && !inst.isin && isinResolver) {
       isinResolver.resolveAndStore(db, symbol).catch(() => {});
@@ -176,6 +203,11 @@ export function assetRoutes(
         exDate: d.exDate,
         amountPerShare: d.amountPerShare,
         currency: d.currency,
+        paymentDate: d.paymentDate,
+        paymentDateEstimated: d.paymentDateEstimated,
+        recordDate: d.recordDate,
+        declarationDate: d.declarationDate,
+        period: d.period,
       })),
     );
     const keptExDates = new Set(divHistory.map((d) => d.exDate));
@@ -208,9 +240,9 @@ export function assetRoutes(
     const divCurrencyUniform = inWindowDivs.every((d) => d.currency === divCurrency);
 
     // Current yield: trailing TTM per share ÷ live price, same currency by
-    // construction. Falls back to the profile's cached yield when there is no
-    // live quote, no trailing dividend, or a currency mismatch (never divide
-    // across currencies).
+    // construction — and nothing else. There is deliberately no fallback to the
+    // provider's own dividendYield: that is a gross figure on another basis, and
+    // the page states "TTM ÷ today's price" for this one.
     const livePrice = quote ? new Decimal(quote.price.amount) : null;
     let currentYield: number | null = null;
     if (
@@ -221,8 +253,6 @@ export function assetRoutes(
       divCurrency === quote?.price.currency
     ) {
       currentYield = Number(trailing12m.dividedBy(livePrice).toFixed(6));
-    } else if (profile.dividendYield && profile.dividendYield.greaterThan(0)) {
-      currentYield = Number(profile.dividendYield.toFixed(6));
     }
 
     // Next projected ex-date from cadence (quantity irrelevant here; use 1).
@@ -280,11 +310,36 @@ export function assetRoutes(
           }
         }
 
-        const retroactive = computeRetroactiveIncome(txs, divHistory);
-        const totalDivIncome = retroactive.reduce(
-          (sum, r) => sum.plus(new Decimal(r.income)),
-          new Decimal(0),
+        // "Received so far": the ledger, through the producer /dividends and
+        // /holdings read. Handed this symbol's rows only — the producer scopes
+        // every query to the symbols it is given. Gross; the page nets it.
+        const receivedRows = await loadReceivedIncome(
+          db,
+          { portfolioId, rows: txRows, txs },
+          asOf.toISOString().slice(0, 10),
         );
+        // A payment recorded in another currency is converted at spot into the
+        // position's currency (getRate(from, to) = units of `to` per 1 `from`);
+        // one without a rate is left out and counted, never summed raw.
+        const receivedRates = new Map<string, Decimal>();
+        if (fxRateService) {
+          const foreign = [
+            ...new Set(receivedRows.map((r) => r.currency).filter((ccy) => ccy !== pos.currency)),
+          ];
+          await Promise.all(
+            foreign.map(async (from) => {
+              try {
+                receivedRates.set(from, await fxRateService.getRate(from, pos.currency));
+              } catch {
+                // no rate: receivedTotal leaves that row out and counts it
+              }
+            }),
+          );
+        }
+        const received = receivedTotal(receivedRows, symbol, pos.currency, (amount, from) => {
+          const rate = receivedRates.get(from);
+          return rate && !rate.isZero() ? amount.times(rate) : null;
+        });
 
         // Optional FX: convert dividend APS into the cost currency when they
         // differ (dual-listed / ADR-style payers). Prefetch pair rates; failure
@@ -326,23 +381,6 @@ export function assetRoutes(
         const feeCcy =
           txRows.find((r) => r.feeCurrency)?.feeCurrency ?? txRows[0]?.currency ?? profile.currency;
 
-        // Forward 12-month income for this holding (projected + none announced).
-        const incomeSchedule = projectDividendSchedule({
-          symbol,
-          quantity: pos.quantity,
-          history: divHistory,
-          announced: [],
-          asOf,
-        });
-        const forward = incomeSchedule.reduce(
-          (s, r) => s.plus(new Decimal(r.income)),
-          new Decimal(0),
-        );
-        const forwardAnnualIncome =
-          incomeSchedule.length > 0
-            ? { amount: forward.toFixed(2), currency: incomeSchedule[0]!.currency }
-            : null;
-
         // Buy/sell markers, ascending by trade date (dividends/splits excluded).
         const trades = txRows
           .filter((r) => r.type === "buy" || r.type === "sell")
@@ -364,10 +402,15 @@ export function assetRoutes(
           marketValue: marketValue?.toJSON() ?? null,
           unrealizedGainLoss: gainLoss?.toJSON() ?? null,
           gainLossPercent,
-          totalDividendIncome: totalDivIncome.toFixed(),
+          dividendsReceived: received
+            ? {
+                amount: received.amount.toFixed(2),
+                currency: pos.currency,
+                leftOut: received.leftOut,
+              }
+            : null,
           yieldOnCost,
           feesPaid: { amount: feesTotal.toFixed(), currency: feeCcy },
-          forwardAnnualIncome,
           trades,
         };
       }
@@ -464,8 +507,6 @@ export function assetRoutes(
       beta: profile.beta?.toFixed() ?? null,
       fiftyTwoWeekHigh: profile.fiftyTwoWeekHigh?.toJSON() ?? null,
       fiftyTwoWeekLow: profile.fiftyTwoWeekLow?.toJSON() ?? null,
-      dividendYield: profile.dividendYield?.toFixed() ?? null,
-      trailingAnnualDividend: profile.trailingAnnualDividend?.toJSON() ?? null,
       website: profile.website,
       description: profile.description,
       ceo: profile.ceo,
@@ -510,18 +551,59 @@ export function assetRoutes(
       annualDividend = { amount: annualPerShare.toFixed(4), currency: annualCcy };
       if ((positionDTO as { held?: boolean }).held) {
         (positionDTO as { yieldOnCost: number | null }).yieldOnCost = heldYieldOnCost;
-        const qtyStr = (positionDTO as { quantity?: string }).quantity;
-        if (qtyStr) {
-          const forward = new Decimal(qtyStr).times(priceForAnnual).times(rate);
-          (
-            positionDTO as {
-              forwardAnnualIncome: { amount: string; currency: string } | null;
-            }
-          ).forwardAnnualIncome = {
-            amount: forward.toFixed(2),
-            currency: annualCcy,
-          };
-        }
+      }
+    }
+
+    // 8. Upcoming payments per share — the income view's own schedule
+    // (forwardScheduleForSymbol), plus payments in flight. Custom holdings
+    // project from their settings and render their own income card instead.
+    let upcoming: AssetUpcomingRow[] = [];
+    if (!customDTO) {
+      const [settings] = await db
+        .select({ allowNegative: user.allowNegativeDividendGrowth })
+        .from(user)
+        .where(eq(user.id, c.get("user").id));
+      const { growth } = forwardGrowth(cagr5y, settings?.allowNegative ?? true);
+      const schedule = forwardScheduleForSymbol({
+        symbol,
+        quantity: new Decimal(1),
+        history: divHistory,
+        now: asOf,
+        growth,
+      });
+      upcoming = toAssetUpcoming({
+        schedule,
+        history: divHistory,
+        todayIso: asOf.toISOString().slice(0, 10),
+      });
+    }
+
+    // 9. Where today's yield sits in its own five-year range. Store-first and
+    // cache-only: a cold symbol answers null now and warms in the background,
+    // rather than holding the whole page on an upstream fetch.
+    let yieldRange5y: YieldRange | null = null;
+    if (!customDTO) {
+      const fiveYearsAgo = new Date(asOf);
+      fiveYearsAgo.setUTCFullYear(fiveYearsAgo.getUTCFullYear() - 5);
+      try {
+        const bars = await provider.getHistoricalPrices(symbol, fiveYearsAgo, asOf, {
+          cacheOnly: true,
+        });
+        yieldRange5y = computeYieldRange5y({
+          closes: bars.map((b) => {
+            const close = b.close.toJSON();
+            return {
+              date: b.date.toISOString().slice(0, 10),
+              close: Number(close.amount),
+              currency: close.currency,
+            };
+          }),
+          dividends: divHistory,
+          todayIso: asOf.toISOString().slice(0, 10),
+          currentYield,
+        });
+      } catch {
+        yieldRange5y = null;
       }
     }
 
@@ -555,6 +637,9 @@ export function assetRoutes(
       position: positionDTO,
       income,
       custom: customDTO,
+      upcoming,
+      yieldRange5y,
+      profileAsOf,
     });
   });
 

@@ -3,8 +3,6 @@ import {
   Decimal,
   Money,
   computeYieldOnCost,
-  computeRetroactiveIncome,
-  dedupeDividends,
   resolveSplitBasis,
   type Position,
   type DividendHistoryRow,
@@ -13,6 +11,7 @@ import type { IMarketDataProvider, IFxRateService } from "@sage/provider-interfa
 import type { Database } from "../db/client";
 import { instrument, dividendHistory, assetProfile, customHolding } from "../db/schema";
 import { loadPortfolioBook, type PortfolioBook } from "./portfolio-book";
+import { loadReceivedIncome, receivedTotal } from "./received-income";
 import { getRatesWithProvenance } from "../market-data/fx-provenance";
 import { findBasisMismatches, toBasisFindingBody } from "./basis-reconciliation";
 import { resolveDisplayName } from "./display-name";
@@ -99,18 +98,12 @@ export async function buildPortfolioView(
 
   const todayIso = asOf.toISOString().slice(0, 10);
 
-  // Retroactive dividend income per symbol (native currency), deduped so the
-  // same payment reported by multiple providers isn't counted twice. "Received"
-  // = cash that has actually landed, so a dividend whose payment date is still
-  // ahead (ex-passed-but-unpaid) is excluded — it must not inflate a holding's
-  // dividend income or total return. Mirrors the dividend income view's
-  // trailing-received semantics. This is synthetic (provider history × held
-  // shares) BY DESIGN — dividend `transaction` rows (including reconciliation's
-  // source='auto' rows) are the performance view's cash flows only and must
-  // never be summed in here, or every payment double-counts.
-  const dedupedDivs = dedupeDividends([...divsBySymbol.values()].flat());
-  const receivedDivs = dedupedDivs.filter((d) => (d.paymentDate ?? d.exDate) <= todayIso);
-  const retroIncome = computeRetroactiveIncome(txs, receivedDivs);
+  // Dividends received, from the ledger — the rows /dividends lists as
+  // received, through the same producer (spec decision, 2026-10-01). Provider
+  // history × shares held used to stand in here and disagreed with /dividends
+  // whenever a broker paid something other than the announced amount. Nothing
+  // synthetic is added, so a payment is never counted twice in total return.
+  const receivedRows = await loadReceivedIncome(db, book, todayIso);
 
   // Company website per held symbol, for logo rendering on the client.
   const websiteBySymbol = new Map<string, string | null>();
@@ -166,6 +159,9 @@ export async function buildPortfolioView(
     for (const divs of divsBySymbol.values()) {
       for (const d of divs) sourceCurrencies.add(d.currency);
     }
+    // A dividend can land in another currency than its position (a broker that
+    // pays out in the account currency); it is converted, not dropped.
+    for (const r of receivedRows) sourceCurrencies.add(r.currency);
     sourceCurrencies.delete(targetCurrency);
     if (sourceCurrencies.size > 0) {
       try {
@@ -229,11 +225,24 @@ export async function buildPortfolioView(
 
   const positionsDTO = priced.map(
     ({ position, currentPrice, previousClose, marketValue, gainLoss }) => {
-      // Dividends received while holding, in the position's own currency. Only
-      // same-currency rows count, mirroring the yield-on-cost convention.
-      const dividendIncomeNative = retroIncome
-        .filter((r) => r.symbol === position.symbol && r.currency === position.currency)
-        .reduce((sum, r) => sum.plus(new Decimal(r.income)), new Decimal(0));
+      // Dividends received, in the position's own currency. A row in another
+      // currency crosses through the display currency's spot rates; one with
+      // no rate is left out rather than summed raw.
+      const received = receivedTotal(
+        receivedRows,
+        position.symbol,
+        position.currency,
+        (amount, from) => {
+          if (!targetCurrency) return null;
+          const fromRate = from === targetCurrency ? new Decimal(1) : fxRates.get(from);
+          const toRate =
+            position.currency === targetCurrency ? new Decimal(1) : fxRates.get(position.currency);
+          if (!fromRate || !toRate || fromRate.isZero() || toRate.isZero()) return null;
+          // rate = units of that currency per 1 display unit.
+          return amount.dividedBy(fromRate).times(toRate);
+        },
+      );
+      const dividendIncomeNative = received?.amount ?? new Decimal(0);
 
       // Day-over-day change from the prior session's close (a price ratio, so
       // currency-agnostic) and its value impact across the holding.

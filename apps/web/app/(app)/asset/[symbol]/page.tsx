@@ -1,12 +1,15 @@
 "use client";
 
+import * as React from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { ChartSkeleton, ErrorState, PageShell } from "@sage/ui";
 import { AssetPageSkeleton } from "../../../../components/skeletons";
-import { getAssetDetail } from "../../../../lib/api";
+import { getAssetDetail, getAssetRatings, getPortfolio } from "../../../../lib/api";
+import { holdingWeight } from "../../../../lib/asset-page/figures";
+import type { ChartReadout } from "../../../../lib/asset-chart/readout";
 import { toSearchResult } from "../../../../lib/instrument";
 import { qk } from "../../../../lib/query/keys";
 import { useDividendTaxRate } from "../../../../lib/dividend-tax-hooks";
@@ -16,15 +19,14 @@ import { RemoveHoldingButton } from "../../../../components/remove-holding-butto
 import { CurrencyPicker } from "../../../../components/currency-picker";
 import { useDisplayCurrency } from "../../../../components/display-currency-context";
 import { AssetHeader } from "./asset-header";
+import { AnswerStrip } from "./answer-strip";
 import { PositionSection } from "./position-section";
 import { TransactionsSection } from "./transactions-section";
 import { IncomeSection } from "./income-section";
-import { AboutSection } from "./about-section";
-import { FundamentalsSection } from "./fundamentals-section";
-import { FundComposition } from "./fund-composition";
-import { DividendHistory } from "./dividend-history";
-import { AnalystRatingsSection } from "./analyst-ratings-section";
+import { BuyMoreSection } from "./buy-more-section";
+import { WhatItIsSection } from "./what-it-is-section";
 import { NewsSection } from "./news-section";
+import { ProviderFootnote } from "./provider-footnote";
 
 // Deferred so lightweight-charts stays out of the asset route's initial JS; the
 // chart is client-only anyway. See components/portfolio-chart-lazy.tsx.
@@ -44,6 +46,27 @@ export default function AssetDetailPage() {
     staleTime: 300_000,
   });
   const { rate: dividendTaxRate, isLoading: taxRateLoading } = useDividendTaxRate();
+  const [readout, setReadout] = React.useState<ChartReadout | null>(null);
+
+  // One fetch each, read by every section that needs them (spec: one source
+  // per figure). The book only matters for a held symbol; ratings only for a
+  // market instrument.
+  const held = data?.position.held ?? false;
+  const isCustom = data?.custom != null;
+  const { data: portfolio } = useQuery({
+    queryKey: qk.portfolio(),
+    queryFn: () => getPortfolio(),
+    staleTime: 300_000,
+    enabled: held,
+  });
+  const { data: ratings } = useQuery({
+    queryKey: qk.assetRatings(slug),
+    queryFn: () => getAssetRatings(slug),
+    staleTime: 300_000,
+    enabled: data != null && !isCustom,
+  });
+  // "Today" for every date rule on the page, read once per mount.
+  const todayISO = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   // OR the loading states together (same pattern as the dividends analytics
   // page): the income section below nets its yields off dividendTaxRate, and
@@ -72,8 +95,26 @@ export default function AssetDetailPage() {
     );
   }
 
-  const { profile, quote, chart, dividends, position, income, custom } = data;
-  const fund = profile.fund; // const local so narrowing holds inside nested callbacks
+  const { profile, quote, chart, dividends, position, custom } = data;
+  const weight = holdingWeight(portfolio?.positions, profile.symbol);
+  const basisMismatch =
+    portfolio?.positions.find((p) => p.symbol === profile.symbol)?.basisMismatch ?? null;
+  const hasProfileFigures =
+    profile.marketCap != null ||
+    profile.peRatio != null ||
+    profile.beta != null ||
+    profile.fiftyTwoWeekHigh != null ||
+    profile.fiftyTwoWeekLow != null ||
+    profile.fund != null ||
+    data.income.payoutRatio != null;
+  const addTransaction = (
+    <TransactionDialog
+      mode="add"
+      instrument={toSearchResult(profile)}
+      triggerVariant="secondary"
+      triggerSize="sm"
+    />
+  );
 
   return (
     <PageShell>
@@ -87,42 +128,69 @@ export default function AssetDetailPage() {
         <CurrencyPicker initialCurrency={currency} />
       </div>
 
-      <AssetHeader profile={profile} quote={quote} held={position.held} custom={custom} />
+      <AssetHeader
+        profile={profile}
+        quote={quote}
+        held={position.held}
+        custom={custom}
+        readout={readout}
+        basisMismatch={basisMismatch}
+      />
       {(position.held || custom) && (
-        <div className="mb-8 flex items-center justify-between gap-3 border-b border-hairline pb-5">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-5">
           <div className="flex flex-wrap items-center gap-2">
-            <TransactionDialog
-              mode="add"
-              instrument={toSearchResult(profile)}
-              triggerVariant="secondary"
-              triggerSize="sm"
-            />
+            {addTransaction}
             {custom && <UpdatePriceDialog symbol={profile.symbol} currency={profile.currency} />}
           </div>
           {position.held && <RemoveHoldingButton symbol={profile.symbol} />}
         </div>
       )}
+      {!custom && (
+        <AnswerStrip
+          detail={data}
+          taxRate={dividendTaxRate}
+          todayISO={todayISO}
+          weight={weight}
+          ratings={ratings}
+          addAction={addTransaction}
+        />
+      )}
       <section className="mb-10">
-        <AssetPriceChart slug={slug} initialChart={chart} position={position} />
+        <AssetPriceChart
+          slug={slug}
+          initialChart={chart}
+          position={position}
+          dividends={dividends.history}
+          onReadout={setReadout}
+        />
       </section>
-      <PositionSection
-        position={position}
-        currency={profile.currency}
-        symbol={profile.symbol}
-        taxRate={dividendTaxRate}
-      />
-      <IncomeSection income={income} custom={custom} taxRate={dividendTaxRate} />
-      <AboutSection profile={profile} />
-
-      <FundamentalsSection profile={profile} />
-      {fund && <FundComposition fund={fund} />}
-      <AnalystRatingsSection slug={slug} />
-      {/* Your own entries, immediately before the payment history they explain:
-          the two ledgers read together, and both sit below the research
-          sections rather than interrupting them. */}
+      {/* The detail, in the strip's order. */}
+      <IncomeSection detail={data} taxRate={dividendTaxRate} todayISO={todayISO} />
+      <PositionSection position={position} weight={weight} />
+      {!custom && (
+        <BuyMoreSection
+          detail={data}
+          taxRate={dividendTaxRate}
+          ratings={ratings}
+          todayISO={todayISO}
+        />
+      )}
+      {!custom && (
+        <WhatItIsSection profile={profile} profileAsOf={data.profileAsOf} todayISO={todayISO} />
+      )}
+      {/* Your own entries, then the news, last. Transactions stay on a custom
+          holding too, collapsed: it is the only place on the page to correct an
+          entry (spec decision 4). */}
       <TransactionsSection symbol={profile.symbol} held={position.held || custom != null} />
-      <DividendHistory dividends={dividends} currency={profile.currency} />
-      <NewsSection slug={slug} />
+      {!custom && <NewsSection slug={slug} />}
+      {!custom && (
+        <ProviderFootnote
+          hasProfileFigures={hasProfileFigures}
+          profileAsOf={data.profileAsOf}
+          hasRatings={ratings != null}
+          ratingsAsOf={ratings?.asOf ?? null}
+        />
+      )}
     </PageShell>
   );
 }
