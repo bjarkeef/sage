@@ -3,7 +3,11 @@ import { Decimal } from "../money/decimal";
 import { Money } from "../money/money";
 import type { PositionTransaction } from "../portfolio/positions";
 import type { DividendHistoryRow } from "../portfolio/dividends";
-import { planAutoDividends, excludeMatchedInFlight } from "./auto-dividends";
+import {
+  planAutoDividends,
+  excludeMatchedInFlight,
+  supersededAutoDividends,
+} from "./auto-dividends";
 
 const TODAY = "2026-07-16";
 
@@ -222,6 +226,49 @@ describe("planAutoDividends", () => {
     expect(plan.map((p) => p.exDate)).toEqual(["2026-04-13"]);
   });
 
+  it("recognises a payment the broker booked at its ex-date, weeks before the cash", () => {
+    // Brokers book a dividend near its ex-date; the provider's cash date is
+    // ~3 weeks later. Matching on the cash date alone missed it, and the
+    // reconciler added the same payment a second time.
+    const plan = planAutoDividends({
+      transactions: [buy("KO", "100", "2026-01-01"), divTx("KO", "2026-03-01")],
+      dividends: [div("KO", "2026-03-01", "2026-03-22")],
+      ledger: [],
+      today: TODAY,
+    });
+    expect(plan).toEqual([]);
+  });
+
+  it("keeps a monthly payer's ex-date bookings on their own months", () => {
+    const plan = planAutoDividends({
+      transactions: [
+        buy("O", "50", "2026-01-01"),
+        divTx("O", "2026-04-01"),
+        divTx("O", "2026-05-01"),
+      ],
+      dividends: [
+        div("O", "2026-04-01", "2026-04-22", "0.27"),
+        div("O", "2026-05-01", "2026-05-22", "0.27"),
+        div("O", "2026-06-01", "2026-06-22", "0.27"),
+      ],
+      ledger: [],
+      today: TODAY,
+    });
+    expect(plan.map((p) => p.exDate)).toEqual(["2026-06-01"]);
+  });
+
+  it("never pairs a booking with an ex-date still ahead of it", () => {
+    // Booked a week before the next ex-date and 25 days after the previous
+    // payment: it belongs to neither, so neither is claimed.
+    const plan = planAutoDividends({
+      transactions: [buy("KO", "100", "2026-01-01"), divTx("KO", "2026-05-25")],
+      dividends: [div("KO", "2026-04-01", "2026-04-30"), div("KO", "2026-06-01", "2026-06-20")],
+      ledger: [],
+      today: TODAY,
+    });
+    expect(plan.map((p) => p.exDate)).toEqual(["2026-04-01", "2026-06-01"]);
+  });
+
   it("matches at exactly the 10-day boundary", () => {
     const plan = planAutoDividends({
       transactions: [buy("KO", "100", "2026-01-01"), divTx("KO", "2026-03-25")], // exactly 10 days
@@ -285,6 +332,14 @@ describe("excludeMatchedInFlight", () => {
     expect(out.map((r) => r.exDate)).toEqual(["2026-05-01"]);
   });
 
+  it("excludes an in-flight payment the broker already booked at its ex-date", () => {
+    const out = excludeMatchedInFlight(
+      [inFlightRow("KO", "2026-07-10", "2026-07-31")],
+      [{ symbol: "KO", cashDate: "2026-07-10" }],
+    );
+    expect(out).toEqual([]);
+  });
+
   it("scopes matching to the same symbol only", () => {
     const out = excludeMatchedInFlight(
       [inFlightRow("KO", "2026-06-01", "2026-07-20")],
@@ -294,5 +349,43 @@ describe("excludeMatchedInFlight", () => {
       ],
     );
     expect(out).toHaveLength(1); // KO's own received row is 26 days away — no match
+  });
+});
+
+describe("supersededAutoDividends", () => {
+  it("names the auto-added payments a broker booking already covers", () => {
+    const out = supersededAutoDividends({
+      dividends: [div("KO", "2026-03-01", "2026-03-22"), div("KO", "2026-06-01", "2026-06-22")],
+      booked: [{ symbol: "KO", tradeDate: "2026-03-02" }],
+      auto: [
+        { symbol: "KO", exDate: "2026-03-01", transactionId: "t-mar" },
+        { symbol: "KO", exDate: "2026-06-01", transactionId: "t-jun" },
+      ],
+    });
+    expect(out).toEqual(["t-mar"]);
+  });
+
+  it("lets one booking cover one payment only", () => {
+    const out = supersededAutoDividends({
+      dividends: [
+        div("O", "2026-04-01", "2026-04-22", "0.27"),
+        div("O", "2026-05-01", "2026-05-22", "0.27"),
+      ],
+      booked: [{ symbol: "O", tradeDate: "2026-04-24" }],
+      auto: [
+        { symbol: "O", exDate: "2026-04-01", transactionId: "t-apr" },
+        { symbol: "O", exDate: "2026-05-01", transactionId: "t-may" },
+      ],
+    });
+    expect(out).toEqual(["t-apr"]);
+  });
+
+  it("scopes to the symbol", () => {
+    const out = supersededAutoDividends({
+      dividends: [div("KO", "2026-03-01", "2026-03-22")],
+      booked: [{ symbol: "MSFT", tradeDate: "2026-03-01" }],
+      auto: [{ symbol: "KO", exDate: "2026-03-01", transactionId: "t" }],
+    });
+    expect(out).toEqual([]);
   });
 });

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { Decimal, MATCH_WINDOW_DAYS } from "@sage/core";
+import { Decimal, MATCH_WINDOW_DAYS, paymentDistance } from "@sage/core";
 import type { Database } from "../db/client";
 import { autoDividend, importRow, transaction } from "../db/schema";
 import type { ImportTransaction } from "./types";
@@ -78,22 +78,23 @@ export interface PlannedRow {
   ledgerId?: string;
 }
 
-function dayDistance(a: string, b: string): number {
-  return Math.abs(Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000;
-}
-
 /** One-to-one nearest-first pairing of incoming dividend rows (by plan index)
- *  with auto-created transactions, within ±MATCH_WINDOW_DAYS. Same rule the
- *  reconciliation engine uses for detection — the two sides of the dedup
- *  contract must agree on what "the same dividend" means. */
+ *  with auto-created transactions, within ±MATCH_WINDOW_DAYS of the payment's
+ *  cash date or — booked on or after it — its ex-date (`paymentDistance`). Same
+ *  rule the reconciliation engine uses for detection — the two sides of the
+ *  dedup contract must agree on what "the same dividend" means. An auto row's
+ *  tradeDate IS its payment's cash date. */
 export function pairIncomingWithAutoRows(
   incoming: { index: number; tradeDate: string }[],
-  autoRows: { transactionId: string; tradeDate: string }[],
+  autoRows: { transactionId: string; tradeDate: string; exDate: string }[],
 ): Map<number, string> {
   const pairs: { i: number; a: number; dist: number }[] = [];
   incoming.forEach((row, i) => {
     autoRows.forEach((candidate, a) => {
-      const dist = dayDistance(row.tradeDate, candidate.tradeDate);
+      const dist = paymentDistance(row.tradeDate, {
+        exDate: candidate.exDate,
+        cashDate: candidate.tradeDate,
+      });
       if (dist <= MATCH_WINDOW_DAYS) pairs.push({ i, a, dist });
     });
   });
@@ -215,6 +216,7 @@ export async function planImport(
         transactionId: transaction.id,
         symbol: transaction.instrumentSymbol,
         tradeDate: transaction.tradeDate,
+        exDate: autoDividend.exDate,
       })
       .from(autoDividend)
       .innerJoin(transaction, eq(transaction.id, autoDividend.transactionId))
@@ -226,10 +228,13 @@ export async function planImport(
           inArray(transaction.instrumentSymbol, symbols),
         ),
       );
-    const autoBySymbol = new Map<string, { transactionId: string; tradeDate: string }[]>();
+    const autoBySymbol = new Map<
+      string,
+      { transactionId: string; tradeDate: string; exDate: string }[]
+    >();
     for (const a of autoRows) {
       const list = autoBySymbol.get(a.symbol) ?? [];
-      list.push({ transactionId: a.transactionId, tradeDate: a.tradeDate });
+      list.push({ transactionId: a.transactionId, tradeDate: a.tradeDate, exDate: a.exDate });
       autoBySymbol.set(a.symbol, list);
     }
     for (const symbol of symbols) {

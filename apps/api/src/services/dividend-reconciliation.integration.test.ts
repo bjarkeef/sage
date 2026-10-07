@@ -331,4 +331,77 @@ describeDb("reconcileDividends", () => {
     );
     expect(after.every((t) => t.fee === null)).toBe(true);
   });
+
+  it("removes an auto dividend a broker booking at the ex-date already covers, for good", async () => {
+    // The broker dates the payment on its ex-date; the provider's cash date is
+    // three weeks later. Before the matcher knew about ex-dates, the reconciler
+    // added the payment again — it counted twice in everything received.
+    await tdb.db.insert(instrument).values({
+      symbol: "EXBOOK",
+      name: "Ex-date Booker",
+      exchange: "XNYS",
+      currency: "USD",
+      assetType: "stock",
+    });
+    await tdb.db.insert(transaction).values([
+      {
+        portfolioId,
+        instrumentSymbol: "EXBOOK",
+        type: "buy",
+        quantity: "10",
+        price: "20",
+        currency: "USD",
+        tradeDate: "2024-01-02",
+      },
+      // Imported from the broker: dated at the ex-date.
+      {
+        portfolioId,
+        instrumentSymbol: "EXBOOK",
+        type: "dividend",
+        quantity: "10",
+        price: "0.30",
+        currency: "USD",
+        tradeDate: "2024-05-01",
+      },
+    ]);
+    await tdb.db.insert(dividendHistory).values({
+      symbol: "EXBOOK",
+      exDate: "2024-05-01",
+      amountPerShare: "0.30",
+      currency: "USD",
+      paymentDate: "2024-05-22",
+      paymentDateEstimated: false,
+      source: "test",
+    });
+    // The duplicate an earlier reconciler wrote.
+    const [dup] = await tdb.db
+      .insert(transaction)
+      .values({
+        portfolioId,
+        instrumentSymbol: "EXBOOK",
+        type: "dividend",
+        quantity: "10",
+        price: "0.30",
+        currency: "USD",
+        tradeDate: "2024-05-22",
+        source: "auto",
+      })
+      .returning({ id: transaction.id });
+    await tdb.db
+      .insert(autoDividend)
+      .values({ portfolioId, symbol: "EXBOOK", exDate: "2024-05-01", transactionId: dup!.id });
+
+    await forceNextRun();
+    await reconcileDividends(tdb.db, userId);
+    const exbook = () => allTxs().then((ts) => ts.filter((t) => t.instrumentSymbol === "EXBOOK"));
+    let divs = (await exbook()).filter((t) => t.type === "dividend");
+    expect(divs).toHaveLength(1);
+    expect(divs[0]!.source).toBeNull(); // the broker's row is the one kept
+
+    // Tombstoned, so a later run cannot bring it back.
+    await forceNextRun();
+    await reconcileDividends(tdb.db, userId);
+    divs = (await exbook()).filter((t) => t.type === "dividend");
+    expect(divs).toHaveLength(1);
+  });
 });

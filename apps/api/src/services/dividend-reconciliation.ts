@@ -1,9 +1,10 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import {
   Decimal,
   Money,
   dedupeDividends,
   planAutoDividends,
+  supersededAutoDividends,
   type PositionTransaction,
 } from "@sage/core";
 import type { Database } from "../db/client";
@@ -19,6 +20,10 @@ import { getUserPortfolio } from "../auth";
 import { correctDividendCurrencies } from "./dividend-currency-correction";
 
 export const RECONCILE_TTL_MS = 24 * 3600 * 1000;
+
+/** Ledger sources Sage writes itself — never evidence that a broker booked a
+ *  payment. */
+const DERIVED_SOURCES = new Set(["auto", "custom", "custom-income"]);
 
 /**
  * Release the 24h claim, so the next dividend-relevant read reconciles again.
@@ -83,6 +88,37 @@ export async function reconcileDividends(db: Database, userId: string): Promise<
     .where(inArray(dividendHistory.symbol, providerSymbols));
   if (divRows.length === 0) return;
 
+  // Repair before planning: an auto-added dividend that a broker booking
+  // already covers counted the payment twice. Deleting its transaction leaves
+  // the ledger row as a tombstone, so it is never added again.
+  const liveAuto = await db
+    .select({
+      symbol: autoDividend.symbol,
+      exDate: autoDividend.exDate,
+      transactionId: autoDividend.transactionId,
+    })
+    .from(autoDividend)
+    .where(and(eq(autoDividend.portfolioId, portfolioId), isNotNull(autoDividend.transactionId)));
+  const superseded = new Set(
+    supersededAutoDividends({
+      dividends: divRows.map((r) => ({
+        symbol: r.symbol,
+        exDate: r.exDate,
+        amountPerShare: r.amountPerShare,
+        currency: r.currency,
+        paymentDate: r.paymentDate,
+      })),
+      booked: txs
+        .filter((t) => t.type === "dividend" && !DERIVED_SOURCES.has(t.source ?? ""))
+        .map((t) => ({ symbol: t.instrumentSymbol, tradeDate: t.tradeDate })),
+      auto: liveAuto.map((a) => ({ ...a, transactionId: a.transactionId! })),
+    }),
+  );
+  if (superseded.size > 0) {
+    await db.delete(transaction).where(inArray(transaction.id, [...superseded]));
+  }
+  const ledgerTxs = txs.filter((t) => !superseded.has(t.id));
+
   const ledger = await db
     .select({ symbol: autoDividend.symbol, exDate: autoDividend.exDate })
     .from(autoDividend)
@@ -109,7 +145,7 @@ export async function reconcileDividends(db: Database, userId: string): Promise<
     .limit(1);
   const taxRate = userRow?.taxRate == null ? new Decimal(0) : new Decimal(userRow.taxRate);
 
-  const positionTxs: PositionTransaction[] = txs.map((t) => ({
+  const positionTxs: PositionTransaction[] = ledgerTxs.map((t) => ({
     symbol: t.instrumentSymbol,
     type: t.type as PositionTransaction["type"],
     quantity: new Decimal(t.quantity),
