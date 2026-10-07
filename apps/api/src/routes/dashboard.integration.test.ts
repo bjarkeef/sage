@@ -336,16 +336,13 @@ describeDb("GET /dashboard", () => {
     // is what surfaces them at all — this pins the same "reach past the
     // window" behavior end to end that dashboard.test.ts pins as a unit.
     //
-    // The 4th row is the frequency-aware projection model's forecast of
-    // AAPL's next cycle beyond its one announced payment (AAPL has a past
-    // ex-date plus one announced future one — enough to infer a cadence;
-    // MSFT's two rows are both announced, so no cadence is inferred beyond
-    // them). Its exact date is the model's own output, not a seeded fixture,
-    // so it's asserted structurally rather than pinned to a literal.
-    const forecastRow = body.upcomingDividends[3];
-    expect(typeof forecastRow?.date).toBe("string");
+    // A 4th row may follow: the model repeating AAPL's payment from the 1st of
+    // this month a year on (one past ex-date is too little to infer a cadence).
+    // Its cash lands a year and ~21 days after the 1st, so whether it is in the
+    // next 12 months — which count by cash date — depends on today's day of the
+    // month. Asserted by that rule rather than pinned, so the test cannot rot.
     expect(
-      body.upcomingDividends.map((d) => ({
+      body.upcomingDividends.slice(0, 3).map((d) => ({
         symbol: d.symbol,
         date: d.date,
         projected: d.projected,
@@ -354,12 +351,17 @@ describeDb("GET /dashboard", () => {
       { symbol: "MSFT", date: recentPay, projected: false },
       { symbol: "MSFT", date: oldPay, projected: false },
       { symbol: "AAPL", date: announcedPay, projected: false },
-      { symbol: "AAPL", date: forecastRow?.date, projected: true },
     ]);
-    // The forecast row's own date is a genuine model prediction (not the
-    // company declaring it), so dateEstimated must be set on it too — a
-    // projected row is never announced-with-a-known-date.
-    expect(forecastRow?.dateEstimated).toBe(true);
+    const yearOut = new Date(now);
+    yearOut.setUTCFullYear(yearOut.getUTCFullYear() + 1);
+    const forecastRow = body.upcomingDividends[3];
+    expect(body.upcomingDividends.length).toBeLessThanOrEqual(4);
+    if (forecastRow) {
+      expect(forecastRow).toMatchObject({ symbol: "AAPL", projected: true });
+      // A model prediction, never announced-with-a-known-date.
+      expect(forecastRow.dateEstimated).toBe(true);
+      expect(forecastRow.date <= yearOut.toISOString().slice(0, 10)).toBe(true);
+    }
 
     // recentDividends: announced rows with paymentDate in [previousMarketDay,
     // today]. Both MSFT rows now have a realistic (future) paymentDate — a

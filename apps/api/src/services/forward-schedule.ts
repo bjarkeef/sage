@@ -72,7 +72,6 @@ export function forwardScheduleForSymbol(input: {
     asOf: now,
   };
 
-  const twelve = projectDividendSchedule(base);
   const projectedThrough = projectionHorizonIso(now);
   const longRange = projectDividendSchedule({
     ...base,
@@ -80,11 +79,24 @@ export function forwardScheduleForSymbol(input: {
     growth: input.growth ?? undefined,
   }).filter((r) => r.exDate > projectedThrough);
 
+  // "The next 12 months" is the cash that lands in them. The projection runs
+  // on ex-dates, and a payment declared inside the year can pay after it; with
+  // the payments already in flight added on top, counting by ex-date put
+  // thirteen months of cash in the headline. A payment that lands after the
+  // year moves to the long range — still on the calendar, outside the total.
+  const twelve = projectDividendSchedule(base);
+  const inYear = (r: ProjectedDividendRow) => cashDate(r) <= projectedThrough;
   return {
-    announced: twelve.filter((r) => r.kind === "announced"),
-    projected: twelve.filter((r) => r.kind === "projected"),
-    longRange,
+    announced: twelve.filter((r) => r.kind === "announced" && inYear(r)),
+    projected: twelve.filter((r) => r.kind === "projected" && inYear(r)),
+    longRange: [...twelve.filter((r) => !inYear(r)), ...longRange],
   };
+}
+
+/** When a payment's cash arrives: its payment date, else its ex-date — the
+ *  rule the tape, /dividends and the asset page all date payments by. */
+function cashDate(r: { paymentDate: string | null; exDate: string }): string {
+  return r.paymentDate ?? r.exDate;
 }
 
 export interface AssetUpcomingRow {

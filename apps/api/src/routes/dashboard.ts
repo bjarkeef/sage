@@ -112,9 +112,10 @@ export interface IncomeStreamPointDTO {
   certainty: PaymentCertainty;
   /** Which headline total this payment is part of. The overview's "next 12
    *  months" is `projectedTwelveMonthIncome`, which sums announced, projected
-   *  and in-flight rows by ex-date horizon — not by payment date — so the client
-   *  cannot rebuild it from dates. It sums the points tagged here instead, and
-   *  the two agree by construction. */
+   *  and in-flight rows whose cash lands in (today, today + 1 calendar year] —
+   *  a calendar year, not the 365 days the client counts, so the two differ
+   *  across a leap day. The client sums the points tagged here instead, and the
+   *  two agree by construction. */
   headline: HeadlineWindow | null;
 }
 
@@ -184,8 +185,8 @@ export function selectIncomeStream(
       certainty: "estimated" as const,
       headline: "forward" as const,
     })),
-    // Already past the 12-month horizon (the income view filters on ex-date),
-    // so nothing here is counted twice and nothing is part of a headline.
+    // Cash after the 12-month horizon (the forward schedule splits by cash
+    // date), so nothing here is counted twice and nothing is part of a headline.
     ...sources.longRange.map((p) => ({
       date: p.paymentDate ?? p.projectedExDate,
       amount: p.income,
