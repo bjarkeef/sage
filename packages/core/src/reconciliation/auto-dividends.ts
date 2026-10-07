@@ -61,10 +61,46 @@ export function paymentDistance(
  *  (a fund's own ex-date against its secondary listing's). */
 const EX_DATE_SLACK_DAYS = 7;
 
+/** The most a booking may trail a provider's pay date and still be that payment. */
+const LATE_BOOKING_CAP_DAYS = 45;
+
+/**
+ * How many days after its cash date a booking still names each payment.
+ *
+ * Providers estimate some pay dates weeks early — a semiannual paid five weeks
+ * after the date given, an annual eighteen days after — and the ten-day window
+ * then left the broker's booking unpaired, so the reconciler added the payment
+ * a second time. A late booking can only be confused with the
+ * next payment, so the allowance is a quarter of the gap to the nearest
+ * neighbouring payment: a monthly payer keeps ten days, a quarterly one gets
+ * about three weeks, a semiannual or annual one the cap. A payment with no
+ * neighbour gives no cadence to size it by and keeps the ten days.
+ */
+function lateWindows(payments: { exDate: string }[]): number[] {
+  return payments.map((pay, i) => {
+    const gaps = [payments[i - 1], payments[i + 1]]
+      .filter((n): n is { exDate: string } => n !== undefined)
+      .map((n) => dayDistance(n.exDate, pay.exDate));
+    if (gaps.length === 0) return MATCH_WINDOW_DAYS;
+    const quarterGap = Math.floor(Math.min(...gaps) / 4);
+    return Math.min(LATE_BOOKING_CAP_DAYS, Math.max(MATCH_WINDOW_DAYS, quarterGap));
+  });
+}
+
+/** Whether a booking can be this payment, given the payment's late allowance. */
+function withinWindow(
+  bookedOn: string,
+  payment: { exDate: string; cashDate: string },
+  lateWindow: number,
+): boolean {
+  if (paymentDistance(bookedOn, payment) <= MATCH_WINDOW_DAYS) return true;
+  return bookedOn >= payment.cashDate && dayDistance(bookedOn, payment.cashDate) <= lateWindow;
+}
+
 /** One-to-one, order-preserving pairing of provider payments with booked
- *  dividends (pairs within `MATCH_WINDOW_DAYS` by `paymentDistance`): the most
- *  pairs, then the least total distance. Returns the indices of matched
- *  payments.
+ *  dividends (pairs within `MATCH_WINDOW_DAYS` by `paymentDistance`, or a late
+ *  booking within the payment's `lateWindows` allowance): the most pairs, then
+ *  the least total distance. Returns the indices of matched payments.
  *
  *  One-to-one is load-bearing for monthly payers — a single recorded payment
  *  must never satisfy two consecutive provider dividends. Order-preserving
@@ -80,6 +116,7 @@ function matchedDividendIndices(
     .map((pay, index) => ({ ...pay, index }))
     .sort((a, b) => a.exDate.localeCompare(b.exDate) || a.index - b.index);
   const t = [...txDates].sort();
+  const late = lateWindows(p);
   const n = p.length;
   const m = t.length;
   // best[i][j]: optimal alignment of p[i..] with t[j..] — [pairs, -distance].
@@ -93,7 +130,7 @@ function matchedDividendIndices(
       let choice = best[i + 1]![j]!;
       if (better(best[i]![j + 1]!, choice)) choice = best[i]![j + 1]!;
       const dist = paymentDistance(t[j]!, p[i]!);
-      if (dist <= MATCH_WINDOW_DAYS) {
+      if (withinWindow(t[j]!, p[i]!, late[i]!)) {
         const next = best[i + 1]![j + 1]!;
         const take: [number, number] = [next[0] + 1, next[1] - dist];
         if (better(take, choice)) choice = take;
@@ -108,7 +145,7 @@ function matchedDividendIndices(
     const dist = paymentDistance(t[j]!, p[i]!);
     const next = best[i + 1]![j + 1]!;
     if (
-      dist <= MATCH_WINDOW_DAYS &&
+      withinWindow(t[j]!, p[i]!, late[i]!) &&
       best[i]![j]![0] === next[0] + 1 &&
       best[i]![j]![1] === next[1] - dist
     ) {
