@@ -145,8 +145,8 @@ export async function reconcileDividends(db: Database, userId: string): Promise<
   // Withholding, at the user's declared rate.
   //
   // A dividend row's `fee` is the tax taken before the cash landed. Imported
-  // rows carry what the broker actually withheld — 35% across the reporting
-  // book's all of them. Rows this reconciler created carried nothing, which
+  // rows carry what the broker actually withheld. Rows this reconciler
+  // created carried nothing, which
   // states that no tax was withheld, and that is never true of a real payment.
   //
   // The two now mean the same thing but are not equally certain, and the

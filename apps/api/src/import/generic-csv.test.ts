@@ -247,7 +247,7 @@ describe("inspectCsv — value summaries", () => {
 
 describe("inspectCsv format detection", () => {
   const SNOWBALL = `Event,Date,Symbol,Price,Quantity,Currency,FeeTax,Exchange,FeeCurrency,DoNotAdjustCash,Note
-"BUY","2023-07-27 00:00:00","MSFT","2500.00","2","DKK","29.00","NASDAQ","DKK","False",""`;
+"BUY","2024-02-12 00:00:00","MSFT","2500.00","3","DKK","29.00","NASDAQ","DKK","False",""`;
 
   it("flags a Snowball export so the caller can route it to the right parser", () => {
     expect(inspectCsv(SNOWBALL).detectedFormat).toBe("snowball");

@@ -182,7 +182,7 @@ describe("TransactionsList", () => {
     // in the secondary line. The primary total uses the raw (untrimmed)
     // quantity × price, formatted as currency.
     expect(await screen.findByText("€2.51")).toBeInTheDocument();
-    expect(await screen.findByText(/3\.4127 sh @ 0\.8238/)).toBeInTheDocument();
+    expect(await screen.findByText(/3\.4127 sh @ 0\.7361/)).toBeInTheDocument();
   });
 
   it("bands a five-figure share count while keeping the sub-cent price at full precision", async () => {

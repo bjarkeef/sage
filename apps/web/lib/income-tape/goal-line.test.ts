@@ -9,7 +9,7 @@ function goal(
   withResult = true,
 ): GoalViewDTO {
   return {
-    goal: { type, amount, currency, targetYear: 2041 } as GoalViewDTO["goal"],
+    goal: { type, amount, currency, targetYear: 2040 } as GoalViewDTO["goal"],
     defaults: null,
     result: withResult
       ? ({
@@ -17,7 +17,7 @@ function goal(
           progressPct: 2,
           currentMetric: "5000",
           goalAtTargetYear: amount,
-          targetYear: 2041,
+          targetYear: 2040,
         } as GoalViewDTO["result"])
       : null,
   };
@@ -65,7 +65,7 @@ describe("goalMark", () => {
   it("captions a goal too large for the ribbon instead of squashing the bars", () => {
     expect(goalMark({ ...base, goal: goal("passive_income", "200000") })).toEqual({
       kind: "caption",
-      text: "Goal: DKK 200,000 a year by 2041 — 2.6% of it this year",
+      text: "Goal: DKK 200,000 a year by 2040 — 3.0% of it this year",
     });
   });
 });

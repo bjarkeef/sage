@@ -29,7 +29,7 @@ describe("parseSnowballCSV", () => {
 
   it("parses a SELL row", () => {
     const result = parseSnowballCSV(
-      csv('SELL,2024-08-05 00:00:00,AAPL,"190.5","2",USD,"13",NASDAQ,"USD","False",""'),
+      csv('SELL,2024-06-03 00:00:00,AAPL,"190.5","2",USD,"4",NASDAQ,"USD","False",""'),
     );
     expect(result.transactions).toHaveLength(1);
     const tx = result.transactions[0]!;

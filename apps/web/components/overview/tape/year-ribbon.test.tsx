@@ -80,7 +80,7 @@ describe("YearRibbon", () => {
         inView={inView}
         currency="DKK"
         selectedYear={null}
-        goal={{ kind: "caption", text: "Goal: DKK 200,000 a year by 2041 — 2.6% of it this year" }}
+        goal={{ kind: "caption", text: "Goal: DKK 200,000 a year by 2040 — 3.0% of it this year" }}
         onPickYear={() => {}}
       />,
     );
