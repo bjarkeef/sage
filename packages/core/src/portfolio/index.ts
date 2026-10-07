@@ -17,6 +17,7 @@ export {
   type FlowRateLookup,
 } from "./replay";
 export { PortfolioError, OversellError } from "./errors";
+export { inferDividendCurrency } from "./dividend-currency";
 export {
   computeRetroactiveIncome,
   computeDividendCAGR,
