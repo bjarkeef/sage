@@ -42,17 +42,32 @@ export interface HashedRow {
   tx: ImportTransaction;
   rowHash: string;
   occurrence: number;
+  /** The identity an older importer gave the same source row, if it differs. */
+  legacy?: { rowHash: string; occurrence: number };
 }
 
 /** Identical rows within one file get occurrence indices 0, 1, 2… in file
  *  order, so two genuine same-day identical trades are distinct identities. */
 export function assignOccurrences(txs: ImportTransaction[]): HashedRow[] {
   const counts = new Map<string, number>();
+  // Legacy identities count per SOURCE row: the rows one source row now
+  // becomes share the identity that row used to have, and its occurrence.
+  const legacyCounts = new Map<string, number>();
+  const legacyBySourceRow = new Map<number, { rowHash: string; occurrence: number }>();
   return txs.map((tx) => {
     const rowHash = computeRowHash(tx);
     const occurrence = counts.get(rowHash) ?? 0;
     counts.set(rowHash, occurrence + 1);
-    return { tx, rowHash, occurrence };
+    if (!tx.legacyRow) return { tx, rowHash, occurrence };
+    let legacy = legacyBySourceRow.get(tx.rowNumber);
+    if (!legacy) {
+      const legacyHash = computeRowHash(tx.legacyRow);
+      const legacyOccurrence = legacyCounts.get(legacyHash) ?? 0;
+      legacyCounts.set(legacyHash, legacyOccurrence + 1);
+      legacy = { rowHash: legacyHash, occurrence: legacyOccurrence };
+      legacyBySourceRow.set(tx.rowNumber, legacy);
+    }
+    return { tx, rowHash, occurrence, legacy };
   });
 }
 
@@ -121,7 +136,9 @@ export async function planImport(
   const hashed = assignOccurrences(txs);
   if (hashed.length === 0) return [];
 
-  const hashes = [...new Set(hashed.map((h) => h.rowHash))];
+  const hashes = [
+    ...new Set(hashed.flatMap((h) => (h.legacy ? [h.rowHash, h.legacy.rowHash] : [h.rowHash]))),
+  ];
   const ledgerRows = await db
     .select({
       id: importRow.id,
@@ -182,13 +199,23 @@ export async function planImport(
     claimQueues.set(hash, queue);
   }
 
-  const planned: PlannedRow[] = hashed.map(({ tx, rowHash, occurrence }) => {
+  const planned: PlannedRow[] = hashed.map(({ tx, rowHash, occurrence, legacy }) => {
     const ledger = ledgerByKey.get(`${rowHash}:${occurrence}`);
     if (ledger) {
       if (ledger.transactionId !== null) {
         return { tx, rowHash, occurrence, disposition: "already-imported" as const };
       }
       return { tx, rowHash, occurrence, disposition: "tombstoned" as const, ledgerId: ledger.id };
+    }
+    // Imported before this source row changed shape: the ledger knows it by
+    // its old identity. Deleted then, it stays deleted — and cannot be
+    // restored from here, since the old row it would relink no longer exists
+    // in this shape.
+    const legacyLedger = legacy && ledgerByKey.get(`${legacy.rowHash}:${legacy.occurrence}`);
+    if (legacyLedger) {
+      return legacyLedger.transactionId !== null
+        ? { tx, rowHash, occurrence, disposition: "already-imported" as const }
+        : { tx, rowHash, occurrence, disposition: "tombstoned" as const };
     }
     const queue = claimQueues.get(rowHash);
     if (queue !== undefined && queue.length > 0) {
@@ -375,7 +402,7 @@ export async function executeImport(
           break;
         }
         case "tombstoned": {
-          if (!opts.restoreDeleted) {
+          if (!opts.restoreDeleted || !row.ledgerId) {
             result.tombstonedSkipped += 1;
             break;
           }
@@ -386,7 +413,7 @@ export async function executeImport(
           const relinked = await dbtx
             .update(importRow)
             .set({ transactionId: created!.id })
-            .where(and(eq(importRow.id, row.ledgerId!), isNull(importRow.transactionId)))
+            .where(and(eq(importRow.id, row.ledgerId), isNull(importRow.transactionId)))
             .returning({ id: importRow.id });
           if (relinked.length === 0) {
             // A concurrent commit restored this row first; undo our insert.

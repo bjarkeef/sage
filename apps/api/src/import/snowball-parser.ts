@@ -172,19 +172,66 @@ export function parseSnowballCSV(csvText: string): ParseResult {
     }
 
     if (isCustom && row.Event === "STOCK_AS_DIVIDEND") {
+      // Interest or income credited as units. Recorded as Snowball records it:
+      // the payment is a dividend of its gross with the tax as its fee, and
+      // the net buys units at the row's price — so it is income, and the
+      // units it bought are in cost basis.
       const fee = new Decimal(row.FeeTax || "0");
-      transactions.push({
+      const tradeDate = row.Date.split(" ")[0]!;
+      const unitPrice = new Decimal(row.Price || "0");
+      const legacyRow = {
         symbol: row.Symbol,
         type: "buy",
+        tradeDate,
         quantity: row.Quantity,
-        price: "0", // reinvested income credits shares without cost basis
+        price: "0",
         currency: row.Currency,
-        tradeDate: row.Date.split(" ")[0]!,
-        fee: fee.greaterThan(0) ? row.FeeTax : null,
-        feeCurrency: fee.greaterThan(0) ? row.Currency : null,
-        exchange: "CUSTOM",
-        rowNumber: rowNum,
-      });
+      };
+      if (unitPrice.isZero()) {
+        // No price to value the units at: keep them credited at zero, which
+        // the server converts once it has a price for the day.
+        transactions.push({
+          symbol: row.Symbol,
+          type: "buy",
+          quantity: row.Quantity,
+          price: "0",
+          currency: row.Currency,
+          tradeDate,
+          fee: fee.greaterThan(0) ? row.FeeTax : null,
+          feeCurrency: fee.greaterThan(0) ? row.Currency : null,
+          exchange: "CUSTOM",
+          rowNumber: rowNum,
+        });
+      } else {
+        transactions.push(
+          {
+            symbol: row.Symbol,
+            type: "dividend",
+            quantity: "1",
+            price: new Decimal(row.Quantity).times(unitPrice).plus(fee).toFixed(),
+            currency: row.Currency,
+            tradeDate,
+            fee: fee.greaterThan(0) ? row.FeeTax : null,
+            feeCurrency: fee.greaterThan(0) ? row.Currency : null,
+            exchange: "CUSTOM",
+            rowNumber: rowNum,
+            legacyRow,
+          },
+          {
+            symbol: row.Symbol,
+            type: "buy",
+            quantity: row.Quantity,
+            price: row.Price,
+            currency: row.Currency,
+            tradeDate,
+            fee: null,
+            feeCurrency: null,
+            exchange: "CUSTOM",
+            rowNumber: rowNum,
+            legacyRow,
+          },
+        );
+      }
       if (!instrumentMap.has(row.Symbol)) {
         instrumentMap.set(row.Symbol, {
           symbol: row.Symbol,

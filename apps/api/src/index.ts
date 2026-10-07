@@ -7,6 +7,7 @@ import type { Env } from "./env";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { expireAllReconciliations } from "./services/dividend-reconciliation";
+import { convertAllReinvestCredits } from "./services/reinvest-credits";
 import { createAuth } from "./auth";
 import type { IMarketDataProvider } from "@sage/provider-interface";
 import { YahooFinanceProvider } from "@sage/provider-yahoo-finance";
@@ -90,6 +91,12 @@ async function main() {
   const auth = createAuth(db, env);
   await runMigrations(db, MIGRATIONS_FOLDER);
   await expireAllReconciliations(db);
+  // Reinvested custom-holding income used to be stored as units at a price of
+  // zero; every reader now expects the payment and the buy it paid for.
+  const reinvestConverted = await convertAllReinvestCredits(db);
+  if (reinvestConverted > 0) {
+    console.log(`converted ${reinvestConverted} reinvested payments to payment + buy`);
+  }
   const providerHealth = new ProviderHealthRegistry();
   // Prices are served from Postgres and refreshed behind the response, so a
   // provider outage shows up as an age rather than as missing data. Caching

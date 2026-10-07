@@ -413,8 +413,7 @@ export function parseGenericCsv(text: string, mapping: ColumnMapping): ParseResu
         return;
       }
       // Zero is legitimate — bonus shares, gifted stock, scrip dividends, and
-      // the price-0 "buy" rows custom-income-sync emits for reinvested
-      // income — only negative prices are nonsense. A sell written as a
+      // income credited as units — only negative prices are nonsense. A sell written as a
       // negative cash amount lands here, hence the abs() on the quantity above
       // but not on this: a negative unit price is a mapping mistake.
       if (new Decimal(price).lessThan(0)) {

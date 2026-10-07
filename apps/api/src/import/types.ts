@@ -11,6 +11,17 @@ export interface ImportTransaction {
   feeCurrency: string | null;
   exchange: string;
   rowNumber: number;
+  /** The identity an older importer gave this same source row, when it has
+   *  since changed shape. Re-importing recognises a payment imported in the
+   *  old shape by it. Not part of this row's own identity. */
+  legacyRow?: {
+    symbol: string;
+    type: string;
+    tradeDate: string;
+    quantity: string;
+    price: string;
+    currency: string;
+  };
 }
 
 export interface SkippedRow {

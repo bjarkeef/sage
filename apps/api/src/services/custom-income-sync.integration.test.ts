@@ -81,7 +81,7 @@ describeDb("syncCustomIncome", () => {
     await t?.stop();
   });
 
-  it("materializes the due payment: ledger + reinvest buy + dividend_history, Snowball-exact", async () => {
+  it("materializes the due payment: a dividend, the buy it reinvests in, and dividend_history", async () => {
     await syncCustomIncome(t.db, userId, NOW);
 
     const ledger = await t.db
@@ -92,12 +92,22 @@ describeDb("syncCustomIncome", () => {
     expect(ledger[0]!.payDate).toBe("2026-04-30");
     expect(ledger[0]!.transactionId).not.toBeNull();
 
-    const [credit] = await t.db
+    // Recorded as Snowball records it: the payment is income, and the net is
+    // spent on units at their price, so it is in cost basis too.
+    const [payment] = await t.db
       .select()
       .from(transaction)
       .where(eq(transaction.id, ledger[0]!.transactionId!));
+    expect(payment!.type).toBe("dividend");
+    expect(payment!.quantity).toBe("1");
+    expect(payment!.source).toBe("custom-income");
+    const [credit] = await t.db
+      .select()
+      .from(transaction)
+      .where(eq(transaction.id, ledger[0]!.reinvestTransactionId!));
     expect(credit!.type).toBe("buy");
-    expect(credit!.price).toBe("0");
+    expect(credit!.price).toBe("1");
+    expect(credit!.fee).toBeNull();
     expect(credit!.source).toBe("custom-income");
     // Derived by hand from accrueGrossIncome's contract, not read back off the
     // implementation — otherwise this asserts only that the code agrees with
@@ -111,8 +121,9 @@ describeDb("syncCustomIncome", () => {
     // gross = 884,000 × 4.25 / 36,500 = 102.93150684931507
     //   tax = gross × 0.35             =  36.02602739726027
     //   net = gross × 0.65             =  66.90547945205479
-    expect(Number(credit!.quantity)).toBeCloseTo(66.90547945, 6);
-    expect(Number(credit!.fee)).toBeCloseTo(36.02602739, 6); // withheld tax
+    expect(Number(payment!.price)).toBeCloseTo(102.93150685, 6); // gross
+    expect(Number(payment!.fee)).toBeCloseTo(36.02602739, 6); // withheld tax
+    expect(Number(credit!.quantity)).toBeCloseTo(66.90547945, 6); // net at 1.00
 
     const divs = await t.db
       .select()
@@ -135,10 +146,10 @@ describeDb("syncCustomIncome", () => {
       .from(transaction)
       .where(eq(transaction.instrumentSymbol, "CASH_DKK"));
     expect(ledger).toHaveLength(1);
-    expect(txs).toHaveLength(5); // 4 buys + 1 credit
+    expect(txs).toHaveLength(6); // 4 buys + the payment + its reinvest buy
   });
 
-  it("tombstone: deleting the credit and re-running does not resurrect it", async () => {
+  it("tombstone: deleting the payment and re-running does not resurrect it", async () => {
     const [row] = await t.db.select().from(customIncome);
     await t.db.delete(transaction).where(eq(transaction.id, row!.transactionId!));
     await syncCustomIncome(t.db, userId, NOW);
@@ -149,7 +160,7 @@ describeDb("syncCustomIncome", () => {
       .select()
       .from(transaction)
       .where(eq(transaction.instrumentSymbol, "CASH_DKK"));
-    expect(txs).toHaveLength(4); // credit NOT recreated
+    expect(txs.filter((x) => x.type === "dividend")).toHaveLength(0); // NOT recreated
   });
 
   it("materializes the next quarter once time passes it", async () => {
@@ -269,116 +280,149 @@ describeDb("syncCustomIncome — per-holding fault isolation", () => {
   });
 });
 
-describeDb("syncCustomIncome — imported-history backfill", () => {
-  let t: TestDb;
-  let portfolioId: string;
-  const userId = "u2";
+// The same payment as two exports have shaped it: an older Sage imported a
+// Snowball credit as units at a price of zero, the current importer as the
+// payment and the buy it reinvests in. Both must end as the second.
+for (const shape of ["a price-0 credit", "a dividend and its buy"] as const) {
+  describeDb(`syncCustomIncome — imported-history backfill, as ${shape}`, () => {
+    let t: TestDb;
+    let portfolioId: string;
+    const userId = "u2";
 
-  beforeAll(async () => {
-    t = await withTestDb();
-    await t.db.insert(user).values({
-      id: userId,
-      name: "U2",
-      email: "u2@x.dk",
-      emailVerified: true,
-      dividendTaxRate: "35",
-    });
-    const [pf] = await t.db
-      .insert(portfolio)
-      .values({ userId, name: "Main" })
-      .returning({ id: portfolio.id });
-    portfolioId = pf!.id;
-    await t.db.insert(instrument).values({
-      symbol: "CASH_DKK",
-      name: "Cash account",
-      exchange: "CUSTOM",
-      currency: "DKK",
-      assetType: "custom",
-    });
-    await t.db.insert(customHolding).values({
-      symbol: "CASH_DKK",
-      portfolioId,
-      holdingType: "savings",
-      incomeEnabled: true,
-      incomeYearlyPct: "4.25",
-      frequencyUnit: "quarter",
-      frequencyInterval: 1,
-      firstPaymentDate: "2026-04-30",
-      lastPaymentDate: "2041-05-01",
-      autoAdd: true,
-      reinvest: true,
-    });
-    // Imported history: buys AND the imported STOCK_AS_DIVIDEND credit
-    // (price-0 buy with the tax in fee) — exactly what Task 7's parser emits.
-    await t.db.insert(transaction).values([
-      {
-        portfolioId,
-        instrumentSymbol: "CASH_DKK",
-        type: "buy",
-        quantity: "6000",
-        price: "1",
+    beforeAll(async () => {
+      t = await withTestDb();
+      await t.db.insert(user).values({
+        id: userId,
+        name: "U2",
+        email: "u2@x.dk",
+        emailVerified: true,
+        dividendTaxRate: "35",
+      });
+      const [pf] = await t.db
+        .insert(portfolio)
+        .values({ userId, name: "Main" })
+        .returning({ id: portfolio.id });
+      portfolioId = pf!.id;
+      await t.db.insert(instrument).values({
+        symbol: "CASH_DKK",
+        name: "Cash account",
+        exchange: "CUSTOM",
         currency: "DKK",
-        tradeDate: "2026-03-02",
-      },
-      {
+        assetType: "custom",
+      });
+      await t.db.insert(customHolding).values({
+        symbol: "CASH_DKK",
         portfolioId,
-        instrumentSymbol: "CASH_DKK",
-        type: "buy",
-        quantity: "14000",
-        price: "1",
-        currency: "DKK",
-        tradeDate: "2026-04-01",
-      },
-      {
-        portfolioId,
-        instrumentSymbol: "CASH_DKK",
-        type: "buy",
-        // Round numbers on purpose: this case reconstructs gross from what the
-        // broker reported (credited + withheld), so the arithmetic should be
-        // checkable at a glance — 65 net + 35 tax is a gross of 100 at 35%.
-        quantity: "65",
-        price: "0",
-        currency: "DKK",
-        tradeDate: "2026-04-30",
-        fee: "35",
-        feeCurrency: "DKK",
-      },
-    ]);
-  }, 60_000);
+        holdingType: "savings",
+        incomeEnabled: true,
+        incomeYearlyPct: "4.25",
+        frequencyUnit: "quarter",
+        frequencyInterval: 1,
+        firstPaymentDate: "2026-04-30",
+        lastPaymentDate: "2041-05-01",
+        autoAdd: true,
+        reinvest: true,
+      });
+      // Imported history: buys AND the imported STOCK_AS_DIVIDEND payment.
+      await t.db.insert(transaction).values([
+        {
+          portfolioId,
+          instrumentSymbol: "CASH_DKK",
+          type: "buy",
+          quantity: "6000",
+          price: "1",
+          currency: "DKK",
+          tradeDate: "2026-03-02",
+        },
+        {
+          portfolioId,
+          instrumentSymbol: "CASH_DKK",
+          type: "buy",
+          quantity: "14000",
+          price: "1",
+          currency: "DKK",
+          tradeDate: "2026-04-01",
+        },
+        // Round numbers on purpose: gross comes from what the broker reported
+        // (credited + withheld), so the arithmetic should be checkable at a
+        // glance — 65 net + 35 tax is a gross of 100 at 35%.
+        ...(shape === "a price-0 credit"
+          ? [
+              {
+                portfolioId,
+                instrumentSymbol: "CASH_DKK",
+                type: "buy",
+                quantity: "65",
+                price: "0",
+                currency: "DKK",
+                tradeDate: "2026-04-30",
+                fee: "35",
+                feeCurrency: "DKK",
+              },
+            ]
+          : [
+              {
+                portfolioId,
+                instrumentSymbol: "CASH_DKK",
+                type: "dividend",
+                quantity: "1",
+                price: "100",
+                currency: "DKK",
+                tradeDate: "2026-04-30",
+                fee: "35",
+                feeCurrency: "DKK",
+              },
+              {
+                portfolioId,
+                instrumentSymbol: "CASH_DKK",
+                type: "buy",
+                quantity: "65",
+                price: "1",
+                currency: "DKK",
+                tradeDate: "2026-04-30",
+              },
+            ]),
+      ]);
+    }, 60_000);
 
-  afterAll(async () => {
-    await t?.stop();
+    afterAll(async () => {
+      await t?.stop();
+    });
+
+    it("claims the imported payment as a dividend and its buy, never a second copy", async () => {
+      await syncCustomIncome(t.db, userId, new Date("2026-07-18T12:00:00Z"));
+
+      const txs = await t.db
+        .select()
+        .from(transaction)
+        .where(eq(transaction.instrumentSymbol, "CASH_DKK"));
+      expect(txs).toHaveLength(4); // two deposits, the payment, its buy
+
+      const ledger = await t.db
+        .select()
+        .from(customIncome)
+        .where(eq(customIncome.portfolioId, portfolioId));
+      expect(ledger).toHaveLength(1);
+      expect(ledger[0]!.payDate).toBe("2026-04-30");
+      const payment = txs.find((x) => x.id === ledger[0]!.transactionId);
+      expect(payment).toMatchObject({ type: "dividend", quantity: "1", price: "100", fee: "35" });
+      const credit = txs.find((x) => x.id === ledger[0]!.reinvestTransactionId);
+      expect(credit).toMatchObject({ type: "buy", quantity: "65", price: "1", fee: null });
+      expect(payment!.source).toBeNull(); // still the broker's rows
+      expect(credit!.source).toBeNull();
+
+      // dividend_history reconstructed from broker values:
+      // gross = credited(65 × price 1.00) + fee(35) = 100
+      const divs = await t.db
+        .select()
+        .from(dividendHistory)
+        .where(eq(dividendHistory.symbol, "CASH_DKK"));
+      expect(divs).toHaveLength(1);
+      const shares = 20065; // held on ex-date incl. credit
+      expect(Number(divs[0]!.amountPerShare) * shares).toBeCloseTo(100, 5);
+    });
   });
-
-  it("claims the imported credit instead of creating a second one", async () => {
-    await syncCustomIncome(t.db, userId, new Date("2026-07-18T12:00:00Z"));
-
-    const txs = await t.db
-      .select()
-      .from(transaction)
-      .where(eq(transaction.instrumentSymbol, "CASH_DKK"));
-    expect(txs).toHaveLength(3); // NOTHING new inserted
-
-    const ledger = await t.db
-      .select()
-      .from(customIncome)
-      .where(eq(customIncome.portfolioId, portfolioId));
-    expect(ledger).toHaveLength(1);
-    expect(ledger[0]!.payDate).toBe("2026-04-30");
-    const claimedTx = txs.find((x) => x.id === ledger[0]!.transactionId);
-    expect(claimedTx!.price).toBe("0"); // it claimed the imported credit
-
-    // dividend_history reconstructed from broker values:
-    // gross = credited(65 × price 1.00) + fee(35) = 100
-    const divs = await t.db
-      .select()
-      .from(dividendHistory)
-      .where(eq(dividendHistory.symbol, "CASH_DKK"));
-    expect(divs).toHaveLength(1);
-    const shares = 20065; // held on ex-date incl. credit
-    expect(Number(divs[0]!.amountPerShare) * shares).toBeCloseTo(100, 5);
-  });
-});
+}
 
 describeDb("syncCustomIncome — dust balance from rounded import", () => {
   let t: TestDb;
@@ -464,7 +508,9 @@ describeDb("syncCustomIncome — dust balance from rounded import", () => {
       .select()
       .from(transaction)
       .where(eq(transaction.instrumentSymbol, "GBP_DUST"));
-    expect(txsAfterFirst.filter((tx) => tx.source === "custom-income")).toHaveLength(1);
+    expect(
+      txsAfterFirst.filter((tx) => tx.source === "custom-income" && tx.type === "dividend"),
+    ).toHaveLength(1);
 
     // Phase 2: 8 more weekly ticks become due between 2026-05-25 and
     // 2026-07-13 — entirely inside the post-sell ~1e-8 dust-balance period
@@ -484,7 +530,10 @@ describeDb("syncCustomIncome — dust balance from rounded import", () => {
       .select()
       .from(transaction)
       .where(eq(transaction.instrumentSymbol, "GBP_DUST"));
-    expect(dustTxs.filter((tx) => tx.source === "custom-income")).toHaveLength(1); // still just the one legit payment
+    // still just the one legit payment
+    expect(
+      dustTxs.filter((tx) => tx.source === "custom-income" && tx.type === "dividend"),
+    ).toHaveLength(1);
   });
 });
 

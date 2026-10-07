@@ -16,10 +16,11 @@ import type { PortfolioBook } from "./portfolio-book";
  *
  * Two sources, both recorded fact, both GROSS (the client applies tax):
  * - ledger `dividend` transactions dated today or earlier (`buildReceivedDividends`);
- * - reinvested custom-income payments, which the ledger records as a price-0
- *   `buy` with the income fact only in the paired `dividend_history` row
- *   (`source: "custom"`). Those are rebuilt as amountPerShare × shares held on
- *   the payment date, using the full `txs` timeline so a since-sold holding's
+ * - reinvested custom-income payments still recorded the old way, as a
+ *   price-0 `buy` with the income fact only in the paired `dividend_history`
+ *   row (`source: "custom"`). Startup converts those into a ledger dividend
+ *   and the buy it paid for; one it could not price stays in the old shape and
+ *   is rebuilt here as amountPerShare × shares held on the payment date, using the full `txs` timeline so a since-sold holding's
  *   history survives. A history row that already has a ledger `dividend` row
  *   on the same day, or whose `custom_income` row is a tombstone (the user
  *   deleted that payment), is skipped — nothing is counted twice, and nothing

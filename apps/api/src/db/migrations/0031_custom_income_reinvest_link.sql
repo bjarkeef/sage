@@ -1,0 +1,3 @@
+ALTER TABLE "custom_income" ADD COLUMN "reinvest_transaction_id" uuid;--> statement-breakpoint
+ALTER TABLE "custom_income" ADD CONSTRAINT "custom_income_reinvest_transaction_id_transaction_id_fk" FOREIGN KEY ("reinvest_transaction_id") REFERENCES "public"."transaction"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "custom_income_reinvest_transaction_id_idx" ON "custom_income" USING btree ("reinvest_transaction_id");
