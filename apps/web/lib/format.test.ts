@@ -55,7 +55,7 @@ describe("formatSecondsAgo", () => {
 
 describe("formatQuantity", () => {
   it("trims broker-precision decimals to 4 places", () => {
-    expect(formatQuantity("3.4126999998786098398863788101336506")).toBe("2.3119");
+    expect(formatQuantity("3.4126999998786098398863788101336506")).toBe("3.4127");
   });
 
   it("leaves integers alone", () => {
