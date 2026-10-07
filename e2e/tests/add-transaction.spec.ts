@@ -31,7 +31,9 @@ test.describe("adding a transaction", () => {
     await expect(page.getByText(`Bought 10 ${ticker}`)).toBeVisible();
 
     // ...and the entry is readable where it was entered, so it can be undone.
+    // The card starts collapsed; its toggle names how many entries it holds.
     const section = page.locator("section", { hasText: "Transactions" }).last();
+    await section.getByRole("button", { name: "1 transaction", expanded: false }).click();
     await expect(
       section.getByRole("button", { name: new RegExp(`Delete buy of ${ticker}`) }),
     ).toBeVisible();
@@ -80,6 +82,7 @@ test.describe("adding a transaction", () => {
     await submitTransaction(page, { quantity: "10", price: "100" });
     await expect(page.getByText("Transaction added")).toBeVisible();
 
+    await page.getByRole("button", { name: "1 transaction", expanded: false }).click();
     await page.getByRole("button", { name: new RegExp(`Delete buy of ${ticker}`) }).click();
     await expect(page.getByText("Transaction deleted")).toBeVisible();
 
