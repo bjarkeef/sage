@@ -87,7 +87,26 @@ describe("assignOccurrences", () => {
 });
 
 describe("pairIncomingWithAutoRows", () => {
-  const auto = (id: string, tradeDate: string) => ({ transactionId: id, tradeDate });
+  // An auto row's tradeDate is its payment's cash date; its ex-date sits three
+  // weeks earlier unless a test says otherwise.
+  const auto = (id: string, tradeDate: string, exDate?: string) => ({
+    transactionId: id,
+    tradeDate,
+    exDate:
+      exDate ??
+      new Date(Date.parse(`${tradeDate}T00:00:00Z`) - 21 * 86_400_000).toISOString().slice(0, 10),
+  });
+
+  it("adopts an auto row when the broker booked the payment at its ex-date", () => {
+    // The broker's export dates the dividend on its ex-date, three weeks before
+    // the cash date the auto row carries. Matching on the cash date alone left
+    // both rows in the ledger — the payment counted twice.
+    const pairs = pairIncomingWithAutoRows(
+      [{ index: 0, tradeDate: "2023-11-06" }],
+      [auto("a1", "2023-11-27", "2023-11-06")],
+    );
+    expect(pairs).toEqual(new Map([[0, "a1"]]));
+  });
 
   it("pairs an incoming dividend with the nearest auto row within 10 days", () => {
     const pairs = pairIncomingWithAutoRows(
