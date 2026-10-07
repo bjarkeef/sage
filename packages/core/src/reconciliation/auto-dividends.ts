@@ -38,9 +38,10 @@ function dayDistance(a: string, b: string): number {
  *
  * Brokers book a dividend near its ex-date while the provider's cash date is
  * ~3 weeks later; measuring from the cash date alone missed those bookings, and
- * the reconciler added the same payment a second time. A booking can never
- * precede its ex-date, so the ex-date only counts from that day on — which also
- * stops an early booking from claiming the next month's payment.
+ * the reconciler added the same payment a second time. A booking cannot
+ * precede its ex-date, so the ex-date only counts from that day on — give or
+ * take the few days providers disagree with brokers about it — which also stops
+ * an early booking from claiming the next month's payment.
  *
  * The one definition of "the same payment": the reconciler, import adoption,
  * the in-flight filter and the supersede repair all use it.
@@ -50,10 +51,14 @@ export function paymentDistance(
   payment: { exDate: string; cashDate: string },
 ): number {
   const fromCash = dayDistance(bookedOn, payment.cashDate);
-  return bookedOn >= payment.exDate
-    ? Math.min(fromCash, dayDistance(bookedOn, payment.exDate))
+  const fromEx = dayDistance(bookedOn, payment.exDate);
+  return bookedOn >= payment.exDate || fromEx <= EX_DATE_SLACK_DAYS
+    ? Math.min(fromCash, fromEx)
     : fromCash;
 }
+
+/** A provider's ex-date can sit a day or two after the one the broker used. */
+const EX_DATE_SLACK_DAYS = 3;
 
 /** One-to-one nearest-first pairing: every (dividend, transaction) pair within
  *  the window is ranked by `paymentDistance`; greedily take pairs whose sides

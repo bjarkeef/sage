@@ -215,15 +215,16 @@ describe("planAutoDividends", () => {
 
   it("resolves multi-way contention nearest-first", () => {
     // One recorded tx sits within ±10 days of BOTH dividends (2 days from the
-    // first, 6 from the second). Nearest-first pairing must claim the closer
-    // one, leaving only the farther dividend in the plan.
+    // first's cash date, 6 from the second's; the second's ex-date is still 4
+    // days ahead, outside the ex-date slack). Nearest-first pairing must claim
+    // the closer one, leaving only the farther dividend in the plan.
     const plan = planAutoDividends({
       transactions: [buy("KO", "100", "2026-01-01"), divTx("KO", "2026-04-12")],
-      dividends: [div("KO", "2026-04-05", "2026-04-10"), div("KO", "2026-04-13", "2026-04-18")],
+      dividends: [div("KO", "2026-04-05", "2026-04-10"), div("KO", "2026-04-16", "2026-04-18")],
       ledger: [],
       today: TODAY,
     });
-    expect(plan.map((p) => p.exDate)).toEqual(["2026-04-13"]);
+    expect(plan.map((p) => p.exDate)).toEqual(["2026-04-16"]);
   });
 
   it("recognises a payment the broker booked at its ex-date, weeks before the cash", () => {
@@ -255,6 +256,16 @@ describe("planAutoDividends", () => {
       today: TODAY,
     });
     expect(plan.map((p) => p.exDate)).toEqual(["2026-06-01"]);
+  });
+
+  it("tolerates a provider ex-date a day or two after the broker's", () => {
+    const plan = planAutoDividends({
+      transactions: [buy("KO", "100", "2026-01-01"), divTx("KO", "2026-05-14")],
+      dividends: [div("KO", "2026-05-15", "2026-06-05")],
+      ledger: [],
+      today: TODAY,
+    });
+    expect(plan).toEqual([]);
   });
 
   it("never pairs a booking with an ex-date still ahead of it", () => {
