@@ -118,8 +118,8 @@ describeDb("GET /dashboard", () => {
   // MSFT announced rows feed upcomingDividends: exDate far in the future so
   // they land in the "announced" bucket, same as AAPL's. paymentDate is a
   // realistic ~21-day ex->pay lag AFTER its own exDate — real provider data
-  // never pays before its ex-date (none of the dividend_history rows in
-  // production violate payment_date >= ex_date), so both are placed the same
+  // never pays before its ex-date (no dividend_history row in production
+  // violated payment_date >= ex_date when this was checked), so both are placed the same
   // number of days beyond their exDate rather than in the past. That also
   // means neither payment falls inside recentDividends' [previousMarketDay,
   // today] window: a dividend that is still genuinely "announced" (future

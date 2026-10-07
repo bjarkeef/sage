@@ -124,8 +124,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * A backfill at import time is a single chance. A throttled request, a book
  * imported before backfill existed, or a row written before the country-code
  * fix all stayed wrong for good, because nothing but opening an asset page ever
- * fetched a profile again. On a real book that left a few of the holdings with no
- * profile and most of the rest two months old: a third of it read "Unknown".
+ * fetched a profile again. That left holdings with no profile and the rest
+ * months old, and a large share of a book read "Unknown".
  */
 describeDb("refreshHeldProfiles", () => {
   let t: TestDb;

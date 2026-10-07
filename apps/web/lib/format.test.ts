@@ -123,7 +123,7 @@ describe("formatRelativeTime", () => {
 
 describe("formatShares", () => {
   it("drops decimals a five-figure count cannot carry", () => {
-    expect(formatShares("37814.2917")).toBe("41,251");
+    expect(formatShares("37814.2917")).toBe("37,814");
   });
   it("allows two decimals in the hundreds", () => {
     expect(formatShares("102.5")).toBe("102.5");
@@ -148,7 +148,7 @@ describe("formatShares", () => {
     // formatShares must diverge from it here (0dp) or the two are the same
     // function under a different name.
     expect(formatQuantity("37814.2917")).toBe("37,814.2917");
-    expect(formatShares("37814.2917")).toBe("41,251");
+    expect(formatShares("37814.2917")).toBe("37,814");
     expect(formatShares("37814.2917")).not.toBe(formatQuantity("37814.2917"));
   });
 });

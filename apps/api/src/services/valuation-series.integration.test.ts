@@ -700,8 +700,8 @@ describeDb("portfolio history — short history detection", () => {
  * 1 January every year, 1W opens on whatever weekday today is, 3M lands on a
  * weekend one time in three.
  *
- * Reported against a real book: the YTD chart's first point read 13,000 where
- * the day before and the day after both read ~38,000, because the only thing
+ * The YTD chart's first point read a third of the value on the day before and
+ * the day after, because the only thing
  * priceable on 1 January was a custom holding, whose provider re-dates its last
  * mark to the window start so it never vanishes from a chart. The
  * money-weighted return takes that first point as the opening balance and
@@ -807,8 +807,8 @@ describeDb("portfolio history — a window opening on a day nothing traded", () 
 /**
  * The chart's last point and the portfolio's own total are the same holdings on
  * the same day. They were priced from two different fields — the daily close
- * and the quote — and on the reporting book that put 170,000.00 under the
- * overview hero and 169,400.00 in the card directly below it.
+ * and the quote — which put two different totals under the overview hero and
+ * in the card directly below it.
  */
 describeDb("portfolio history — the newest point is priced like the portfolio", () => {
   let tdb: TestDb;
@@ -886,8 +886,7 @@ describeDb("portfolio history — the newest point is priced like the portfolio"
 /**
  * Forward-fill is how a holding survives a weekend. It was unbounded, so a
  * symbol whose bars stopped in August was still valued in September at August's
- * price, silently — on a real book, most of the holdings had no bar for three
- * weeks and the chart drew a confident line through all of it.
+ * price, silently — most of a book's holdings went three weeks without a bar and the chart drew a confident line through all of it.
  */
 describeDb("portfolio history — prices carried too far", () => {
   let tdb: TestDb;

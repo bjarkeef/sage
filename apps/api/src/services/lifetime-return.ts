@@ -8,9 +8,8 @@ import type { SeriesFxLookup } from "./valuation-series";
  *
  * Sage reported "total return" as unrealised gain plus gross dividends on the
  * holdings still open. That is a real quantity but not one anybody asks for:
- * on the reporting book it came to 8,000.00 against a broker's 2,900.00 for
- * the open positions and 23,000.00 for the book's life. It was a third number,
- * between two the holder could recognise and equal to neither, because it
+ * it landed between the broker's figure for the open positions and its figure
+ * for the book's life — a third number, equal to neither, because it
  * counted income from the positions it still held while ignoring every sale
  * and the tax on every payment.
  *
@@ -66,7 +65,8 @@ export function computeLifetimeReturn(
 
   // Fees ride along as their own currency; each disposal converts its cost and
   // its proceeds separately, so a lot bought in kroner and sold in dollars —
-  // which three of the reporting book's symbols were — needs no special case.
+  // which a broker that lists one share on two venues produces — needs no
+  // special case.
   const rateOn = (date: string, currency: string): Decimal | null => {
     const conversion = fxLookup.rateOn(date, currency);
     return conversion ? conversion.divisor : null;

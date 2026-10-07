@@ -38,6 +38,15 @@ export async function invalidateReconciliation(db: Database, portfolioId: string
 }
 
 /**
+ * Release every portfolio's claim. Run at startup: a deploy that changes what
+ * reconciliation does would otherwise wait out the claim of the run before it,
+ * up to a day, before acting on any book.
+ */
+export async function expireAllReconciliations(db: Database): Promise<void> {
+  await db.update(portfolio).set({ lastReconciledAt: null });
+}
+
+/**
  * Lazy dividend auto-reconciliation (spec 2026-07-16). Called at the top of
  * dividend-relevant GETs; exits in one indexed read unless 24h have passed.
  * Reads dividend_history as-is — freshness is the existing stale-sync's job.

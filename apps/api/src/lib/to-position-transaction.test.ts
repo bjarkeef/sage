@@ -19,13 +19,12 @@ describe("feeInTradeCurrency", () => {
     expect(feeInTradeCurrency(row("1.25", "USD"))!.amount.toString()).toBe("1.25");
   });
 
-  // Four of the reporting book's purchases were charged this way: bought in
-  // USD, billed in DKK at around 90 kroner a time. Dropping them understates
-  // what those shares cost.
+  // Brokers do charge this way: a purchase in USD, its commission billed in
+  // DKK. Dropping the fee understates what those shares cost.
   it("converts a fee billed in another currency at the trade date", () => {
     const fee = feeInTradeCurrency(row("75.00", "DKK"), rateOn);
 
-    // 75.00 DKK / 7.4748 = 11.7836 EUR, x 1.0921 = 10.9578 USD.
+    // 75.00 DKK / 7.4748 = 10.0337 EUR, x 1.0921 = 10.9578 USD.
     expect(fee!.currency).toBe("USD");
     expect(Number(fee!.amount)).toBeCloseTo(10.9578, 3);
   });

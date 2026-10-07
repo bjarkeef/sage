@@ -572,8 +572,8 @@ describeDb("PersistedPriceProvider", () => {
 
   // ---- a settled close beats an intraday print from the same session -------
   //
-  // The reporting book served a thinly traded ETF's 07:04 print — nine minutes after
-  // the open — as its current price two days later, while that session's
+  // A thin listing's print from nine minutes after the open was served as its
+  // current price two days later, while that session's
   // official close sat in `price_daily` all along. Two reads a minute apart
   // with the market shut reported different portfolio totals.
 

@@ -6,6 +6,7 @@ import { parseEnv } from "./env";
 import type { Env } from "./env";
 import { createDb } from "./db/client";
 import { runMigrations } from "./db/migrate";
+import { expireAllReconciliations } from "./services/dividend-reconciliation";
 import { createAuth } from "./auth";
 import type { IMarketDataProvider } from "@sage/provider-interface";
 import { YahooFinanceProvider } from "@sage/provider-yahoo-finance";
@@ -88,6 +89,7 @@ async function main() {
   const { db } = createDb(env.DATABASE_URL);
   const auth = createAuth(db, env);
   await runMigrations(db, MIGRATIONS_FOLDER);
+  await expireAllReconciliations(db);
   const providerHealth = new ProviderHealthRegistry();
   // Prices are served from Postgres and refreshed behind the response, so a
   // provider outage shows up as an age rather than as missing data. Caching

@@ -261,9 +261,8 @@ describe("computePositions — acquisition fees", () => {
   });
 
   // Fees were recorded from the first import and read by nothing: every figure
-  // built on cost basis assumed the shares had been free to buy. On the
-  // reporting book that overstated the unrealised gain by 100.00 DKK, 3% of the
-  // gain being reported.
+  // built on cost basis assumed the shares had been free to buy, overstating
+  // the unrealised gain.
   it("counts a buy's fee as part of what the shares cost", () => {
     const [p] = computePositions([withFee(buy("AAPL", "10", "100", "2024-01-01"), "25")]);
 
@@ -325,9 +324,8 @@ describe("computePositions — acquisition fees", () => {
   });
 
   // A reinvestment credits shares rather than buying them, and the fee on one
-  // is tax withheld from the income that paid for them. The reporting book's
-  // savings account has three such rows; counting their withholding as cost
-  // would have added 250.00 DKK the holder never spent.
+  // is tax withheld from the income that paid for them. Counting it as cost
+  // would add money the holder never spent.
   it("ignores a fee on shares credited at a price of zero", () => {
     const [p] = computePositions([withFee(buy("AAPL", "5", "0", "2024-01-01"), "40")]);
 
@@ -413,7 +411,7 @@ describe("computeDisposals", () => {
     expect(computeDisposals([buy("AAPL", "10", "100", "2024-01-01")])).toEqual([]);
   });
 
-  // Three of the reporting book's symbols were bought in DKK and sold in USD.
+  // A broker can buy a share in DKK and sell the same holding in USD.
   // Cost and proceeds stay in their own currencies precisely so this does not
   // silently subtract one from the other.
   it("keeps cost and proceeds in the currencies they were paid in", () => {

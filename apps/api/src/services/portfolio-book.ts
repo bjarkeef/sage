@@ -26,9 +26,9 @@ export interface PortfolioBook {
  * A date/currency rate lookup, loaded only when some fee needs converting.
  *
  * Nearly every fee is already in the currency of its own trade, so the usual
- * answer here is "no query at all". The exceptions matter: the reporting book
- * has four USD purchases charged in DKK at around 90 kroner each, one of them
- * still open. Dropping those would understate that holding's cost by 3.8%.
+ * answer here is "no query at all". The exceptions matter: a USD purchase
+ * whose commission was billed in DKK, dropped, understates that holding's cost
+ * by several percent.
  *
  * Loads the whole ECB series for the currencies involved rather than one row
  * per flow — the table is small, the alternative is a query per transaction,

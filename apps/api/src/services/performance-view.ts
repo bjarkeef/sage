@@ -81,12 +81,11 @@ function ratioBlock(mine: Decimal | null, theirs: Decimal | null): RatioBlock | 
  *
  * The arithmetic was never wrong — it reproduced to four decimal places — but
  * the flows handed to it are not the flows that happened. Sage has no cash or
- * settlement account: when the reporting book was restructured in one week of
- * October 2025, 170,000 DKK of sales and 190,000 of purchases went through a
- * portfolio worth 150,000, and every one of those round trips was read as a
- * withdrawal followed by a deposit rather than as money moving between
- * holdings. IRR prices that shape as brilliant timing and returned 36% for a
- * year the time-weighted return puts at 14.6%.
+ * settlement account: when a book is restructured in a week, sales and
+ * purchases larger than the whole portfolio go through it, and every one of
+ * those round trips is read as a withdrawal followed by a deposit rather than
+ * as money moving between holdings. IRR prices that shape as brilliant timing
+ * and returned more than twice the year's time-weighted return.
  *
  * It is a question worth answering — did the timing help? is exactly what a
  * time-weighted return refuses to tell you — and the price of answering it is
@@ -273,9 +272,8 @@ export async function buildPerformanceView(
   // today's positions can finish the sum, and because the parts answer
   // different questions: `realised` is every sale ever made, `income` the cash
   // that actually landed after the tax taken off it. Sage reported neither, and
-  // called unrealised-plus-gross-dividends "total return" — on the reporting
-  // book 8,000.00, against a broker's 2,900.00 for the open positions and
-  // 23,000.00 for the book's life. A third number, equal to neither.
+  // called unrealised-plus-gross-dividends "total return" — a third number,
+  // equal to neither the broker's open-positions figure nor its lifetime one.
   //
   // Its honesty flags are OR'd into this view's: the contract on
   // `fxApproximated` and `fxIncomplete` is that a consumer making further
@@ -381,8 +379,8 @@ export async function buildPerformanceView(
     .minus(first.marketValue.minus(first.invested));
   // The same money over what had been paid in when the window opened. This is
   // the rate the OVERVIEW prints, and publishing it here is the point: the two
-  // pages were reporting different percentages for one window — 9.5% against
-  // 14.6% on the reporting book — and a reader could only discover they are
+  // pages were reporting different percentages for one window, several points
+  // apart, and a reader could only discover they are
   // different measures by noticing the discrepancy. Now they sit side by side
   // on the page whose job is defining measures.
   const simpleReturn = first.invested.isZero()

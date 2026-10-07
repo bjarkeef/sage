@@ -171,10 +171,9 @@ export class PersistedPriceProvider implements IMarketDataProvider {
    * A settled close beats an intraday print from the same session.
    *
    * A quote's `asOf` is whenever the provider last saw a trade, which for a
-   * thin listing can be hours before that session ended: on the reporting book
-   * a thinly traded ETF was quoted at 07:04 UTC — nine minutes after the open — and an
-   * another one at 14:48, and both were being served as "the current price"
-   * two days later. Meanwhile the official close for the very same date was
+   * thin listing can be hours before that session ended: one ETF was quoted
+   * nine minutes after the open, another mid-afternoon, and both were being
+   * served as "the current price" two days later. Meanwhile the official close for the very same date was
    * already sitting in `price_daily`.
    *
    * So the portfolio total moved between two reads a minute apart with the

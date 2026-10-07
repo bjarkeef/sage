@@ -243,7 +243,7 @@ export function refreshHeldProfilesInBackground(
  * `backfillProfiles` at import time is a single chance. A throttled request, a
  * book imported before backfill existed, or a row written before the
  * country-code fix all stayed wrong for good, because nothing but opening an
- * asset page ever fetched a profile again — so a third of a real book read
+ * asset page ever fetched a profile again — so a large share of a book read
  * "Unknown" on Diversification. Readers call this fire-and-forget; the next
  * load shows the result.
  */

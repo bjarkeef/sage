@@ -60,8 +60,8 @@ export const CLOSED_MARKET_TOLERANCE_DAYS = 4;
  * Forward-fill is how a holding survives a weekend, a holiday, or a day its
  * exchange simply did not print. It was unbounded: a symbol whose bars stopped
  * in August was still "priceable" in September at August's price, and nothing
- * anywhere said so. On the reporting book most of the holdings had no bar for three
- * weeks and the chart drew a confident line through all of it.
+ * anywhere said so. Most of a book's holdings went three weeks without a bar
+ * and the chart drew a confident line through all of it.
  *
  * The fix is to DISCLOSE, not to drop. Dropping the holding would take its value
  * out of the total and draw a cliff — the book would appear to have lost money
@@ -171,10 +171,9 @@ export type ValuationSeriesResult = ValuationSeries | { empty: true; targetCurre
  * happened to trade, and custom holdings, whose provider re-dates their last
  * mark to the window start so they never vanish from a chart.
  *
- * On a real book that produced a first point of 13,000 against a true 38,000 —
- * a GBP savings account and nothing else — which the money-weighted return
- * then took as the opening balance and reported 52% for the year against a
- * time-weighted 8.7%. The cost line disagreed with itself between ranges for
+ * That produced a first point a third of the true value — one savings account
+ * and nothing else — which the money-weighted return then took as the opening
+ * balance and reported several times the year's time-weighted return. The cost line disagreed with itself between ranges for
  * the same date for the same reason.
  *
  * 14 days clears the longest ordinary closure (Christmas into New Year,
@@ -635,7 +634,7 @@ export async function buildValuationSeries(
         // depend on whether the store happened to hold the symbol's old bars
         // inside the window.
         //
-        // Found on a real book: one closed position, sold at a profit, whose
+        // Found in use: one closed position, sold at a profit, whose
         // last stored bar predated a 1M window but not a 3M one. Every longer
         // range counted its negative residue and 1M did not, so 1M reported a
         // cost line a few hundred kroner higher than every other range for the
@@ -673,9 +672,9 @@ export async function buildValuationSeries(
   // the most recent price known FOR that date", which for a past date is its
   // close. For the newest date the most recent price known is the quote — and
   // `portfolio-view` values every holding from exactly that. Leaving this point
-  // on closes put two totals for "what this is worth" on one screen: 170,000.00
-  // under the hero, 169,400.00 in the card below it, 600 DKK apart on the
-  // reporting book. Same day, same holdings, two price fields.
+  // on closes put two totals for "what this is worth" on one screen, a few
+  // hundred kroner apart: one under the hero, one in the card below it. Same
+  // day, same holdings, two price fields.
   //
   // Per symbol, and only forward: a quote older than the point's own date is a
   // staler answer than the close already in hand, so that symbol keeps its
