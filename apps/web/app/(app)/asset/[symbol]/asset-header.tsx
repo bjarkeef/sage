@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Chip } from "@sage/ui";
+import { Chip, cn } from "@sage/ui";
 import { CompanyLogo } from "../../../../components/company-logo";
 import { BasisMismatchMark } from "../../../../components/basis-mismatch-mark";
 import { ChartReadoutLine } from "../../../../components/chart-readout-line";
@@ -73,8 +73,18 @@ export function AssetHeader({
         <div className="text-right">
           <div className="hero-num">{formatMoney(shown)}</div>
           {readout && <ChartReadoutLine readout={readout} />}
-          {quote && readout?.date == null && (
-            <div className="mt-1 text-xs text-muted-foreground">
+          {/* Hidden while scrubbing (the quote's date is not true of a hovered
+              close) but never removed: dropping the line changed the header's
+              height, moved the chart under the pointer, ended the hover and
+              brought the line back — a loop that never settled. */}
+          {quote && (
+            <div
+              aria-hidden={readout?.date != null ? true : undefined}
+              className={cn(
+                "mt-1 text-xs text-muted-foreground",
+                readout?.date != null && "invisible",
+              )}
+            >
               As of {formatDate(quote.asOf, { year: "always" })}
             </div>
           )}

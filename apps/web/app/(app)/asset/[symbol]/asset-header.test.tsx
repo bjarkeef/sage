@@ -37,7 +37,13 @@ describe("AssetHeader readout", () => {
     expect(screen.getByText("$58.12")).toBeInTheDocument();
     expect(screen.queryByText("$60.00")).not.toBeInTheDocument();
     expect(screen.getByTestId("chart-readout").textContent).toContain("to May 4, 2026");
-    expect(screen.queryByText(/^As of/)).not.toBeInTheDocument();
+    // The quote's date is not true of a hovered close, so it is hidden — but it
+    // keeps its line. Removing it changed the header's height under the pointer,
+    // which moved the chart, which ended the hover, which brought the line back:
+    // a loop that never settled while the pointer rested near the chart's edge.
+    const asOf = screen.getByText(/^As of/);
+    expect(asOf).toHaveClass("invisible");
+    expect(asOf).toHaveAttribute("aria-hidden", "true");
   });
 
   it("reads total return beside price in TR mode", () => {
