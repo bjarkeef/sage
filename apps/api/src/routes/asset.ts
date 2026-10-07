@@ -12,7 +12,6 @@ import {
   projectDividendSchedule,
   dedupeDividends,
   incomePaymentDates,
-  type PositionTransaction,
   type DividendHistoryRow,
   type IncomeFrequencyUnit,
 } from "@sage/core";
@@ -34,6 +33,8 @@ import {
 import { computeYieldRange5y, type YieldRange } from "../services/yield-range";
 import { loadReceivedIncome, receivedTotal } from "../services/received-income";
 import { getUserPortfolio } from "../auth";
+import { feeInTradeCurrency, toPositionTransaction } from "../lib/to-position-transaction";
+import { feeRateLookup } from "../services/portfolio-book";
 import { forwardFillChart } from "./chart-utils";
 import type { IsinResolver } from "../market-data/isin-resolver";
 import { getCachedOrFetchProfile } from "../market-data/asset-profile-cache";
@@ -283,13 +284,11 @@ export function assetRoutes(
     let positionDTO: Record<string, unknown> = { held: false };
 
     if (txRows.length > 0) {
-      const txs: PositionTransaction[] = txRows.map((row) => ({
-        symbol: row.instrumentSymbol,
-        type: row.type as PositionTransaction["type"],
-        quantity: new Decimal(row.quantity),
-        price: Money.of(row.price, row.currency),
-        tradeDate: new Date(`${row.tradeDate}T00:00:00Z`),
-      }));
+      // The same mapping /holdings uses, so a buy's fee is part of what the
+      // shares cost here too, converted when the broker charged it in another
+      // currency.
+      const rateOn = await feeRateLookup(db, txRows);
+      const txs = txRows.map((row) => toPositionTransaction(row, rateOn));
 
       const positions = computePositions(txs);
       const pos = positions.find((p) => p.symbol === symbol);
@@ -373,13 +372,17 @@ export function assetRoutes(
         const yoc = computeYieldOnCost(divHistory, pos.averageCost, asOf, yocConvert);
         const yieldOnCost = yoc ? Number(yoc.toFixed(6)) : null;
 
-        // Fees: sum of transaction fees for this symbol.
-        const feesTotal = txRows.reduce(
-          (s, r) => (r.fee ? s.plus(new Decimal(r.fee)) : s),
-          new Decimal(0),
-        );
-        const feeCcy =
-          txRows.find((r) => r.feeCurrency)?.feeCurrency ?? txRows[0]?.currency ?? profile.currency;
+        // Fees: the commissions on buys and sells, each in the position's
+        // currency at its own trade date. A dividend's fee is tax withheld from
+        // the payment, not a cost of holding, and a fee that cannot be
+        // converted is left out rather than added to dollars as kroner.
+        const feesTotal = txRows
+          .filter((r) => r.type === "buy" || r.type === "sell")
+          .map((r) => feeInTradeCurrency(r, rateOn))
+          .reduce(
+            (s, fee) => (fee && fee.currency === pos.currency ? s.plus(fee.toDecimal()) : s),
+            new Decimal(0),
+          );
 
         // Buy/sell markers, ascending by trade date (dividends/splits excluded).
         const trades = txRows
@@ -410,7 +413,7 @@ export function assetRoutes(
               }
             : null,
           yieldOnCost,
-          feesPaid: { amount: feesTotal.toFixed(), currency: feeCcy },
+          feesPaid: { amount: feesTotal.toFixed(), currency: pos.currency },
           trades,
         };
       }
