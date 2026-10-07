@@ -365,6 +365,62 @@ describe("projectDividendSchedule", () => {
     expect(projected[0]!.amountPerShare).toBe("0.27"); // median of last three
   });
 
+  it("steps a monthly payer by calendar month: exactly 12 a year, on its own day of the month", () => {
+    // A 30-day step fits 12.17 payments in a year, so roughly one forecast in
+    // six held a 13th — "next 12 months" overstated by a month's income.
+    const rows = projectDividendSchedule({
+      symbol: "O",
+      quantity: new Decimal(10),
+      history: [monthly("2026-04-15"), monthly("2026-05-15"), monthly("2026-06-15")],
+      announced: [],
+      asOf: new Date("2026-06-20T00:00:00Z"),
+    });
+    const ex = rows.map((r) => r.exDate);
+    expect(ex).toHaveLength(12);
+    expect(ex[0]).toBe("2026-07-15");
+    expect(ex[11]).toBe("2027-06-15");
+    expect(ex.every((d) => d.endsWith("-15"))).toBe(true);
+  });
+
+  it("keeps a month-end payer on the month's end without drifting to the 28th", () => {
+    const rows = projectDividendSchedule({
+      symbol: "O",
+      quantity: new Decimal(10),
+      history: [monthly("2026-03-31"), monthly("2026-04-30"), monthly("2026-05-31")],
+      announced: [],
+      asOf: new Date("2026-06-05T00:00:00Z"),
+    });
+    const ex = rows.map((r) => r.exDate);
+    expect(ex).toContain("2026-06-30");
+    expect(ex).toContain("2027-02-28");
+    expect(ex).toContain("2027-03-31");
+    expect(ex).toHaveLength(12);
+  });
+
+  it("steps a quarterly payer by three calendar months: exactly 4 a year", () => {
+    const q = (exDate: string): DividendHistoryRow => ({
+      symbol: "KO",
+      exDate,
+      amountPerShare: "0.51",
+      currency: "USD",
+      paymentDate: null,
+      period: "Quarterly",
+    });
+    const rows = projectDividendSchedule({
+      symbol: "KO",
+      quantity: new Decimal(10),
+      history: [q("2025-12-01"), q("2026-03-02"), q("2026-06-01")],
+      announced: [],
+      asOf: new Date("2026-06-10T00:00:00Z"),
+    });
+    expect(rows.map((r) => r.exDate)).toEqual([
+      "2026-09-01",
+      "2026-12-01",
+      "2027-03-01",
+      "2027-06-01",
+    ]);
+  });
+
   it("falls back to repeat-last-year for irregular payers, low confidence", () => {
     const history = [
       { symbol: "X", exDate: "2025-09-15", amountPerShare: "1.00", currency: "USD" },

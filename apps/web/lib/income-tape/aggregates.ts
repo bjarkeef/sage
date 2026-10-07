@@ -92,8 +92,9 @@ function sumWhere(points: TapePoint[], pred: (p: TapePoint) => boolean): number 
 }
 
 // The money windows follow the headline tags, so a chip, the focus card and the
-// HUD's focused figure all sum the same points. The tags select by ex-date
-// horizon, so a forward payment can land after today + 365.
+// HUD's focused figure all sum the same points. The server tags by cash date
+// within a calendar year, so across a leap day a tagged payment can land one
+// day after today + 365.
 const isForward = (p: TapePoint) => p.headline === "forward";
 const isTrailing = (p: TapePoint) => p.headline === "trailing";
 

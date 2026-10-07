@@ -77,6 +77,34 @@ describe("forwardScheduleForSymbol", () => {
     }
   });
 
+  it("counts a payment in the next 12 months by when the cash lands, not by its ex-date", () => {
+    // A monthly payer paying 21 days after ex: its twelfth ex-date in the year
+    // pays after the year is out. Counting by ex-date (plus the payments in
+    // flight, which the income view adds) put 13 months of cash in "the next 12
+    // months". That payment belongs to the calendar's long range instead.
+    const monthly = Array.from({ length: 6 }, (_, i) =>
+      div(day(-30 * (6 - i) + 10), "0.20", {
+        paymentDate: day(-30 * (6 - i) + 31),
+        period: "Monthly",
+      }),
+    );
+    const s = forwardScheduleForSymbol({
+      symbol: "KO",
+      quantity: new Decimal(1),
+      history: monthly,
+      now: NOW,
+      growth: null,
+    });
+    const cash = (r: ProjectedDividendRow) => r.paymentDate ?? r.exDate;
+    const twelve = [...s.announced, ...s.projected];
+    expect(twelve.every((r) => cash(r) <= day(365))).toBe(true);
+    // Moved, not dropped: the late-paying one is the long range's first payment.
+    const late = s.longRange.filter((r) => r.exDate <= day(365));
+    expect(late).toHaveLength(1);
+    expect(cash(late[0]!) > day(365)).toBe(true);
+    expect(s.longRange.every((r) => cash(r) > day(365))).toBe(true);
+  });
+
   it("treats a future-dated history row as announced and never projects a second payment beside it", () => {
     const s = forwardScheduleForSymbol({
       symbol: "KO",

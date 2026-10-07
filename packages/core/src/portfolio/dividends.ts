@@ -287,19 +287,43 @@ export function projectDividendSchedule(input: {
   const regular = regularDividendAmount(cleaned, frequency, asOf);
   if (!regular) return rows.sort((a, b) => a.exDate.localeCompare(b.exDate));
 
-  const interval = FREQUENCY_INTERVAL_DAYS[frequency];
+  // Step in calendar months, each counted from the last known ex-date rather
+  // than from the previous step, so a payer on the 31st stays at month-end
+  // instead of drifting to the 28th after February. A fixed day count (30, 91)
+  // fitted 12.17 monthly payments in a year — a 13th in about one forecast in
+  // six, overstating "the next 12 months" by a month's income.
+  const months = FREQUENCY_MONTHS[frequency];
   const inWindowAnnouncedDates = announcedDates.filter((d) => d <= windowEndIso);
   const known = [cleaned[cleaned.length - 1]!.exDate, ...inWindowAnnouncedDates].sort();
   const lastKnown = known[known.length - 1]!;
 
-  let next = isoAddDays(lastKnown, interval);
-  while (next <= windowEndIso) {
+  for (let k = 1; ; k++) {
+    const next = isoAddMonths(lastKnown, k * months);
+    if (next > windowEndIso) break;
     if (next > asOfIso && !collides(next)) {
       pushProjected(next, regular.amount, regular.confidence);
     }
-    next = isoAddDays(next, interval);
   }
   return rows.sort((a, b) => a.exDate.localeCompare(b.exDate));
+}
+
+/** Calendar months between payments, for stepping a schedule forward. */
+const FREQUENCY_MONTHS: Record<Exclude<DividendFrequency, "irregular">, number> = {
+  monthly: 1,
+  quarterly: 3,
+  semiannual: 6,
+  annual: 12,
+};
+
+/** `iso` plus `n` calendar months, the day clamped to the target month's
+ *  length (Jan 31 + 1 → Feb 28/29). */
+function isoAddMonths(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  const total = m - 1 + n;
+  const year = y + Math.floor(total / 12);
+  const month = ((total % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, Math.min(d, lastDay))).toISOString().slice(0, 10);
 }
 
 export type DividendFrequency = "monthly" | "quarterly" | "semiannual" | "annual" | "irregular";

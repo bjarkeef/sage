@@ -16,6 +16,7 @@ import {
   user,
 } from "../db/schema";
 import { getUserPortfolio } from "../auth";
+import { correctDividendCurrencies } from "./dividend-currency-correction";
 
 export const RECONCILE_TTL_MS = 24 * 3600 * 1000;
 
@@ -71,6 +72,10 @@ export async function reconcileDividends(db: Database, userId: string): Promise<
   const customSet = new Set(customRows.map((r) => r.symbol));
   const providerSymbols = symbols.filter((s) => !customSet.has(s));
   if (providerSymbols.length === 0) return;
+
+  // Before planning: a dividend added under a mislabelled currency would be
+  // wrong from the moment it is written.
+  await correctDividendCurrencies(db, providerSymbols);
 
   const divRows = await db
     .select()

@@ -3,6 +3,7 @@ import { dedupeDividends } from "@sage/core";
 import type { IMarketDataProvider } from "@sage/provider-interface";
 import type { Database } from "../db/client";
 import { dividendHistory, instrument } from "../db/schema";
+import { correctDividendCurrencies } from "../services/dividend-currency-correction";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_PAYMENT_LAG_DAYS = 21;
@@ -224,6 +225,10 @@ export async function syncDividends(
       .set({ paymentDate: e.paymentDate, paymentDateEstimated: true })
       .where(and(eq(dividendHistory.symbol, symbol), eq(dividendHistory.exDate, e.exDate)));
   }
+
+  // The fresh rows carry the provider's label again; put the broker-confirmed
+  // currency back before anything reads them.
+  await correctDividendCurrencies(db, [symbol]);
 
   return upserts.length;
 }
