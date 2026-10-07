@@ -9,7 +9,7 @@ import {
   dividendHistory,
   autoDividend,
 } from "../db/schema";
-import { reconcileDividends } from "./dividend-reconciliation";
+import { expireAllReconciliations, reconcileDividends } from "./dividend-reconciliation";
 
 describeDb("reconcileDividends", () => {
   let tdb: TestDb;
@@ -457,5 +457,23 @@ describeDb("reconcileDividends", () => {
       (t) => t.instrumentSymbol === "ADOPTED" && t.type === "dividend",
     );
     expect(divs.map((t) => t.id)).toEqual([adopted!.id]);
+  });
+
+  it("reconciles again after a restart, without waiting out the day", async () => {
+    // A deploy that fixes the reconciler should act on the next page load,
+    // not a day later when the last run's claim lapses.
+    await reconcileDividends(tdb.db, userId);
+    const claimed = await tdb.db
+      .select({ last: portfolio.lastReconciledAt })
+      .from(portfolio)
+      .where(eq(portfolio.id, portfolioId));
+    expect(claimed[0]!.last).not.toBeNull();
+
+    await expireAllReconciliations(tdb.db);
+    const released = await tdb.db
+      .select({ last: portfolio.lastReconciledAt })
+      .from(portfolio)
+      .where(eq(portfolio.id, portfolioId));
+    expect(released[0]!.last).toBeNull();
   });
 });
