@@ -91,7 +91,7 @@ describe("computeLifetimeReturn", () => {
     expect(Number(r.realised)).toBeCloseTo(-50 / 0.145, 2);
   });
 
-  // Three of the reporting book's symbols were bought in DKK and sold in USD.
+  // A broker can buy a share in DKK and sell the same holding in USD.
   it("handles a lot bought in one currency and sold in another", () => {
     const r = computeLifetimeReturn(
       [

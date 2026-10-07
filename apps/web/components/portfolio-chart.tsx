@@ -108,8 +108,9 @@ export interface PortfolioChartProps {
    *  Deliberately NOT fired during the entrance. The numeral was briefly made
    *  to travel from the range's opening value to today's, as the mockup did —
    *  but the overview is server-rendered, so today's figure is in the HTML and
-   *  on screen before React is alive. Measured: 340,000 painted at 209ms, then
-   *  the chart mounted and pulled it back to 280,000. The number was right,
+   *  on screen before React is alive. Measured: today's figure painted at
+   *  209ms, then the chart mounted and pulled it back to the range's opening
+   *  value. The number was right,
    *  then snapped backwards and re-earned itself, which reads as a fault.
    *
    *  Starting it lower would mean shipping a figure in the SSR HTML that is not

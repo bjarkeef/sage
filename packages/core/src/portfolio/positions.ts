@@ -36,9 +36,8 @@ export interface PositionTransaction {
  *
  * Fees were recorded from the first import and read by nothing: the column was
  * written, exported and shown on the transaction row, while every figure built
- * on cost basis quietly assumed the shares had been free to buy. On the
- * reporting book that overstated the unrealised gain by 100.00 DKK, 3% of the
- * gain it was reporting, spread across most of its holdings.
+ * on cost basis quietly assumed the shares had been free to buy, overstating
+ * the unrealised gain on almost every holding.
  *
  * Folding the fee into the lot's per-share cost rather than carrying it beside
  * the lot means splits, partial sells and `averageCost` all keep working
@@ -50,9 +49,8 @@ function lotCostPerShare(tx: PositionTransaction): Money {
   // Shares credited rather than bought — a reinvestment, a DRIP, a bonus issue
   // — carry a price of zero, and a fee on one of those is tax withheld from the
   // income that paid for them, not a cost of acquiring them. Counting it would
-  // say the holder spent money they never spent: on the reporting book the
-  // savings account's three reinvest rows would have added 250.00 DKK of
-  // withholding to its cost.
+  // say the holder spent money they never spent — a savings account's
+  // reinvest rows would add their withholding to its cost.
   if (tx.price.isZero()) return tx.price;
   return tx.price.plus(tx.fee.dividedBy(tx.quantity));
 }
@@ -189,8 +187,8 @@ function walkLots(
 /**
  * Every sale in the history, matched FIFO against the lots it consumed.
  *
- * Sage computed this nowhere. On the reporting book the sales it never looked
- * at are the largest single component of what that book has actually made, so
+ * Sage computed this nowhere. For a book that has sold much, the sales it never
+ * looked at can be the largest single component of what it has made, so
  * a "total return" built only from open positions was answering a much smaller
  * question than the one being asked of it.
  */

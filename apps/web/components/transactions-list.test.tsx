@@ -202,10 +202,10 @@ describe("TransactionsList", () => {
       },
     ]);
     // The share count is a five-figure quantity, so formatShares bands it to
-    // 0 decimals ("41,251 sh"); the price beside it must stay on
+    // 0 decimals ("37,814 sh"); the price beside it must stay on
     // formatQuantity at full precision, or a 5-cent price would render as
     // "0.05" instead of "0.0521".
-    expect(await screen.findByText(/41,251 sh @ 0\.0521/)).toBeInTheDocument();
+    expect(await screen.findByText(/37,814 sh @ 0\.0521/)).toBeInTheDocument();
   });
 
   it("renders seeded cache data without refetching", async () => {

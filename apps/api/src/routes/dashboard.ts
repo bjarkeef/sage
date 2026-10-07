@@ -329,12 +329,12 @@ export function dashboardRoutes(
     // It used to mean unrealised gain plus GROSS dividends on the holdings
     // still open — which counted income from positions it held while ignoring
     // every position it had sold, and treated withheld tax as money received.
-    // On the reporting book that printed 8,000.00 where the broker said
-    // 23,000.00, and matched no figure the holder could find anywhere else.
+    // It printed roughly a third of what the broker reported for the book's
+    // life, and matched no figure the holder could find anywhere else.
     //
     // No percentage travels with it. A lifetime gain has no denominator anyone
     // agrees on — today's cost basis, every krone ever put in, and average
-    // capital employed differ by more than a factor of two on this book, and
+    // capital employed can differ by more than a factor of two, and
     // the broker's own headline divides by the first, which flatters it. The
     // rate lives on /performance, where it is a time-weighted return over a
     // window the reader chose.

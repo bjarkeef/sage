@@ -1,8 +1,8 @@
 -- Dividend rows the auto-reconciler created carried no `fee`, and a dividend
 -- row's `fee` is the tax withheld before the cash landed. Zero there does not
 -- mean "unknown", it means "none was taken" — which is never true of a real
--- payment. Imported rows have always carried the broker's real figure: 35%
--- across the reporting book's all of them, against 0% on its auto rows.
+-- payment. Imported rows have always carried the broker's real figure, while
+-- every auto row carried 0%.
 --
 -- With income about to be reported net, that split would have bent the trend
 -- line at the point where a book stopped importing and started reconciling —

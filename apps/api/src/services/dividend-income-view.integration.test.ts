@@ -64,9 +64,9 @@ describeDb("buildDividendIncomeView — custom holding income projection", () =>
       reinvest: true,
     });
 
-    // Buys totaling 19987.68 shares @ 1 DKK before the first payment date,
-    // plus the price-0 reinvest credit (Snowball's STOCK_AS_DIVIDEND import
-    // shape) landing exactly on it — mirrors the live CASH_DKK position.
+    // A deposit of 19987.68 shares @ 1 DKK before the first payment date, plus
+    // the price-0 reinvest credit (Snowball's STOCK_AS_DIVIDEND import shape)
+    // landing exactly on it.
     await t.db.insert(transaction).values([
       {
         portfolioId,
@@ -132,14 +132,13 @@ describeDb("buildDividendIncomeView — custom holding income projection", () =>
       (sum, days) => sum + Math.round(shares * yearlyPct * (days / 365) * 100) / 100,
       0,
     );
-    expect(expectedTotal).toBeCloseTo(1700, 0); // ~40,000 × 4.25%
+    expect(expectedTotal).toBeCloseTo(shares * yearlyPct, 0); // a year of quarters
 
     const actualTotal = symbolRows.reduce((sum, r) => sum + Number(r.income), 0);
     expect(actualTotal).toBeCloseTo(expectedTotal, 2);
 
-    // The old history-inferred single-payment projection (~150.00 DKK total)
-    // must be gone — this is the regression the parity gap was about.
-    expect(actualTotal).not.toBeCloseTo(150.00, 0);
+    // The old projection inferred a cadence from the one stored payment and
+    // repeated it; the exact total above is what rules it out.
 
     const projectedSummary = Number(view.summary.projectedTwelveMonthIncome[0]!.amount);
     expect(projectedSummary).toBeCloseTo(expectedTotal, 2);

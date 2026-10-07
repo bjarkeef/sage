@@ -10,11 +10,10 @@ export interface FeeColumns {
  * A row's fee expressed in the trade's own currency, or null when it cannot be.
  *
  * Almost every fee is already denominated in the currency of the trade it
- * belongs to — nearly all on the reporting book. The exceptions are real
- * though, and not small: four USD purchases were charged in DKK at around 90
- * kroner each, one of them on a holding that is still open and worth 2,300. So
- * a mismatch is converted rather than waved through or dropped, and only a
- * conversion that is genuinely unavailable returns null.
+ * belongs to. The exceptions are real though, and not small: a broker can bill
+ * a USD purchase's commission in DKK, at a size that moves a small holding's
+ * cost by several percent. So a mismatch is converted rather than waved through
+ * or dropped, and only a conversion that is genuinely unavailable returns null.
  *
  * `rateOn` is the same shape the replay lookups take: units of `currency` per
  * reporting unit on that date, null when the date or currency cannot be priced.

@@ -1,8 +1,8 @@
 import type { GoalViewDTO } from "../types";
 
 /** A goal line is drawn only while it fits: above this multiple of the tallest
- *  year it would squash every bar to a sliver (a 200,000 goal over ~6,000 of
- *  income leaves them at 2.6% of the ribbon). */
+ *  year it would squash every bar to a sliver (a 200,000 goal over ~5,000 of
+ *  income leaves them at 2.5% of the ribbon). */
 export const GOAL_FIT_RATIO = 1.6;
 
 export type GoalMark =

@@ -33,7 +33,7 @@ export function GoalResultsTable({
   // `max-content` rather than fixed pixels. The old 110/140/120 were sized
   // against a book in the tens of thousands; a goal projection runs to the
   // year it is aimed at, so by construction its last rows are the largest
-  // numbers in the app. On this book "DKK 2,000,000.00" needed 125px in a
+  // numbers in the app. A seven-figure "DKK 2,000,000.00" needed 125px in a
   // 120px column and rendered clipped. No pixel guess survives a long currency
   // code, a bigger book or a JPY ledger — sizing to the content does. The
   // label column stays `1fr` and the wrapper is already `overflow-x-auto`, so
