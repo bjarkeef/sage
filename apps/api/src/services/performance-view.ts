@@ -218,7 +218,19 @@ export async function buildPerformanceView(
       continue;
     }
     if (conversion.approximated) fxApproximated = true;
-    const amount = new Decimal(row.quantity).times(row.price).dividedBy(conversion.divisor);
+    // What reached the holder: the gross less the tax withheld, which is the
+    // row's fee. Withheld tax is not return — Snowball's period gain subtracts
+    // it, and so does the lifetime income figure here.
+    let amount = new Decimal(row.quantity).times(row.price).dividedBy(conversion.divisor);
+    if (row.fee != null && row.fee !== "" && !new Decimal(row.fee).isZero()) {
+      const feeConversion = series.fxLookup.rateOn(row.tradeDate, row.feeCurrency ?? row.currency);
+      if (feeConversion) {
+        if (feeConversion.approximated) fxApproximated = true;
+        amount = amount.minus(new Decimal(row.fee).dividedBy(feeConversion.divisor));
+      } else {
+        fxIncomplete = true;
+      }
+    }
     dividendsByDate.set(
       row.tradeDate,
       (dividendsByDate.get(row.tradeDate) ?? new Decimal(0)).plus(amount),
