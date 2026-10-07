@@ -57,34 +57,71 @@ export function paymentDistance(
     : fromCash;
 }
 
-/** A provider's ex-date can sit a day or two after the one the broker used. */
-const EX_DATE_SLACK_DAYS = 3;
+/** A provider's ex-date can sit up to a week after the one the broker used
+ *  (a fund's own ex-date against its secondary listing's). */
+const EX_DATE_SLACK_DAYS = 7;
 
-/** One-to-one nearest-first pairing: every (dividend, transaction) pair within
- *  the window is ranked by `paymentDistance`; greedily take pairs whose sides
- *  are both still free. Returns the indices of matched dividends. One-to-one is
- *  load-bearing for monthly payers — a single recorded payment must never
- *  satisfy two consecutive provider dividends (~30 days apart). */
+/** One-to-one, order-preserving pairing of provider payments with booked
+ *  dividends (pairs within `MATCH_WINDOW_DAYS` by `paymentDistance`): the most
+ *  pairs, then the least total distance. Returns the indices of matched
+ *  payments.
+ *
+ *  One-to-one is load-bearing for monthly payers — a single recorded payment
+ *  must never satisfy two consecutive provider dividends. Order-preserving
+ *  because bookings and payments both run in date order: a greedy
+ *  nearest-first pass let May's booking, three days after April's cash date,
+ *  claim April — stranding April's own ex-date booking and reporting May as
+ *  unbooked, which the reconciler then added a second time. */
 function matchedDividendIndices(
   payments: { exDate: string; cashDate: string }[],
   txDates: string[],
 ): Set<number> {
-  const pairs: { div: number; tx: number; dist: number }[] = [];
-  for (let i = 0; i < payments.length; i++) {
-    for (let j = 0; j < txDates.length; j++) {
-      const dist = paymentDistance(txDates[j]!, payments[i]!);
-      if (dist <= MATCH_WINDOW_DAYS) pairs.push({ div: i, tx: j, dist });
+  const p = payments
+    .map((pay, index) => ({ ...pay, index }))
+    .sort((a, b) => a.exDate.localeCompare(b.exDate) || a.index - b.index);
+  const t = [...txDates].sort();
+  const n = p.length;
+  const m = t.length;
+  // best[i][j]: optimal alignment of p[i..] with t[j..] — [pairs, -distance].
+  const best: [number, number][][] = Array.from({ length: n + 1 }, () =>
+    Array.from({ length: m + 1 }, () => [0, 0] as [number, number]),
+  );
+  const better = (a: [number, number], b: [number, number]) =>
+    a[0] !== b[0] ? a[0] > b[0] : a[1] > b[1];
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      let choice = best[i + 1]![j]!;
+      if (better(best[i]![j + 1]!, choice)) choice = best[i]![j + 1]!;
+      const dist = paymentDistance(t[j]!, p[i]!);
+      if (dist <= MATCH_WINDOW_DAYS) {
+        const next = best[i + 1]![j + 1]!;
+        const take: [number, number] = [next[0] + 1, next[1] - dist];
+        if (better(take, choice)) choice = take;
+      }
+      best[i]![j] = choice;
     }
   }
-  pairs.sort((a, b) => a.dist - b.dist || a.div - b.div || a.tx - b.tx);
-  const matchedDivs = new Set<number>();
-  const usedTxs = new Set<number>();
-  for (const p of pairs) {
-    if (matchedDivs.has(p.div) || usedTxs.has(p.tx)) continue;
-    matchedDivs.add(p.div);
-    usedTxs.add(p.tx);
+  const matched = new Set<number>();
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    const dist = paymentDistance(t[j]!, p[i]!);
+    const next = best[i + 1]![j + 1]!;
+    if (
+      dist <= MATCH_WINDOW_DAYS &&
+      best[i]![j]![0] === next[0] + 1 &&
+      best[i]![j]![1] === next[1] - dist
+    ) {
+      matched.add(p[i]!.index);
+      i++;
+      j++;
+    } else if (best[i]![j] === best[i + 1]![j]) {
+      i++;
+    } else {
+      j++;
+    }
   }
-  return matchedDivs;
+  return matched;
 }
 
 /**

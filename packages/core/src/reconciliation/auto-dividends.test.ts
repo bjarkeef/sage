@@ -258,6 +258,25 @@ describe("planAutoDividends", () => {
     expect(plan.map((p) => p.exDate)).toEqual(["2026-06-01"]);
   });
 
+  it("tolerates a provider ex-date up to a week after the broker's (a secondary listing)", () => {
+    // A monthly fund the broker books on its own ex-date, a week before the
+    // listing's ex-date the provider reports — each month to its own payment.
+    const plan = planAutoDividends({
+      transactions: [
+        buy("O", "50", "2026-01-01"),
+        divTx("O", "2026-04-07"),
+        divTx("O", "2026-05-08"),
+      ],
+      dividends: [
+        div("O", "2026-04-14", "2026-05-05", "0.27"),
+        div("O", "2026-05-14", "2026-06-04", "0.27"),
+      ],
+      ledger: [],
+      today: TODAY,
+    });
+    expect(plan).toEqual([]);
+  });
+
   it("tolerates a provider ex-date a day or two after the broker's", () => {
     const plan = planAutoDividends({
       transactions: [buy("KO", "100", "2026-01-01"), divTx("KO", "2026-05-14")],
@@ -269,10 +288,10 @@ describe("planAutoDividends", () => {
   });
 
   it("never pairs a booking with an ex-date still ahead of it", () => {
-    // Booked a week before the next ex-date and 25 days after the previous
+    // Booked 12 days before the next ex-date and 20 days after the previous
     // payment: it belongs to neither, so neither is claimed.
     const plan = planAutoDividends({
-      transactions: [buy("KO", "100", "2026-01-01"), divTx("KO", "2026-05-25")],
+      transactions: [buy("KO", "100", "2026-01-01"), divTx("KO", "2026-05-20")],
       dividends: [div("KO", "2026-04-01", "2026-04-30"), div("KO", "2026-06-01", "2026-06-20")],
       ledger: [],
       today: TODAY,
