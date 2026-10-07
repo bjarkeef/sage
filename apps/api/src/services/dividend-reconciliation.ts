@@ -91,14 +91,21 @@ export async function reconcileDividends(db: Database, userId: string): Promise<
   // Repair before planning: an auto-added dividend that a broker booking
   // already covers counted the payment twice. Deleting its transaction leaves
   // the ledger row as a tombstone, so it is never added again.
-  const liveAuto = await db
-    .select({
-      symbol: autoDividend.symbol,
-      exDate: autoDividend.exDate,
-      transactionId: autoDividend.transactionId,
-    })
-    .from(autoDividend)
-    .where(and(eq(autoDividend.portfolioId, portfolioId), isNotNull(autoDividend.transactionId)));
+  //
+  // Only rows still sourced "auto" are Sage's to remove. An import that adopts
+  // an auto-added payment turns the row into the broker's booking, and the
+  // ledger keeps pointing at it.
+  const autoSourced = new Set(txs.filter((t) => t.source === "auto").map((t) => t.id));
+  const liveAuto = (
+    await db
+      .select({
+        symbol: autoDividend.symbol,
+        exDate: autoDividend.exDate,
+        transactionId: autoDividend.transactionId,
+      })
+      .from(autoDividend)
+      .where(and(eq(autoDividend.portfolioId, portfolioId), isNotNull(autoDividend.transactionId)))
+  ).filter((a) => autoSourced.has(a.transactionId!));
   const superseded = new Set(
     supersededAutoDividends({
       dividends: divRows.map((r) => ({
@@ -115,7 +122,9 @@ export async function reconcileDividends(db: Database, userId: string): Promise<
     }),
   );
   if (superseded.size > 0) {
-    await db.delete(transaction).where(inArray(transaction.id, [...superseded]));
+    await db
+      .delete(transaction)
+      .where(and(inArray(transaction.id, [...superseded]), eq(transaction.source, "auto")));
   }
   const ledgerTxs = txs.filter((t) => !superseded.has(t.id));
 

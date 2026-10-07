@@ -404,4 +404,58 @@ describeDb("reconcileDividends", () => {
     divs = (await exbook()).filter((t) => t.type === "dividend");
     expect(divs).toHaveLength(1);
   });
+
+  it("never removes a broker booking an import adopted from an auto dividend", async () => {
+    // An import that finds Sage's auto-added copy of a payment adopts it: the
+    // row becomes the broker's, and the auto-dividend ledger still points at
+    // it. The supersede repair took every pointed-at row for Sage's own and
+    // deleted real bookings the broker had made.
+    await tdb.db.insert(instrument).values({
+      symbol: "ADOPTED",
+      name: "Adopted Booking Co",
+      exchange: "XNYS",
+      currency: "USD",
+      assetType: "stock",
+    });
+    await tdb.db.insert(transaction).values({
+      portfolioId,
+      instrumentSymbol: "ADOPTED",
+      type: "buy",
+      quantity: "10",
+      price: "20",
+      currency: "USD",
+      tradeDate: "2024-01-02",
+    });
+    await tdb.db.insert(dividendHistory).values({
+      symbol: "ADOPTED",
+      exDate: "2024-05-01",
+      amountPerShare: "0.30",
+      currency: "USD",
+      paymentDate: "2024-05-22",
+      paymentDateEstimated: false,
+      source: "test",
+    });
+    const [adopted] = await tdb.db
+      .insert(transaction)
+      .values({
+        portfolioId,
+        instrumentSymbol: "ADOPTED",
+        type: "dividend",
+        quantity: "10",
+        price: "0.30",
+        currency: "USD",
+        tradeDate: "2024-05-22",
+      })
+      .returning({ id: transaction.id });
+    await tdb.db
+      .insert(autoDividend)
+      .values({ portfolioId, symbol: "ADOPTED", exDate: "2024-05-01", transactionId: adopted!.id });
+
+    await forceNextRun();
+    await reconcileDividends(tdb.db, userId);
+    const divs = (await allTxs()).filter(
+      (t) => t.instrumentSymbol === "ADOPTED" && t.type === "dividend",
+    );
+    expect(divs.map((t) => t.id)).toEqual([adopted!.id]);
+  });
 });

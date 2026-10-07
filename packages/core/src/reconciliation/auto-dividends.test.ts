@@ -299,6 +299,59 @@ describe("planAutoDividends", () => {
     expect(plan.map((p) => p.exDate)).toEqual(["2026-04-01", "2026-06-01"]);
   });
 
+  it("pairs a semiannual payment the broker booked weeks after the provider's pay date", () => {
+    // Providers estimate some pay dates a month early; the broker's booking is
+    // the payment, and a second copy would count it twice.
+    const plan = planAutoDividends({
+      transactions: [buy("HALFCO", "100", "2024-12-02"), divTx("HALFCO", "2025-11-03", "GBP")],
+      dividends: [
+        div("HALFCO", "2025-03-06", "2025-03-27", "0.25", "GBP"),
+        div("HALFCO", "2025-09-04", "2025-09-29", "0.35", "GBP"),
+      ],
+      ledger: [],
+      today: TODAY,
+    });
+    expect(plan.map((p) => p.exDate)).toEqual(["2025-03-06"]);
+  });
+
+  it("pairs an annual payment booked eighteen days after the provider's pay date", () => {
+    const plan = planAutoDividends({
+      transactions: [buy("YEARCO", "5", "2024-01-03"), divTx("YEARCO", "2025-06-22", "EUR")],
+      dividends: [
+        div("YEARCO", "2024-05-15", "2024-06-05", "1.80", "EUR"),
+        div("YEARCO", "2025-05-14", "2025-06-04", "1.95", "EUR"),
+      ],
+      ledger: [],
+      today: TODAY,
+    });
+    expect(plan.map((p) => p.exDate)).toEqual(["2024-05-15"]);
+  });
+
+  it("keeps a monthly payer's window at ten days after the pay date", () => {
+    // Thirteen days late is a quarter of nothing for a monthly payer: the
+    // booking may be next month's, so neither payment is assumed booked.
+    const plan = planAutoDividends({
+      transactions: [buy("O", "100", "2026-01-01"), divTx("O", "2026-03-23")],
+      dividends: [
+        div("O", "2026-03-01", "2026-03-10", "0.27"),
+        div("O", "2026-04-01", "2026-04-10", "0.27"),
+      ],
+      ledger: [],
+      today: TODAY,
+    });
+    expect(plan.map((p) => p.exDate)).toEqual(["2026-03-01", "2026-04-01"]);
+  });
+
+  it("keeps the ten-day window for a payment with no neighbour to size it", () => {
+    const plan = planAutoDividends({
+      transactions: [buy("KO", "100", "2026-01-01"), divTx("KO", "2026-04-15")],
+      dividends: [div("KO", "2026-03-01", "2026-03-15")],
+      ledger: [],
+      today: TODAY,
+    });
+    expect(plan.map((p) => p.exDate)).toEqual(["2026-03-01"]);
+  });
+
   it("matches at exactly the 10-day boundary", () => {
     const plan = planAutoDividends({
       transactions: [buy("KO", "100", "2026-01-01"), divTx("KO", "2026-03-25")], // exactly 10 days
@@ -408,6 +461,21 @@ describe("supersededAutoDividends", () => {
       ],
     });
     expect(out).toEqual(["t-apr"]);
+  });
+
+  it("removes an auto-added payment the broker booked weeks after the provider's pay date", () => {
+    const out = supersededAutoDividends({
+      dividends: [
+        div("HALFCO", "2025-03-06", "2025-03-27", "0.25", "GBP"),
+        div("HALFCO", "2025-09-04", "2025-09-29", "0.35", "GBP"),
+      ],
+      booked: [
+        { symbol: "HALFCO", tradeDate: "2025-04-02" },
+        { symbol: "HALFCO", tradeDate: "2025-11-03" },
+      ],
+      auto: [{ symbol: "HALFCO", exDate: "2025-09-04", transactionId: "t-autumn" }],
+    });
+    expect(out).toEqual(["t-autumn"]);
   });
 
   it("scopes to the symbol", () => {

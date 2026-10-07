@@ -11,6 +11,7 @@ import {
   dividendHistory,
   assetProfile,
   customHolding,
+  fxRateDaily,
 } from "../db/schema";
 import { assetRoutes } from "./asset";
 import type { AppEnv } from "../middleware/session";
@@ -84,6 +85,13 @@ describeDb("GET /:slug — position extras and income block", () => {
       },
       { symbol: "KO", name: "Coca-Cola Co", exchange: "XNYS", currency: "USD", assetType: "stock" },
       {
+        symbol: "FEECO",
+        name: "Fee Example Co",
+        exchange: "XNYS",
+        currency: "USD",
+        assetType: "stock",
+      },
+      {
         symbol: "O",
         name: "Example Realty",
         exchange: "XNYS",
@@ -129,6 +137,49 @@ describeDb("GET /:slug — position extras and income block", () => {
       currency: "USD",
       tradeDate: "2025-01-02",
     });
+
+    // FEECO: a USD holding whose buy was charged in kroner, a dividend with tax
+    // withheld, and a sale with a dollar commission. Only the two commissions
+    // are fees; the withholding is income that never arrived.
+    await tdb.db.insert(fxRateDaily).values([
+      { date: "2025-01-02", currency: "USD", rate: "1.04" },
+      { date: "2025-01-02", currency: "DKK", rate: "7.46" },
+    ]);
+    await tdb.db.insert(transaction).values([
+      {
+        portfolioId,
+        instrumentSymbol: "FEECO",
+        type: "buy",
+        quantity: "10",
+        price: "20",
+        currency: "USD",
+        fee: "74.6",
+        feeCurrency: "DKK",
+        tradeDate: "2025-01-02",
+      },
+      {
+        portfolioId,
+        instrumentSymbol: "FEECO",
+        type: "dividend",
+        quantity: "10",
+        price: "1",
+        currency: "USD",
+        fee: "3",
+        feeCurrency: "USD",
+        tradeDate: "2025-03-03",
+      },
+      {
+        portfolioId,
+        instrumentSymbol: "FEECO",
+        type: "sell",
+        quantity: "5",
+        price: "25",
+        currency: "USD",
+        fee: "2",
+        feeCurrency: "USD",
+        tradeDate: "2025-04-01",
+      },
+    ]);
 
     await tdb.db.insert(dividendHistory).values([
       { symbol: "AAPL", exDate: exDate1, amountPerShare: "0.5", currency: "USD", source: "test" },
@@ -232,6 +283,24 @@ describeDb("GET /:slug — position extras and income block", () => {
     expect(typeof body.income.nextExDate === "string" || body.income.nextExDate === null).toBe(
       true,
     );
+  });
+
+  it("counts only trade commissions as fees, in the position's currency, and puts the buy's in cost", async () => {
+    const res = await app.request("/FEECO");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      position: {
+        feesPaid: { amount: string; currency: string };
+        costBasis: { amount: string; currency: string };
+      };
+    };
+    // 74.6 DKK at 7.46 per euro and 1.04 dollars per euro is $10.40, plus the
+    // sale's $2. The $3 withheld from the dividend is not a fee.
+    expect(body.position.feesPaid.currency).toBe("USD");
+    expect(Number(body.position.feesPaid.amount)).toBeCloseTo(12.4, 6);
+    // Five of ten shares remain; they cost $20 each plus half the buy's $10.40.
+    expect(body.position.costBasis.currency).toBe("USD");
+    expect(Number(body.position.costBasis.amount)).toBeCloseTo(105.2, 6);
   });
 
   it("returns held:false and a null yieldOnCost for a symbol with no position", async () => {
