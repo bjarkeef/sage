@@ -12,7 +12,7 @@ const ctx = {
   year: 2026,
   extent: { firstDay: today - 900, lastDay: today + 900 },
 };
-const totals = { total: 6400.5, paid: 0, confirmed: 400, estimated: 6000.5, count: 53 };
+const totals = { total: 6400.5, paid: 0, confirmed: 400, estimated: 6000.5, count: 48 };
 
 describe("TapeHud", () => {
   it("names the range and its dates, the figure, the split and the comparison", () => {

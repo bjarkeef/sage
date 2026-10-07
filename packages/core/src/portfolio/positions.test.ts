@@ -416,8 +416,8 @@ describe("computeDisposals", () => {
   // silently subtract one from the other.
   it("keeps cost and proceeds in the currencies they were paid in", () => {
     const d = computeDisposals([
-      buy("AAPL", "2", "1250.00", "2023-08-03", "DKK"),
-      sell("AAPL", "2", "190.5", "2024-08-05", "USD"),
+      buy("AAPL", "2", "1250.00", "2023-05-10", "DKK"),
+      sell("AAPL", "2", "190.5", "2024-06-03", "USD"),
     ]);
 
     expect(d[0]!.cost.currency).toBe("DKK");
