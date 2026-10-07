@@ -781,7 +781,11 @@ export async function buildValuationSeries(
  * series must be a TOTAL-RETURN series.**
  *
  * A portfolio's TWR folds dividend income into the return —
- * `r_t = (MV_t + D_t - F_t) / MV_{t-1} - 1` in `computeDailyReturns`. Measuring
+ * `r_t = (MV_t + D_t - F_t) / MV_{t-1} - 1` in `computeDailyReturns`, with
+ * `D_t` net of the tax withheld (what reached the holder). `^SP500TR`
+ * reinvests dividends gross, so against it a taxed book trails by roughly the
+ * withholding on its yield; an accumulating fund such as `IWDA.L` already
+ * suffers withholding inside the fund, so that comparison is like for like. Measuring
  * it against a *price* index compares a book that keeps its dividends to an
  * index that throws them away, and the gap the UI prints is then the
  * portfolio's skill plus the index's yield. That is not a rounding error:

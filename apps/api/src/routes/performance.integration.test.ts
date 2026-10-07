@@ -132,6 +132,9 @@ describeDb("GET /performance", () => {
         type: "dividend",
         quantity: "1",
         price: "5",
+        // $1.50 withheld: $3.50 reached the holder.
+        fee: "1.5",
+        feeCurrency: "USD",
         tradeDate: daysAgo(182),
       }),
     });
@@ -150,8 +153,11 @@ describeDb("GET /performance", () => {
 
     expect(body.insufficientData).toBe(false);
     expect(body.displayCurrency).toBe("USD");
-    // r1 = (110 + 5)/100 − 1 = 0.15 ; r2 = 121/110 − 1 = 0.10 ; TWR = 1.15×1.10 − 1
-    expect(body.twr).toBeCloseTo(0.265, 4);
+    // The dividend counts at what reached the holder — withheld tax is not
+    // return, and Snowball's period gain subtracts it too.
+    // r1 = (110 + 3.5)/100 − 1 = 0.135 ; r2 = 121/110 − 1 = 0.10 ;
+    // TWR = 1.135×1.10 − 1 = 0.2485
+    expect(body.twr).toBeCloseTo(0.2485, 4);
     // Single-currency book: nothing was converted, so nothing was approximated.
     expect(body.fxApproximated).toBe(false);
     expect(body.twrAnnualized).toBeNull(); // window ≤ 365 days
@@ -160,17 +166,17 @@ describeDb("GET /performance", () => {
     // rather than only in the unit test: this is the response field the
     // overview's headline reads.
     expect(body.lifetime!.realised.amount).toBe("0.00");
-    expect(Number(body.lifetime!.income.amount)).toBeCloseTo(5, 2);
+    expect(Number(body.lifetime!.income.amount)).toBeCloseTo(3.5, 2);
     expect(Number(body.lifetime!.total.amount)).toBeCloseTo(
-      Number(body.lifetime!.unrealised.amount) + 5,
+      Number(body.lifetime!.unrealised.amount) + 3.5,
       2,
     );
-    // stdev(0.15, 0.10) × √252 = 0.025/√2 … = 0.5612
-    expect(body.volatility).toBeCloseTo(0.5612, 3);
+    // stdev(0.135, 0.10) × √252 = (0.035/√2) × √252 = 0.3929
+    expect(body.volatility).toBeCloseTo(0.3929, 3);
     expect(body.maxDrawdown).toBeCloseTo(0, 6);
-    expect(body.bestDay!.value).toBeCloseTo(0.15, 4);
+    expect(body.bestDay!.value).toBeCloseTo(0.135, 4);
     expect(body.worstDay!.value).toBeCloseTo(0.1, 4);
-    expect(body.indexSeries.map((p) => Number(p.value.toFixed(4)))).toEqual([1, 1.15, 1.265]);
+    expect(body.indexSeries.map((p) => Number(p.value.toFixed(4)))).toEqual([1, 1.135, 1.2485]);
     expect(body.window!.days).toBeGreaterThan(300);
     expect(body.multiCurrency).toBe(false);
   });
