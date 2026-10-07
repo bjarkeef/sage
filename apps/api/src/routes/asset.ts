@@ -538,8 +538,8 @@ export function assetRoutes(
     if (customDTO?.income) {
       const rate = new Decimal(customDTO.income.yearlyPct).dividedBy(100);
       currentYield = Number(rate.toFixed(6));
-      // Reinvest credits (price-0 buys) drag FIFO average cost down and would
-      // inflate a price/cost YoC; the contractual rate is what the holding pays.
+      // The contractual rate is what the holding pays; a price/cost YoC would
+      // move with every deposit's timing.
       heldYieldOnCost = currentYield;
       if (customDTO.income.nextPaymentDate) {
         nextExDate = customDTO.income.nextPaymentDate;

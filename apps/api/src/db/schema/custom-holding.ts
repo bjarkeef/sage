@@ -41,7 +41,7 @@ export const customHolding = pgTable("custom_holding", {
   lastPaymentDate: date("last_payment_date"),
   /** Engine materializes due payments automatically. */
   autoAdd: boolean("auto_add").notNull().default(true),
-  /** Net income credited as shares (price-0 buy) instead of cash. */
+  /** Net income spent on units at the day's price instead of paid as cash. */
   reinvest: boolean("reinvest").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -78,10 +78,16 @@ export const customIncome = pgTable(
     transactionId: uuid("transaction_id").references(() => transaction.id, {
       onDelete: "set null",
     }),
+    /** The buy a reinvested payment bought with its net income. The payment
+     *  itself is `transactionId` (a dividend); null when paid out as cash. */
+    reinvestTransactionId: uuid("reinvest_transaction_id").references(() => transaction.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     unique("custom_income_identity").on(t.portfolioId, t.symbol, t.payDate),
     index("custom_income_transaction_id_idx").on(t.transactionId),
+    index("custom_income_reinvest_transaction_id_idx").on(t.reinvestTransactionId),
   ],
 );

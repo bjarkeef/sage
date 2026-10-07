@@ -11,20 +11,10 @@ import {
 import type { Database } from "../db/client";
 import { customHolding, customIncome, dividendHistory, transaction, user } from "../db/schema";
 import { getUserPortfolio } from "../auth";
-import { resolvePricePoints, type PricePoint } from "../market-data/manual-price-provider";
+import { resolvePricePoints } from "../market-data/manual-price-provider";
+import { convertReinvestCredits, priceOn } from "./reinvest-credits";
 
 const inFlightUsers = new Set<string>();
-
-/** price on a date = latest point at or before it (marks win over tx prices —
- *  resolvePricePoints already encodes that); zero before the first point. */
-function priceOn(points: PricePoint[], date: string): Decimal {
-  let price = new Decimal(0);
-  for (const p of points) {
-    if (p.date > date) break;
-    price = p.price;
-  }
-  return price;
-}
 
 /**
  * Materialize due custom-holding income payments (spec 2026-07-18 §3).
@@ -95,6 +85,9 @@ async function syncHolding(
   today: string,
 ): Promise<void> {
   const symbol = holding.symbol;
+  // Older imports recorded a reinvested payment as units at a price of zero;
+  // claiming below only recognises the payment-and-buy shape.
+  await convertReinvestCredits(db, portfolioId, symbol);
   const dueDates = incomePaymentDates({
     firstPaymentDate: holding.firstPaymentDate!,
     lastPaymentDate: holding.lastPaymentDate,
@@ -134,7 +127,6 @@ async function syncHolding(
       payDate,
       holding.reinvest,
       txRows,
-      points,
     );
     if (claimedExisting) continue;
 
@@ -178,7 +170,29 @@ async function syncHolding(
         .returning({ id: customIncome.id });
       if (claimedRow.length === 0) return; // raced or tombstoned
 
-      const [created] = holding.reinvest
+      // INVARIANT: every ledger `dividend` row's income (quantity × price)
+      // must be GROSS, uniformly — buildReceivedDividends reads it directly as
+      // received income, and the web client applies the user's flat tax rate
+      // on top of that. Writing net here would understate history AND get
+      // taxed a second time client-side. Tax is recorded separately via `fee`.
+      const [payment] = await dbtx
+        .insert(transaction)
+        .values({
+          portfolioId,
+          instrumentSymbol: symbol,
+          type: "dividend",
+          quantity: "1",
+          price: gross.toFixed(),
+          currency,
+          fee: tax.isZero() ? null : tax.toFixed(),
+          feeCurrency: tax.isZero() ? null : currency,
+          tradeDate: payDate,
+          source: "custom-income",
+        })
+        .returning({ id: transaction.id });
+      // Reinvested, the net buys units at the day's price — Snowball's model,
+      // so the payment is income and the units it bought are in cost basis.
+      const [credit] = holding.reinvest
         ? await dbtx
             .insert(transaction)
             .values({
@@ -186,38 +200,16 @@ async function syncHolding(
               instrumentSymbol: symbol,
               type: "buy",
               quantity: net.dividedBy(priceAtPay).toFixed(),
-              price: "0",
+              price: priceAtPay.toFixed(),
               currency,
-              fee: tax.isZero() ? null : tax.toFixed(),
-              feeCurrency: tax.isZero() ? null : currency,
               tradeDate: payDate,
               source: "custom-income",
             })
             .returning({ id: transaction.id })
-        : await dbtx
-            .insert(transaction)
-            .values({
-              portfolioId,
-              instrumentSymbol: symbol,
-              type: "dividend",
-              quantity: "1",
-              // INVARIANT: every ledger `dividend` row's income (quantity ×
-              // price) must be GROSS, uniformly — buildReceivedDividends
-              // reads it directly as received income, and the web client
-              // applies the user's flat tax rate on top of that. Writing net
-              // here would understate history AND get taxed a second time
-              // client-side. Tax is recorded separately via `fee`.
-              price: gross.toFixed(),
-              currency,
-              fee: tax.isZero() ? null : tax.toFixed(),
-              feeCurrency: tax.isZero() ? null : currency,
-              tradeDate: payDate,
-              source: "custom-income",
-            })
-            .returning({ id: transaction.id });
+        : [];
       await dbtx
         .update(customIncome)
-        .set({ transactionId: created!.id })
+        .set({ transactionId: payment!.id, reinvestTransactionId: credit?.id ?? null })
         .where(eq(customIncome.id, claimedRow[0]!.id));
 
       // amountPerShare uses shares held ON the ex-date INCLUDING the credit,
@@ -246,12 +238,11 @@ async function syncHolding(
 
 type TxRow = typeof transaction.$inferSelect;
 
-/** If an imported (source-null) row already records this payment — a price-0
- *  buy when reinvested, a dividend otherwise, on exactly the payment date
- *  (Snowball's export dates walk the same schedule) — claim it: ledger row,
- *  plus a dividend_history row reconstructed from broker values
- *  (gross = credited amount + FeeTax). Snowball's numbers win over
- *  recomputation for historical payments. */
+/** If an imported (source-null) dividend already records this payment, on
+ *  exactly the payment date (Snowball's export dates walk the same schedule),
+ *  claim it — and, reinvested, the buy it paid for on the same day: ledger row,
+ *  plus a dividend_history row from the broker's gross. Snowball's numbers win
+ *  over recomputation for historical payments. */
 async function claimImportedPayment(
   db: Database,
   portfolioId: string,
@@ -259,22 +250,26 @@ async function claimImportedPayment(
   payDate: string,
   reinvest: boolean,
   txRows: TxRow[],
-  points: PricePoint[],
 ): Promise<boolean> {
   const candidate = txRows.find(
-    (t) =>
-      t.tradeDate === payDate &&
-      t.source === null &&
-      (reinvest ? t.type === "buy" && new Decimal(t.price).isZero() : t.type === "dividend"),
+    (t) => t.tradeDate === payDate && t.source === null && t.type === "dividend",
   );
   if (!candidate) return false;
 
-  const price = priceOn(points, payDate);
-  const credited = reinvest
-    ? new Decimal(candidate.quantity).times(price)
-    : new Decimal(candidate.quantity).times(new Decimal(candidate.price));
-  const fee = candidate.fee === null ? new Decimal(0) : new Decimal(candidate.fee);
-  const gross = credited.plus(fee);
+  // A ledger dividend row is gross; the tax withheld is its fee.
+  const gross = new Decimal(candidate.quantity).times(new Decimal(candidate.price));
+  // The buy it paid for spends exactly the net, which tells it apart from a
+  // deposit made the same day.
+  const net = gross.minus(candidate.fee ? new Decimal(candidate.fee) : 0);
+  const credit = reinvest
+    ? txRows.find(
+        (t) =>
+          t.tradeDate === payDate &&
+          t.source === null &&
+          t.type === "buy" &&
+          new Decimal(t.quantity).times(t.price).minus(net).abs().lessThanOrEqualTo("0.01"),
+      )
+    : undefined;
 
   const positionTxs: PositionTransaction[] = txRows.map((t) => ({
     symbol: t.instrumentSymbol,
@@ -288,7 +283,13 @@ async function claimImportedPayment(
   await db.transaction(async (dbtx) => {
     const claimedRow = await dbtx
       .insert(customIncome)
-      .values({ portfolioId, symbol, payDate, transactionId: candidate.id })
+      .values({
+        portfolioId,
+        symbol,
+        payDate,
+        transactionId: candidate.id,
+        reinvestTransactionId: credit?.id ?? null,
+      })
       .onConflictDoNothing()
       .returning({ id: customIncome.id });
     if (claimedRow.length === 0) return;

@@ -16,6 +16,8 @@ import {
   user,
 } from "../db/schema";
 import { syncCustomIncome } from "../services/custom-income-sync";
+import { convertAllReinvestCredits } from "../services/reinvest-credits";
+import { computeRowHash } from "../import/dedupe";
 
 const header =
   "Event,Date,Symbol,Price,Quantity,Currency,FeeTax,Exchange,FeeCurrency,DoNotAdjustCash,Note";
@@ -615,7 +617,7 @@ describeDb("import routes", () => {
     expect(links).toHaveLength(1);
   });
 
-  it("imports a custom holding end-to-end: trades, marks, settings, then income sync claims the credit", async () => {
+  it("imports a custom holding end-to-end: trades, marks, settings, then income sync claims the payment", async () => {
     // The commit handler's post-import trigger calls syncCustomIncome with an
     // UNPINNED `now = new Date()`, while this test pins its own direct calls
     // to 2026-07-18. They only agree because that happens to be "today" —
@@ -645,7 +647,7 @@ describeDb("import routes", () => {
         customHoldings: number;
         priceMarks: number;
       };
-      expect(body.inserted).toBe(3); // 2 buys + 1 credit
+      expect(body.inserted).toBe(4); // 2 deposits + the payment and the buy it paid for
       expect(body.customHoldings).toBe(1);
       expect(body.priceMarks).toBe(1);
 
@@ -690,15 +692,118 @@ describeDb("import routes", () => {
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
 
-      // engine claimed the imported credit — no duplicate
+      // engine claimed the imported payment and its buy — no duplicate
       expect(ledger).toHaveLength(1);
       const txs = await tdb.db
         .select()
         .from(transaction)
         .where(eq(transaction.instrumentSymbol, "CASH_DKK"));
-      expect(txs).toHaveLength(3);
+      expect(txs).toHaveLength(4);
+      const payment = txs.find((t) => t.id === ledger[0]!.transactionId);
+      expect(payment).toMatchObject({ type: "dividend", price: "80.4898494576923" });
+      const credit = txs.find((t) => t.id === ledger[0]!.reinvestTransactionId);
+      expect(credit).toMatchObject({ type: "buy", quantity: "52.31840215", price: "1" });
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("recognises interest imported in the old shape, kept or deleted, when the export comes again", async () => {
+    // An older importer wrote each credit as units at a price of zero and
+    // recorded that identity. Converted since, the same export now parses into
+    // a payment and a buy — neither of which the ledger knows by its own hash.
+    const [pf] = await tdb.db.select().from(portfolio);
+    const portfolioId = pf!.id;
+    await tdb.db.insert(instrument).values({
+      symbol: "OLDSAVE",
+      name: "Old-shape savings",
+      exchange: "CUSTOM",
+      currency: "DKK",
+      assetType: "custom",
+    });
+    await tdb.db.insert(customHolding).values({
+      symbol: "OLDSAVE",
+      portfolioId,
+      holdingType: "savings",
+      incomeEnabled: true,
+      incomeYearlyPct: "2",
+      frequencyUnit: "quarter",
+      frequencyInterval: 1,
+      firstPaymentDate: "2025-03-31",
+      autoAdd: false,
+      reinvest: true,
+    });
+    const deposit = {
+      symbol: "OLDSAVE",
+      type: "buy",
+      quantity: "8000",
+      price: "1",
+      currency: "DKK",
+      tradeDate: "2025-01-06",
+    };
+    const kept = { ...deposit, quantity: "26", price: "0", tradeDate: "2025-03-31" };
+    const deleted = { ...deposit, quantity: "27", price: "0", tradeDate: "2025-06-30" };
+    const [depositTx, keptTx] = await tdb.db
+      .insert(transaction)
+      .values([
+        {
+          portfolioId,
+          instrumentSymbol: "OLDSAVE",
+          type: "buy",
+          quantity: "8000",
+          price: "1",
+          currency: "DKK",
+          tradeDate: "2025-01-06",
+        },
+        {
+          portfolioId,
+          instrumentSymbol: "OLDSAVE",
+          type: "buy",
+          quantity: "26",
+          price: "0",
+          currency: "DKK",
+          tradeDate: "2025-03-31",
+          fee: "14",
+          feeCurrency: "DKK",
+        },
+      ])
+      .returning({ id: transaction.id });
+    await tdb.db.insert(importRow).values([
+      {
+        portfolioId,
+        source: "snowball",
+        rowHash: computeRowHash(deposit),
+        transactionId: depositTx!.id,
+      },
+      { portfolioId, source: "snowball", rowHash: computeRowHash(kept), transactionId: keptTx!.id },
+      // The second payment was deleted after that import: a tombstone.
+      { portfolioId, source: "snowball", rowHash: computeRowHash(deleted), transactionId: null },
+    ]);
+    await convertAllReinvestCredits(tdb.db);
+
+    const file = csvFile(
+      'BUY,2025-01-06 00:00:00,OLDSAVE,"1","8000",DKK,"0",CUSTOM_HOLDING,"DKK","False",""',
+      'STOCK_AS_DIVIDEND,2025-03-31 00:00:00,OLDSAVE,"1","26",DKK,"14",CUSTOM_HOLDING,"","False",""',
+      'STOCK_AS_DIVIDEND,2025-06-30 00:00:00,OLDSAVE,"1","27",DKK,"14.5",CUSTOM_HOLDING,"","False",""',
+    );
+    const res = await app.request("/import/snowball/commit", {
+      method: "POST",
+      headers: { cookie },
+      body: formBodyWithRestore(file, true),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { inserted: number };
+    expect(body.inserted).toBe(0);
+
+    const rows = await tdb.db
+      .select()
+      .from(transaction)
+      .where(eq(transaction.instrumentSymbol, "OLDSAVE"));
+    // The deposit, and the kept payment as a dividend and its buy. The deleted
+    // payment does not come back.
+    expect(rows).toHaveLength(3);
+    expect(rows.filter((r) => r.type === "dividend").map((r) => r.tradeDate)).toEqual([
+      "2025-03-31",
+    ]);
   });
 });

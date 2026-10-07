@@ -91,19 +91,59 @@ describe("parseSnowballCSV", () => {
     expect(result.skipped).toHaveLength(0);
   });
 
-  it("maps custom STOCK_AS_DIVIDEND to a zero-price buy carrying the tax as fee", () => {
+  it("maps custom STOCK_AS_DIVIDEND to the payment and the buy it reinvests in", () => {
     const result = parseSnowballCSV(
       csv(
         'STOCK_AS_DIVIDEND,2026-04-30 00:00:00,CASH_DKK,"1","52.31840215",DKK,"28.1714473076923",CUSTOM_HOLDING,"","False",""',
       ),
     );
+    expect(result.transactions).toHaveLength(2);
+    const [payment, credit] = result.transactions;
+    // Gross is what was credited plus what was withheld; the tax is its fee.
+    expect(payment).toMatchObject({
+      type: "dividend",
+      quantity: "1",
+      price: "80.4898494576923",
+      fee: "28.1714473076923",
+      feeCurrency: "DKK",
+      tradeDate: "2026-04-30",
+    });
+    expect(credit).toMatchObject({
+      type: "buy",
+      quantity: "52.31840215",
+      price: "1",
+      fee: null,
+      feeCurrency: null,
+      tradeDate: "2026-04-30",
+    });
+    // Both name the row an older importer wrote, so a re-import of the same
+    // export still recognises a payment imported in the old shape.
+    const legacy = {
+      symbol: "CASH_DKK",
+      type: "buy",
+      tradeDate: "2026-04-30",
+      quantity: "52.31840215",
+      price: "0",
+      currency: "DKK",
+    };
+    expect(payment!.legacyRow).toEqual(legacy);
+    expect(credit!.legacyRow).toEqual(legacy);
+  });
+
+  it("keeps a STOCK_AS_DIVIDEND with no unit price as units credited at zero", () => {
+    // Nothing to value the units at here; the server converts them once it has
+    // a price for the day.
+    const result = parseSnowballCSV(
+      csv(
+        'STOCK_AS_DIVIDEND,2026-04-30 00:00:00,CASH_DKK,"0","52.31840215",DKK,"28.1714473076923",CUSTOM_HOLDING,"","False",""',
+      ),
+    );
     expect(result.transactions).toHaveLength(1);
-    const tx = result.transactions[0]!;
-    expect(tx.type).toBe("buy");
-    expect(tx.price).toBe("0");
-    expect(tx.quantity).toBe("52.31840215");
-    expect(tx.fee).toBe("28.1714473076923");
-    expect(tx.feeCurrency).toBe("DKK");
+    expect(result.transactions[0]).toMatchObject({
+      type: "buy",
+      price: "0",
+      fee: "28.1714473076923",
+    });
   });
 
   it("still skips non-custom STOCK_AS_DIVIDEND", () => {
